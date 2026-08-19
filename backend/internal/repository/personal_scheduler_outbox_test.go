@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
@@ -15,10 +16,14 @@ func TestPersonalSQLiteSchedulerOutboxContracts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open personal sqlite: %v", err)
 	}
-	defer func() { _ = drv.Close() }()
+	client := ent.NewClient(ent.Driver(drv))
+	defer func() { _ = client.Close() }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if err := client.Schema.Create(ctx); err != nil {
+		t.Fatalf("create Ent schema before Personal infrastructure: %v", err)
+	}
 	if err := ensurePersonalSQLiteInfrastructure(ctx, db); err != nil {
 		t.Fatalf("create personal infrastructure: %v", err)
 	}
