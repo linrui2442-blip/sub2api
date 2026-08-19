@@ -32,7 +32,7 @@ const (
 
 // Policy captures the non-SaaS boundaries of Personal Edition.
 type Policy struct {
-	MaxPrivateMembers int
+	MaxPrivateMembers  int
 	PublicRegistration bool
 	SelfServiceInvite  bool
 	PaymentsEnabled    bool
@@ -44,7 +44,7 @@ type Policy struct {
 // DefaultPolicy returns the locked V1 defaults.
 func DefaultPolicy() Policy {
 	return Policy{
-		MaxPrivateMembers: DefaultMaxPrivateMembers,
+		MaxPrivateMembers:  DefaultMaxPrivateMembers,
 		PublicRegistration: false,
 		SelfServiceInvite:  false,
 		PaymentsEnabled:    false,
