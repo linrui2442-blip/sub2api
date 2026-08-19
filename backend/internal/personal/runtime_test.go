@@ -9,6 +9,9 @@ func TestPrepareEnvironmentForPersonalBuild(t *testing.T) {
 	t.Setenv(EnvEnabled, "")
 	t.Setenv("RUN_MODE", "standard")
 	t.Setenv("SERVER_HOST", "")
+	for _, key := range personalDisabledBackgroundFeatureEnv {
+		t.Setenv(key, "true")
+	}
 
 	if !PrepareEnvironment("personal") {
 		t.Fatal("personal build must enable personal runtime")
@@ -18,6 +21,14 @@ func TestPrepareEnvironmentForPersonalBuild(t *testing.T) {
 	}
 	if got := os.Getenv("SERVER_HOST"); got != "127.0.0.1" {
 		t.Fatalf("personal runtime should default to loopback, got %q", got)
+	}
+	for _, key := range personalDisabledBackgroundFeatureEnv {
+		if got := os.Getenv(key); got != "false" {
+			t.Fatalf("personal runtime must hard-disable %s, got %q", key, got)
+		}
+	}
+	if got := os.Getenv("TOKEN_REFRESH_ENABLED"); got != "" {
+		t.Fatalf("personal runtime must not disable token refresh, got %q", got)
 	}
 }
 
@@ -41,11 +52,15 @@ func TestPrepareEnvironmentNoopWhenDisabled(t *testing.T) {
 	t.Setenv(EnvEnabled, "")
 	t.Setenv("RUN_MODE", "standard")
 	t.Setenv("SERVER_HOST", "0.0.0.0")
+	t.Setenv("OPS_ENABLED", "true")
 
 	if PrepareEnvironment("source") {
 		t.Fatal("normal source build must not enable personal runtime")
 	}
 	if got := os.Getenv("RUN_MODE"); got != "standard" {
 		t.Fatalf("disabled personal runtime must not rewrite run mode, got %q", got)
+	}
+	if got := os.Getenv("OPS_ENABLED"); got != "true" {
+		t.Fatalf("disabled personal runtime must not rewrite ops switch, got %q", got)
 	}
 }
