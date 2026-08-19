@@ -39,6 +39,10 @@ func (r *personalAdminAccountRepository) UpdateExtra(ctx context.Context, id int
 	return r.compat.UpdateExtra(ctx, id, updates)
 }
 
+func (r *personalAdminAccountRepository) BatchUpdateLastUsed(ctx context.Context, updates map[int64]time.Time) error {
+	return r.compat.BatchUpdateLastUsed(ctx, updates)
+}
+
 func (r *personalAdminAccountRepository) SetTempUnschedulable(ctx context.Context, id int64, until time.Time, reason string) error {
 	return r.compat.SetTempUnschedulable(ctx, id, until, reason)
 }
