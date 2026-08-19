@@ -6,7 +6,7 @@ on:
       - personal-v1
   pull_request:
     branches:
-      - personal-v1
+      - main
 
 permissions:
   contents: read
@@ -26,6 +26,20 @@ jobs:
         working-directory: backend
         run: go test ./internal/personal
 
+  personal-storage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Test Personal SQLite and local caches
+        working-directory: backend
+        run: go test ./internal/repository -run '^TestPersonal' -count=1
+
   windows-cross-compile:
     runs-on: ubuntu-latest
     steps:
@@ -36,10 +50,10 @@ jobs:
           check-latest: false
           cache: true
           cache-dependency-path: backend/go.sum
-      - name: Verify Windows server compilation
+      - name: Verify Windows Personal Edition compilation
         working-directory: backend
         env:
           GOOS: windows
           GOARCH: amd64
           CGO_ENABLED: "0"
-        run: go build -tags=embed -o ../sub2api-personal.exe ./cmd/server
+        run: go build -tags=embed -ldflags='-X main.BuildType=personal' -o ../sub2api-personal.exe ./cmd/server

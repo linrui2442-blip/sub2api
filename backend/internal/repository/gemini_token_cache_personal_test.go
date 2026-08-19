@@ -9,6 +9,14 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+func TestPersonalGeminiTokenCacheConstructor(t *testing.T) {
+	t.Setenv("SUB2_PERSONAL_MODE", "1")
+	cache := NewGeminiTokenCache(nil)
+	if _, ok := cache.(*personalGeminiTokenCache); !ok {
+		t.Fatalf("personal mode must select in-memory Gemini token cache, got %T", cache)
+	}
+}
+
 func TestPersonalGeminiTokenCacheTTLAndDelete(t *testing.T) {
 	cache := newPersonalGeminiTokenCache()
 	ctx := context.Background()
