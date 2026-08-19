@@ -8,6 +8,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/server/routes"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -123,13 +124,28 @@ func registerRoutes(
 	// 防止高频刷管理面接口打爆数据库（阈值可在系统设置中调整）。
 	panelRateLimiter := middleware2.NewPanelRateLimiter(redisClient, settingService)
 
-	// 注册各模块路由
-	routes.RegisterAuthRoutes(v1, h, jwtAuth, auditLog, redisClient, settingService, panelRateLimiter)
+	personalMode := personal.Enabled()
+
+	// Personal Edition exposes only login/session routes for already-provisioned
+	// users. Public registration, password recovery, promo/invitation, and social
+	// registration flows are intentionally not registered.
+	if personalMode {
+		routes.RegisterPersonalAuthRoutes(v1, h, jwtAuth, auditLog, redisClient, settingService, panelRateLimiter)
+	} else {
+		routes.RegisterAuthRoutes(v1, h, jwtAuth, auditLog, redisClient, settingService, panelRateLimiter)
+	}
+
+	// Authenticated member/admin capabilities remain available so the owner can
+	// manually manage a small private member set and each member can use an
+	// independent gateway API key.
 	routes.RegisterUserRoutes(v1, h, jwtAuth, auditLog, settingService, panelRateLimiter)
-	routes.RegisterModelPlazaRoutes(v1, h, optionalJWTAuth, settingService, panelRateLimiter)
 	routes.RegisterAdminRoutes(v1, h, adminAuth, auditLog, stepUpAuth, settingService, panelRateLimiter)
 	routes.RegisterGatewayRoutes(r, h, apiKeyAuth, apiKeyService, subscriptionService, opsService, settingService, compositeResolver, cfg)
-	routes.RegisterPaymentRoutes(v1, h.Payment, h.PaymentWebhook, h.Admin.Payment, jwtAuth, adminAuth, auditLog, settingService, panelRateLimiter)
 
-	handler.RegisterPageRoutes(v1, cfg.Pricing.DataDir, gin.HandlerFunc(jwtAuth), gin.HandlerFunc(adminAuth), settingService)
+	if !personalMode {
+		// Public/SaaS surfaces are deliberately absent from Personal Edition.
+		routes.RegisterModelPlazaRoutes(v1, h, optionalJWTAuth, settingService, panelRateLimiter)
+		routes.RegisterPaymentRoutes(v1, h.Payment, h.PaymentWebhook, h.Admin.Payment, jwtAuth, adminAuth, auditLog, settingService, panelRateLimiter)
+		handler.RegisterPageRoutes(v1, cfg.Pricing.DataDir, gin.HandlerFunc(jwtAuth), gin.HandlerFunc(adminAuth), settingService)
+	}
 }
