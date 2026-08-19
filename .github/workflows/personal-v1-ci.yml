@@ -73,3 +73,10 @@ jobs:
           GOARCH: amd64
           CGO_ENABLED: "0"
         run: go build -tags=embed -ldflags='-X main.BuildType=personal' -o ../sub2api-personal.exe ./cmd/server
+      - name: Upload Windows Personal Edition
+        uses: actions/upload-artifact@v7
+        with:
+          name: sub2api-personal-windows-x64
+          path: sub2api-personal.exe
+          if-no-files-found: error
+          retention-days: 7
