@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 )
 
@@ -46,8 +47,12 @@ func NewEmailQueueService(emailService *EmailService, workers int) *EmailQueueSe
 		workers:      workers,
 	}
 
-	// 启动工作协程
-	service.start()
+	// Personal Edition has no public email verification/password-reset surface.
+	// Keep the object inert while the shared AuthService/Wire graph is being
+	// reduced; the email subsystem will be removed from the final Personal graph.
+	if !personal.Enabled() {
+		service.start()
+	}
 
 	return service
 }
@@ -101,6 +106,9 @@ func (s *EmailQueueService) processTask(workerID int, task EmailTask) {
 
 // EnqueueVerifyCode 将验证码发送任务加入队列
 func (s *EmailQueueService) EnqueueVerifyCode(email, siteName string, locale ...string) error {
+	if personal.Enabled() {
+		return fmt.Errorf("email verification is disabled in personal mode")
+	}
 	task := EmailTask{
 		Email:    email,
 		SiteName: siteName,
@@ -119,6 +127,9 @@ func (s *EmailQueueService) EnqueueVerifyCode(email, siteName string, locale ...
 
 // EnqueuePasswordReset 将密码重置邮件任务加入队列
 func (s *EmailQueueService) EnqueuePasswordReset(email, siteName, resetURL string, locale ...string) error {
+	if personal.Enabled() {
+		return fmt.Errorf("password reset email is disabled in personal mode")
+	}
 	task := EmailTask{
 		Email:    email,
 		SiteName: siteName,
