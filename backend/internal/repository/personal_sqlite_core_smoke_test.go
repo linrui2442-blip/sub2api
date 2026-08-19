@@ -25,6 +25,9 @@ func TestPersonalSQLiteCoreAccountRepositorySmoke(t *testing.T) {
 	if err := client.Schema.Create(ctx); err != nil {
 		t.Fatalf("create schema: %v", err)
 	}
+	if err := ensurePersonalSQLiteInfrastructure(ctx, db); err != nil {
+		t.Fatalf("create personal infrastructure schema: %v", err)
+	}
 	if err := ensureSimpleModeDefaultGroups(ctx, client); err != nil {
 		t.Fatalf("seed simple-mode groups: %v", err)
 	}
