@@ -18,9 +18,10 @@ import (
 )
 
 // initPersonalEnt creates the single-file SQLite backend used by Personal
-// Edition. Upstream PostgreSQL migrations intentionally do not run here;
-// Ent's generated schema is the source of truth for the private single-node
-// runtime while the migration is still under development.
+// Edition. Upstream PostgreSQL migrations intentionally do not run here.
+// Generated Ent schemas cover application entities; a deliberately small
+// Personal infrastructure bootstrap covers hand-written migration tables that
+// the private GPT/Gemini gateway runtime still requires.
 func initPersonalEnt(cfg *config.Config) (*ent.Client, *sql.DB, error) {
 	dbPath, err := personal.SQLitePath()
 	if err != nil {
@@ -42,6 +43,10 @@ func initPersonalEnt(cfg *config.Config) (*ent.Client, *sql.DB, error) {
 	if err := client.Schema.Create(migrationCtx); err != nil {
 		_ = client.Close()
 		return nil, nil, fmt.Errorf("create personal sqlite schema: %w", err)
+	}
+	if err := ensurePersonalSQLiteInfrastructure(migrationCtx, db); err != nil {
+		_ = client.Close()
+		return nil, nil, err
 	}
 
 	// Reuse the upstream bootstrap secret contract so JWT/TOTP material remains
