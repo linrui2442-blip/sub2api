@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/ent"
-	_ "github.com/Wei-Shaw/sub2api/ent/runtime"
 	entgroup "github.com/Wei-Shaw/sub2api/ent/group"
+	_ "github.com/Wei-Shaw/sub2api/ent/runtime"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
