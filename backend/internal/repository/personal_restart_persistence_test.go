@@ -18,7 +18,8 @@ func TestPersonalRestartPreservesOAuthAccountAndRefreshEligibility(t *testing.T)
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 
-	// First process lifetime: create and refresh a GPT OAuth account.
+	// First process lifetime: create and refresh a GPT OAuth account through the
+	// same admin repository used by the Personal account-management UI.
 	drv1, db1, err := openPersonalSQLite(dbPath)
 	if err != nil {
 		t.Fatalf("open first Personal SQLite: %v", err)
@@ -40,7 +41,7 @@ func TestPersonalRestartPreservesOAuthAccountAndRefreshEligibility(t *testing.T)
 	}
 	rdb1 := redis1.Client()
 	scheduler1 := newSchedulerCacheWithChunkSizes(rdb1, defaultSchedulerSnapshotMGetChunkSize, defaultSchedulerSnapshotWriteChunkSize)
-	repo1 := NewPersonalAwareAccountRepository(client1, db1, scheduler1)
+	adminRepo1 := NewPersonalAwareAdminAccountRepository(client1, db1, scheduler1)
 
 	openAIGroup, err := client1.Group.Query().Where(entgroup.NameEQ(service.PlatformOpenAI + "-default")).Only(ctx)
 	if err != nil {
@@ -57,19 +58,15 @@ func TestPersonalRestartPreservesOAuthAccountAndRefreshEligibility(t *testing.T)
 		Status:      service.StatusActive,
 		Schedulable: true,
 	}
-	creator, ok := repo1.(service.AccountDuplicateRepository)
-	if !ok {
-		t.Fatalf("Personal repository must support atomic account/group creation, got %T", repo1)
-	}
-	if err := creator.CreateWithAccountGroups(ctx, account, []service.AccountGroup{{GroupID: openAIGroup.ID, Priority: 1}}); err != nil {
-		t.Fatalf("create restart account: %v", err)
+	if err := adminRepo1.CreateWithAccountGroups(ctx, account, []service.AccountGroup{{GroupID: openAIGroup.ID, Priority: 1}}); err != nil {
+		t.Fatalf("create restart account through Personal admin repository: %v", err)
 	}
 
-	updater, ok := repo1.(interface {
+	updater, ok := adminRepo1.(interface {
 		UpdateCredentials(context.Context, int64, map[string]any) error
 	})
 	if !ok {
-		t.Fatalf("Personal repository must expose SQLite-safe credential persistence, got %T", repo1)
+		t.Fatalf("Personal admin repository must expose SQLite-safe credential persistence, got %T", adminRepo1)
 	}
 	if err := updater.UpdateCredentials(ctx, account.ID, map[string]any{
 		"access_token":  "access-after-refresh",
