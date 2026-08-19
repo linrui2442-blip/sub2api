@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/google/uuid"
 )
@@ -72,6 +73,12 @@ func (s *SubscriptionExpiryService) SetNotificationEmailService(notificationEmai
 }
 
 func (s *SubscriptionExpiryService) Start() {
+	// Personal Edition has no commercial subscriptions or expiry-reminder email
+	// flow. Keep this upstream type inert until it is removed from the Personal
+	// dependency graph entirely.
+	if personal.Enabled() {
+		return
+	}
 	if s == nil || s.userSubRepo == nil || s.interval <= 0 {
 		return
 	}
