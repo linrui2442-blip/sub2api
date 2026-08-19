@@ -92,9 +92,18 @@ jobs:
       - name: Install frontend dependencies
         working-directory: frontend
         run: pnpm install --frozen-lockfile
-      - name: Build embedded frontend
+      - name: Build embedded Personal frontend
         working-directory: frontend
+        env:
+          VITE_PERSONAL_EDITION: "1"
         run: pnpm run build
+      - name: Verify SaaS routes are absent from Personal bundle
+        working-directory: frontend
+        run: |
+          if grep -R -E 'PurchaseSubscription|AdminPaymentDashboard|AdminAffiliateInvites|ModelPlaza|ForgotPassword' dist >/dev/null 2>&1; then
+            echo 'Commercial/public route markers leaked into Personal frontend bundle.'
+            exit 1
+          fi
       - uses: actions/setup-go@v6
         with:
           go-version-file: backend/go.mod
