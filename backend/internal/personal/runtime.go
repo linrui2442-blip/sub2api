@@ -1,0 +1,51 @@
+package personal
+
+import (
+	"os"
+	"strings"
+)
+
+const EnvEnabled = "SUB2_PERSONAL_MODE"
+
+// Enabled reports whether the current process is running with Personal Edition
+// routing/policy enabled.
+func Enabled() bool {
+	return truthy(os.Getenv(EnvEnabled))
+}
+
+// PrepareEnvironment activates the Personal Edition runtime for dedicated
+// personal builds or when SUB2_PERSONAL_MODE is explicitly enabled.
+//
+// Until the upstream config package gets a first-class personal run mode, we
+// intentionally force its recognized SIMPLE mode underneath Personal Edition.
+// This preserves upstream account/gateway behavior while disabling billing and
+// quota charging semantics. Personal-specific route restrictions are enforced
+// separately by the server router.
+func PrepareEnvironment(buildType string) bool {
+	if strings.EqualFold(strings.TrimSpace(buildType), ModeName) {
+		_ = os.Setenv(EnvEnabled, "1")
+	}
+	if !Enabled() {
+		return false
+	}
+
+	// Fail safe: Personal Edition always inherits upstream SIMPLE semantics.
+	_ = os.Setenv("RUN_MODE", "simple")
+
+	// Windows/local-first default. Operators may explicitly bind another
+	// address later (for example a trusted private LAN/VPN) by setting
+	// SERVER_HOST themselves.
+	if strings.TrimSpace(os.Getenv("SERVER_HOST")) == "" {
+		_ = os.Setenv("SERVER_HOST", "127.0.0.1")
+	}
+	return true
+}
+
+func truthy(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
