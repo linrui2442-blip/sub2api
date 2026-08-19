@@ -111,8 +111,15 @@ func runSetupServer() {
 	r.Use(middleware.CORS(config.CORSConfig{}))
 	r.Use(middleware.SecurityHeaders(config.CSPConfig{Enabled: true, Policy: config.DefaultCSPPolicy}, nil))
 
+	var personalInstalled chan struct{}
 	if personal.Enabled() {
-		setup.RegisterPersonalRoutes(r)
+		personalInstalled = make(chan struct{}, 1)
+		setup.RegisterPersonalRoutes(r, func() {
+			select {
+			case personalInstalled <- struct{}{}:
+			default:
+			}
+		})
 	} else {
 		setup.RegisterRoutes(r)
 	}
@@ -141,9 +148,46 @@ func runSetupServer() {
 		Protocols:         protocols,
 	}
 
-	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatalf("Failed to start setup server: %v", err)
+	if !personal.Enabled() {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("Failed to start setup server: %v", err)
+		}
+		return
 	}
+
+	serverErr := make(chan error, 1)
+	go func() {
+		serverErr <- server.ListenAndServe()
+	}()
+
+	select {
+	case err := <-serverErr:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("Failed to start setup server: %v", err)
+		}
+		return
+	case <-personalInstalled:
+		log.Println("Personal Edition setup completed; switching to main gateway...")
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("Failed to gracefully stop setup server: %v", err)
+	}
+	cancel()
+
+	// Wait briefly for ListenAndServe to release the port before the full app
+	// binds the same address. A graceful shutdown normally returns immediately.
+	select {
+	case err := <-serverErr:
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("Setup server stopped with error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		log.Println("Setup server shutdown wait timed out; continuing to main gateway")
+	}
+
+	runMainServer()
 }
 
 func runMainServer() {
