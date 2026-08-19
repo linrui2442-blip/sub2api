@@ -1,0 +1,45 @@
+name: Personal Edition CI
+
+on:
+  push:
+    branches:
+      - personal-v1
+  pull_request:
+    branches:
+      - personal-v1
+
+permissions:
+  contents: read
+
+jobs:
+  personal-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Test Personal Edition policy
+        working-directory: backend
+        run: go test ./internal/personal
+
+  windows-cross-compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Verify Windows server compilation
+        working-directory: backend
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: "0"
+        run: go build -tags=embed -o ../sub2api-personal.exe ./cmd/server
