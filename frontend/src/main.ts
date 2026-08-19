@@ -1,7 +1,6 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from './App.vue'
-import router from './router'
 import i18n, { initI18n } from './i18n'
 import { useAppStore } from '@/stores/app'
 import { updateFavicon } from '@/utils/branding'
@@ -30,6 +29,13 @@ function initThemeClass() {
   document.documentElement.classList.toggle('dark', shouldUseDark)
 }
 
+async function loadRouter() {
+  if (import.meta.env.VITE_PERSONAL_EDITION === '1') {
+    return (await import('./router/personal')).default
+  }
+  return (await import('./router')).default
+}
+
 async function bootstrap() {
   // Apply theme class globally before app mount to keep all routes consistent.
   initThemeClass()
@@ -50,6 +56,7 @@ async function bootstrap() {
   }
   updateFavicon(appStore.siteLogo)
 
+  const router = await loadRouter()
   await initI18n()
 
   app.use(router)
