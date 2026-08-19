@@ -7,6 +7,16 @@ import (
 
 const EnvEnabled = "SUB2_PERSONAL_MODE"
 
+var personalDisabledBackgroundFeatureEnv = []string{
+	"OPS_ENABLED",
+	"OPS_CLEANUP_ENABLED",
+	"DASHBOARD_AGGREGATION_ENABLED",
+	"USAGE_CLEANUP_ENABLED",
+	"BATCH_IMAGE_ENABLED",
+	"IMAGE_STORAGE_ENABLED",
+	"GATEWAY_CN_PROVIDERS_BALANCE_CHECK_ENABLED",
+}
+
 // Enabled reports whether the current process is running with Personal Edition
 // routing/policy enabled.
 func Enabled() bool {
@@ -31,6 +41,15 @@ func PrepareEnvironment(buildType string) bool {
 
 	// Fail safe: Personal Edition always inherits upstream SIMPLE semantics.
 	_ = os.Setenv("RUN_MODE", "simple")
+
+	// These upstream workers belong to SaaS operations/commercial or unrelated
+	// batch-provider surfaces. Personal Edition does not expose them, so keep the
+	// corresponding config hard-disabled while their shared Wire dependencies are
+	// being physically removed. OAuth token refresh, scheduler, account health
+	// and gateway concurrency are deliberately NOT disabled here.
+	for _, key := range personalDisabledBackgroundFeatureEnv {
+		_ = os.Setenv(key, "false")
+	}
 
 	// Route config, install lock, logs and other upstream DATA_DIR consumers to
 	// the same private user-scoped directory as the SQLite database. This makes
