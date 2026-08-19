@@ -2,21 +2,27 @@ package setup
 
 import (
 	"database/sql"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	_ "github.com/Wei-Shaw/sub2api/ent/runtime"
 	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/repository"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 	_ "modernc.org/sqlite"
 )
 
-func TestPersonalInstallCreatesLocalOwnerAndSecrets(t *testing.T) {
+func preparePersonalSetupTest(t *testing.T) string {
+	t.Helper()
 	viper.Reset()
-	defer viper.Reset()
+	t.Cleanup(viper.Reset)
 
 	dataDir := t.TempDir()
 	dbPath := filepath.Join(dataDir, "personal.db")
@@ -32,6 +38,11 @@ func TestPersonalInstallCreatesLocalOwnerAndSecrets(t *testing.T) {
 	if !NeedsSetup() {
 		t.Fatal("fresh Personal data directory must require setup")
 	}
+	return dbPath
+}
+
+func TestPersonalInstallCreatesLocalOwnerAndSecrets(t *testing.T) {
+	dbPath := preparePersonalSetupTest(t)
 
 	const (
 		email    = "owner@example.com"
@@ -81,5 +92,40 @@ func TestPersonalInstallCreatesLocalOwnerAndSecrets(t *testing.T) {
 	}
 	if secretCount != 2 {
 		t.Fatalf("expected JWT + TOTP persistent secrets, got %d", secretCount)
+	}
+}
+
+func TestPersonalInstallHandlerNotifiesAfterSuccess(t *testing.T) {
+	preparePersonalSetupTest(t)
+	gin.SetMode(gin.TestMode)
+
+	completed := make(chan struct{}, 1)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(
+		http.MethodPost,
+		"/setup/personal/install",
+		strings.NewReader(`{"admin":{"email":"owner@example.com","password":"PersonalPass123!"}}`),
+	)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	installPersonalHandler(ctx, func() {
+		select {
+		case completed <- struct{}{}:
+		default:
+		}
+	})
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("personal install handler status = %d, body=%s", recorder.Code, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), `"restart":false`) {
+		t.Fatalf("personal install response must advertise live transition: %s", recorder.Body.String())
+	}
+
+	select {
+	case <-completed:
+	case <-time.After(time.Second):
+		t.Fatal("personal install completion callback was not delivered")
 	}
 }
