@@ -16,6 +16,7 @@ const setupClient = axios.create({
 export interface SetupStatus {
   needs_setup: boolean
   step: string
+  personal?: boolean
 }
 
 export interface DatabaseConfig {
@@ -54,6 +55,10 @@ export interface InstallRequest {
   server: ServerConfig
 }
 
+export interface PersonalInstallRequest {
+  admin: AdminConfig
+}
+
 export interface InstallResponse {
   message: string
   restart: boolean
@@ -82,9 +87,18 @@ export async function testRedis(config: RedisConfig): Promise<void> {
 }
 
 /**
- * Perform installation
+ * Perform upstream installation
  */
 export async function install(config: InstallRequest): Promise<InstallResponse> {
   const response = await setupClient.post('/setup/install', config)
+  return response.data.data
+}
+
+/**
+ * Initialize Personal Edition. SQLite and the in-process cache/scheduler are
+ * automatic; only the local owner account is provided by the user.
+ */
+export async function installPersonal(config: PersonalInstallRequest): Promise<InstallResponse> {
+  const response = await setupClient.post('/setup/personal/install', config)
   return response.data.data
 }
