@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -20,6 +21,11 @@ type personalEmbeddedRedis struct {
 	done   chan struct{}
 	once   sync.Once
 }
+
+var (
+	personalEmbeddedRedisMu      sync.Mutex
+	personalEmbeddedRedisRuntime *personalEmbeddedRedis
+)
 
 func newPersonalEmbeddedRedis() (*personalEmbeddedRedis, error) {
 	mr := miniredis.NewMiniRedis()
@@ -82,6 +88,44 @@ func (r *personalEmbeddedRedis) Close() {
 		<-r.done
 		r.server.Close()
 	})
+}
+
+func getPersonalEmbeddedRedis() (*personalEmbeddedRedis, error) {
+	personalEmbeddedRedisMu.Lock()
+	defer personalEmbeddedRedisMu.Unlock()
+	if personalEmbeddedRedisRuntime != nil {
+		return personalEmbeddedRedisRuntime, nil
+	}
+	runtime, err := newPersonalEmbeddedRedis()
+	if err != nil {
+		return nil, err
+	}
+	personalEmbeddedRedisRuntime = runtime
+	return runtime, nil
+}
+
+func personalEmbeddedRedisClient() *redis.Client {
+	runtime, err := getPersonalEmbeddedRedis()
+	if err != nil {
+		// InitRedis historically cannot return an error. Failing to bind a random
+		// loopback port means the Personal runtime cannot safely start, so fail
+		// immediately instead of silently falling back to an external Redis.
+		panic(fmt.Sprintf("start Personal Edition embedded Redis: %v", err))
+	}
+	return runtime.Client()
+}
+
+// ClosePersonalEmbeddedRedis is idempotent and is exposed for tests and the
+// eventual Personal Edition shutdown path. Normal process exit also releases
+// the loopback listener.
+func ClosePersonalEmbeddedRedis() {
+	personalEmbeddedRedisMu.Lock()
+	runtime := personalEmbeddedRedisRuntime
+	personalEmbeddedRedisRuntime = nil
+	personalEmbeddedRedisMu.Unlock()
+	if runtime != nil {
+		runtime.Close()
+	}
 }
 
 func pingPersonalEmbeddedRedis(ctx context.Context, client *redis.Client) error {

@@ -10,6 +10,18 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+func TestPersonalInitRedisUsesEmbeddedRuntime(t *testing.T) {
+	t.Setenv("SUB2_PERSONAL_MODE", "1")
+	ClosePersonalEmbeddedRedis()
+	defer ClosePersonalEmbeddedRedis()
+
+	client := InitRedis(nil)
+	defer func() { _ = client.Close() }()
+	if err := pingPersonalEmbeddedRedis(context.Background(), client); err != nil {
+		t.Fatalf("Personal InitRedis must use embedded runtime: %v", err)
+	}
+}
+
 func TestPersonalEmbeddedRedisWallClockTTL(t *testing.T) {
 	runtime, err := newPersonalEmbeddedRedis()
 	if err != nil {
