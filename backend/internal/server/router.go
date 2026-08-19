@@ -9,6 +9,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	"github.com/Wei-Shaw/sub2api/internal/personal"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/server/routes"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -125,6 +126,20 @@ func registerRoutes(
 	panelRateLimiter := middleware2.NewPanelRateLimiter(redisClient, settingService)
 
 	personalMode := personal.Enabled()
+	if personalMode {
+		// The bootstrap server owns the mutable Personal setup routes. Once the
+		// full application is running, keep only this read-only status endpoint so
+		// the frontend can reliably redirect any future /setup visit back to login
+		// or the dashboard instead of falling through to the upstream DB/Redis
+		// wizard.
+		r.GET("/setup/status", func(c *gin.Context) {
+			response.Success(c, gin.H{
+				"needs_setup": false,
+				"step":        "complete",
+				"personal":    true,
+			})
+		})
+	}
 
 	// Personal Edition exposes only login/session routes for already-provisioned
 	// users. Public registration, password recovery, promo/invitation, and social
