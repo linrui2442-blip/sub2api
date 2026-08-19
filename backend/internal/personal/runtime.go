@@ -32,6 +32,16 @@ func PrepareEnvironment(buildType string) bool {
 	// Fail safe: Personal Edition always inherits upstream SIMPLE semantics.
 	_ = os.Setenv("RUN_MODE", "simple")
 
+	// Route config, install lock, logs and other upstream DATA_DIR consumers to
+	// the same private user-scoped directory as the SQLite database. This makes
+	// the Windows build portable from the user's point of view and avoids files
+	// leaking into whichever working directory launched the EXE.
+	if strings.TrimSpace(os.Getenv("DATA_DIR")) == "" {
+		if dataDir, err := DataDir(); err == nil && strings.TrimSpace(dataDir) != "" {
+			_ = os.Setenv("DATA_DIR", dataDir)
+		}
+	}
+
 	// Windows/local-first default. Operators may explicitly bind another
 	// address later (for example a trusted private LAN/VPN) by setting
 	// SERVER_HOST themselves.
