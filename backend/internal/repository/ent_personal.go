@@ -17,6 +17,8 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+const personalSecuritySecretKeyTOTP = "personal_totp_encryption_key"
+
 // initPersonalEnt creates the single-file SQLite backend used by Personal
 // Edition. Upstream PostgreSQL migrations intentionally do not run here.
 // Generated Ent schemas cover application entities; a deliberately small
@@ -49,10 +51,15 @@ func initPersonalEnt(cfg *config.Config) (*ent.Client, *sql.DB, error) {
 		return nil, nil, err
 	}
 
-	// Reuse the upstream bootstrap secret contract so JWT/TOTP material remains
-	// durable and the rest of the application does not need a Personal-specific
-	// authentication implementation.
+	// Reuse the upstream JWT bootstrap contract and persist a separate TOTP
+	// encryption key in the same local database. config.Load generates an
+	// ephemeral TOTP key when none is configured; Personal Edition replaces it
+	// with this durable value before any encrypted 2FA secret can be used.
 	if err := ensureBootstrapSecrets(migrationCtx, client, cfg); err != nil {
+		_ = client.Close()
+		return nil, nil, err
+	}
+	if err := ensurePersonalTOTPSecret(migrationCtx, client, cfg); err != nil {
 		_ = client.Close()
 		return nil, nil, err
 	}
@@ -77,6 +84,16 @@ func initPersonalEnt(cfg *config.Config) (*ent.Client, *sql.DB, error) {
 	}
 
 	return client, db, nil
+}
+
+func ensurePersonalTOTPSecret(ctx context.Context, client *ent.Client, cfg *config.Config) error {
+	secret, _, err := getOrCreateGeneratedSecuritySecret(ctx, client, personalSecuritySecretKeyTOTP, 32)
+	if err != nil {
+		return fmt.Errorf("ensure personal TOTP encryption key: %w", err)
+	}
+	cfg.Totp.EncryptionKey = secret
+	cfg.Totp.EncryptionKeyConfigured = true
+	return nil
 }
 
 func openPersonalSQLite(path string) (*entsql.Driver, *sql.DB, error) {
