@@ -16,8 +16,21 @@ AS $$
 DECLARE
     affected_date DATE;
     published_before DATE;
-    configured_timezone TEXT := current_setting('TimeZone');
+    configured_timezone TEXT;
 BEGIN
+    -- The rollup state owns the bucket timezone. Do not derive invalidation
+    -- dates from the PostgreSQL session timezone: CI, operators, and pooled
+    -- connections may run in UTC while persisted buckets use another zone.
+    SELECT closed_before, timezone_name
+    INTO published_before, configured_timezone
+    FROM usage_group_rollup_state
+    WHERE id = 1
+    FOR UPDATE;
+
+    IF configured_timezone IS NULL OR BTRIM(configured_timezone) = '' THEN
+        configured_timezone := current_setting('TimeZone');
+    END IF;
+
     IF TG_OP = 'DELETE' THEN
         affected_date := (OLD.created_at AT TIME ZONE configured_timezone)::date;
     ELSE
@@ -32,12 +45,6 @@ BEGIN
             );
         END IF;
     END IF;
-
-    SELECT closed_before
-    INTO published_before
-    FROM usage_group_rollup_state
-    WHERE id = 1
-    FOR UPDATE;
 
     IF published_before > affected_date THEN
         UPDATE usage_group_rollup_state
@@ -60,8 +67,20 @@ AS $$
 DECLARE
     affected_date DATE;
     published_before DATE;
-    configured_timezone TEXT := current_setting('TimeZone');
+    configured_timezone TEXT;
 BEGIN
+    -- Read and lock the same state row that publishes the watermark so an
+    -- insert cannot race a timezone/watermark transition across midnight.
+    SELECT closed_before, timezone_name
+    INTO published_before, configured_timezone
+    FROM usage_group_rollup_state
+    WHERE id = 1
+    FOR KEY SHARE;
+
+    IF configured_timezone IS NULL OR BTRIM(configured_timezone) = '' THEN
+        configured_timezone := current_setting('TimeZone');
+    END IF;
+
     SELECT MIN((created_at AT TIME ZONE configured_timezone)::date)
     INTO affected_date
     FROM inserted_usage_logs
@@ -70,12 +89,6 @@ BEGIN
     IF affected_date IS NULL THEN
         RETURN NULL;
     END IF;
-
-    SELECT closed_before
-    INTO published_before
-    FROM usage_group_rollup_state
-    WHERE id = 1
-    FOR KEY SHARE;
 
     IF published_before > affected_date THEN
         UPDATE usage_group_rollup_state
