@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/personal"
+	"github.com/Wei-Shaw/sub2api/internal/repository"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/spf13/viper"
 	_ "modernc.org/sqlite"
@@ -52,11 +53,11 @@ func TestPersonalInstallCreatesLocalOwnerAndSecrets(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	var (
-		storedEmail string
+		storedEmail  string
 		passwordHash string
-		role string
-		status string
-		concurrency int
+		role         string
+		status       string
+		concurrency  int
 	)
 	if err := db.QueryRow(`SELECT email, password_hash, role, status, concurrency FROM users LIMIT 1`).
 		Scan(&storedEmail, &passwordHash, &role, &status, &concurrency); err != nil {
@@ -69,8 +70,8 @@ func TestPersonalInstallCreatesLocalOwnerAndSecrets(t *testing.T) {
 	if !owner.CheckPassword(password) {
 		t.Fatal("Personal owner password hash does not validate")
 	}
-	if owner.Concurrency != personalOwnerConcurrency {
-		t.Fatalf("owner concurrency = %d, want %d", owner.Concurrency, personalOwnerConcurrency)
+	if owner.Concurrency != repository.PersonalOwnerConcurrency {
+		t.Fatalf("owner concurrency = %d, want %d", owner.Concurrency, repository.PersonalOwnerConcurrency)
 	}
 
 	var secretCount int
