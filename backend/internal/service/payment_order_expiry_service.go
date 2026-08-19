@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/google/uuid"
 )
 
@@ -55,6 +56,12 @@ func (s *PaymentOrderExpiryService) SetLeaderLock(lockCache LeaderLockCache, db 
 }
 
 func (s *PaymentOrderExpiryService) Start() {
+	// Personal Edition has no payment/order surface. Keep the upstream type
+	// available only while the shared Wire graph is being disentangled, but do
+	// not start any payment reconciliation/expiry worker in the Personal runtime.
+	if personal.Enabled() {
+		return
+	}
 	if s == nil || s.paymentSvc == nil || s.interval <= 0 {
 		return
 	}
