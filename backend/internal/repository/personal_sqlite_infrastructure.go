@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-// ensurePersonalSQLiteInfrastructure creates the small set of runtime tables
+// ensurePersonalSQLiteInfrastructure creates the small set of runtime objects
 // that upstream owns through hand-written PostgreSQL migrations rather than Ent
 // schemas. Keep this list intentionally narrow: Personal Edition should only
 // carry infrastructure required by its private GPT/Gemini gateway paths.
@@ -16,6 +16,16 @@ func ensurePersonalSQLiteInfrastructure(ctx context.Context, db *sql.DB) error {
 	}
 
 	statements := []string{
+		// Soft-delete aware uniqueness normally comes from upstream migration 016.
+		`CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_active
+			ON users(email) WHERE deleted_at IS NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS groups_name_unique_active
+			ON groups(name) WHERE deleted_at IS NULL`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS user_subscriptions_user_group_unique_active
+			ON user_subscriptions(user_id, group_id) WHERE deleted_at IS NULL`,
+
+		// Scheduler outbox is migration-owned upstream and is required by account
+		// mutation/snapshot propagation even in a single-process Personal runtime.
 		`CREATE TABLE IF NOT EXISTS scheduler_outbox (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			event_type TEXT NOT NULL,
