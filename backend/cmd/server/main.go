@@ -18,6 +18,7 @@ import (
 	_ "github.com/Wei-Shaw/sub2api/ent/runtime"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/setup"
@@ -34,7 +35,7 @@ var (
 	Version   = ""
 	Commit    = "unknown"
 	Date      = "unknown"
-	BuildType = "source" // "source" for manual builds, "release" for CI builds (set by ldflags)
+	BuildType = "source" // "source" for manual builds, "release"/"personal" for CI builds
 )
 
 func init() {
@@ -56,14 +57,22 @@ func main() {
 	logger.InitBootstrap()
 	defer logger.Sync()
 
+	// Dedicated Personal Edition builds activate themselves automatically.
+	// Source builds can opt in with SUB2_PERSONAL_MODE=1.
+	personalRuntime := personal.PrepareEnvironment(BuildType)
+
 	// Parse command line flags
 	setupMode := flag.Bool("setup", false, "Run setup wizard in CLI mode")
 	showVersion := flag.Bool("version", false, "Show version information")
 	flag.Parse()
 
 	if *showVersion {
-		log.Printf("Sub2API %s (commit: %s, built: %s)\n", Version, Commit, Date)
+		log.Printf("Sub2API %s (commit: %s, built: %s, build-type: %s)\n", Version, Commit, Date, BuildType)
 		return
+	}
+
+	if personalRuntime {
+		log.Println("Personal Edition runtime enabled: private routes + upstream SIMPLE semantics")
 	}
 
 	// CLI setup mode
@@ -139,7 +148,9 @@ func runMainServer() {
 	if err := logger.Init(logger.OptionsFromConfig(cfg.Log)); err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
-	if cfg.RunMode == config.RunModeSimple {
+	if personal.Enabled() {
+		log.Println("Personal Edition: public registration/payment/model-plaza routes are disabled")
+	} else if cfg.RunMode == config.RunModeSimple {
 		log.Println("⚠️  WARNING: Running in SIMPLE mode - billing and quota checks are DISABLED")
 	}
 
