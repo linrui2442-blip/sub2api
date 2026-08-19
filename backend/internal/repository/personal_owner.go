@@ -9,7 +9,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
-const personalOwnerConcurrency = 30
+const PersonalOwnerConcurrency = 30
 
 // CreatePersonalOwner creates the one initial administrator used by Personal
 // Edition. It intentionally bypasses public registration, invitation, billing,
@@ -32,11 +32,11 @@ func CreatePersonalOwner(ctx context.Context, client *ent.Client, email, passwor
 	}
 
 	owner := &service.User{
-		Email:       email,
-		Role:        service.RoleAdmin,
-		Status:      service.StatusActive,
-		Balance:     0,
-		Concurrency: personalOwnerConcurrency,
+		Email:        email,
+		Role:         service.RoleAdmin,
+		Status:       service.StatusActive,
+		Balance:      0,
+		Concurrency:  PersonalOwnerConcurrency,
 		SignupSource: "email",
 	}
 	if err := owner.SetPassword(password); err != nil {
