@@ -44,6 +44,20 @@ jobs:
         working-directory: backend
         run: go test ./internal/repository -run '^TestPersonal' -count=1
 
+  personal-setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Test owner-only first-run installation
+        working-directory: backend
+        run: go test ./internal/setup -run '^TestPersonal' -count=1 -timeout=3m
+
   personal-application:
     runs-on: ubuntu-latest
     steps:
