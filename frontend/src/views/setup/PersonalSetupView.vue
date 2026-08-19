@@ -20,9 +20,17 @@
         <div>
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white">初始化完成</h2>
           <p class="mt-2 text-sm leading-6 text-gray-500 dark:text-dark-400">
-            本地 SQLite 数据库、加密密钥和管理员账号已经创建。请关闭当前程序并重新打开，随后使用刚才的管理员账号登录。
+            <template v-if="waitingForGateway">
+              本地 SQLite 数据库、加密密钥和管理员账号已经创建，正在启动私人网关并进入登录页...
+            </template>
+            <template v-else>
+              本地服务启动时间超过预期。数据已经保存，可以刷新页面；如果仍无法进入登录页，再重新打开程序即可。
+            </template>
           </p>
         </div>
+        <button v-if="!waitingForGateway" class="btn btn-primary w-full" type="button" @click="goToLogin">
+          进入登录页
+        </button>
       </div>
 
       <form v-else class="space-y-5" @submit.prevent="submit">
@@ -95,7 +103,36 @@ const password = ref('')
 const confirmPassword = ref('')
 const submitting = ref(false)
 const completed = ref(false)
+const waitingForGateway = ref(false)
 const errorMessage = ref('')
+
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
+
+function goToLogin() {
+  window.location.replace('/login')
+}
+
+async function waitForGateway() {
+  waitingForGateway.value = true
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch('/api/v1/settings/public', {
+        cache: 'no-store',
+        credentials: 'same-origin'
+      })
+      if (response.ok) {
+        goToLogin()
+        return
+      }
+    } catch {
+      // Expected while the setup listener releases the port and the full
+      // application starts on the same address.
+    }
+    await sleep(500)
+  }
+  waitingForGateway.value = false
+}
 
 async function submit() {
   errorMessage.value = ''
@@ -121,6 +158,7 @@ async function submit() {
       }
     })
     completed.value = true
+    void waitForGateway()
   } catch (error: unknown) {
     errorMessage.value = error instanceof Error ? error.message : '初始化失败，请重试。'
   } finally {
