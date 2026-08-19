@@ -40,6 +40,20 @@ jobs:
         working-directory: backend
         run: go test ./internal/repository -run '^TestPersonal' -count=1
 
+  personal-application:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Boot full Personal Edition application
+        working-directory: backend
+        run: go test ./cmd/server -run '^TestPersonalApplicationBootSmoke$' -count=1 -timeout=5m
+
   windows-cross-compile:
     runs-on: ubuntu-latest
     steps:
