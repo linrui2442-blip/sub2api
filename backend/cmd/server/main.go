@@ -102,7 +102,7 @@ func main() {
 		}
 	}
 
-	runMainServer()
+	runMainServer(personalRuntime)
 }
 
 func runSetupServer() {
@@ -159,6 +159,7 @@ func runSetupServer() {
 	go func() {
 		serverErr <- server.ListenAndServe()
 	}()
+	personal.OpenLocalBrowser(addr, "/setup")
 
 	select {
 	case err := <-serverErr:
@@ -187,10 +188,12 @@ func runSetupServer() {
 		log.Println("Setup server shutdown wait timed out; continuing to main gateway")
 	}
 
-	runMainServer()
+	// The setup browser tab polls the main API and redirects itself to /login,
+	// so do not open a second browser tab during this transition.
+	runMainServer(false)
 }
 
-func runMainServer() {
+func runMainServer(openBrowser bool) {
 	cfg, err := config.LoadForBootstrap()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
@@ -231,6 +234,9 @@ func runMainServer() {
 	}()
 
 	log.Printf("Server started on %s", app.Server.Addr)
+	if openBrowser && personal.Enabled() {
+		personal.OpenLocalBrowser(app.Server.Addr, "/login")
+	}
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
