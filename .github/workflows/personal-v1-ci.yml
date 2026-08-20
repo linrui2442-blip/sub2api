@@ -17,14 +17,15 @@ permissions:
 
 jobs:
   wire-sync:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/personal-v1'
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          ref: personal-v1
+          fetch-depth: 0
       - uses: actions/setup-go@v6
         with:
           go-version-file: backend/go.mod
@@ -36,7 +37,7 @@ jobs:
         run: |
           go generate ./cmd/server
           cd ..
-          git show HEAD^:.github/workflows/personal-v1-ci.yml > .github/workflows/personal-v1-ci.yml
+          git show b198c70acbc41810b52ee4255051ec6c18da9a80:.github/workflows/personal-v1-ci.yml > .github/workflows/personal-v1-ci.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -- backend/cmd/server/wire_gen.go .github/workflows/personal-v1-ci.yml
