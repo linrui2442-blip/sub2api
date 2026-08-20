@@ -204,7 +204,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	apiKeyAuthMiddleware := middleware.ProvidePersonalAPIKeyAuthMiddleware(apiKeyService, configConfig)
 	auditLogMiddleware := middleware.NewAuditLogMiddleware(auditLogService)
 	stepUpAuthMiddleware := middleware.NewStepUpAuthMiddleware(totpService, userService, settingService)
-	engine := server.ProvidePersonalRouter(configConfig, handlers, jwtAuthMiddleware, adminAuthMiddleware, apiKeyAuthMiddleware, auditLogMiddleware, stepUpAuthMiddleware, apiKeyService, opsService, settingService, compositeRouteResolver, redisClient)
+	engine := server.ProvidePersonalRouter(configConfig, handlers, jwtAuthMiddleware, adminAuthMiddleware, apiKeyAuthMiddleware, auditLogMiddleware, stepUpAuthMiddleware, apiKeyService, opsService, settingService, compositeRouteResolver)
 	httpServer := server.ProvideHTTPServer(configConfig, engine)
 	tokenRefreshService := service.ProvideTokenRefreshService(accountRepository, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, grokOAuthService, compositeTokenCacheInvalidator, schedulerCache, configConfig, tempUnschedCache, privacyClientFactory, proxyRepository, oAuthRefreshAPI, openAIGatewayService)
 	v := providePersonalCleanup(client, redisClient, apiKeyService, opsService, schedulerSnapshotService, tokenRefreshService, usageRecordWorkerPool, oAuthService, openAIOAuthService, geminiOAuthService, openAIGatewayService, auditLogService, promptService)

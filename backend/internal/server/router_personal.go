@@ -13,7 +13,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/Wei-Shaw/sub2api/internal/web"
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 )
 
 const frameSrcRefreshTimeout = 5 * time.Second
@@ -34,7 +33,6 @@ func SetupPersonalRouter(
 	settingService *service.SettingService,
 	compositeResolver *service.CompositeRouteResolver,
 	cfg *config.Config,
-	redisClient *redis.Client,
 ) *gin.Engine {
 	middleware2.SetIngressRejectRecorder(opsService)
 
@@ -84,9 +82,9 @@ func SetupPersonalRouter(
 
 	routes.RegisterCommonRoutes(r)
 	v1 := r.Group("/api/v1")
-	panelRateLimiter := middleware2.NewPanelRateLimiter(redisClient, settingService)
+	panelRateLimiter := middleware2.NewPersonalPanelRateLimiter(settingService)
 
-	routes.RegisterPersonalAuthRoutes(v1, handlers, jwtAuth, auditLog, redisClient, settingService, panelRateLimiter)
+	routes.RegisterPersonalAuthRoutes(v1, handlers, jwtAuth, auditLog, settingService, panelRateLimiter)
 	routes.RegisterPersonalUserRoutes(v1, handlers, jwtAuth, auditLog, settingService, panelRateLimiter)
 	routes.RegisterPersonalAdminRoutes(v1, handlers, adminAuth, auditLog, stepUpAuth, settingService, panelRateLimiter)
 

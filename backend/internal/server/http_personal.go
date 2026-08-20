@@ -7,7 +7,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
-	"github.com/redis/go-redis/v9"
 )
 
 // PersonalProviderSet is the HTTP/server provider boundary used by the
@@ -31,7 +30,6 @@ func ProvidePersonalRouter(
 	opsService *service.OpsService,
 	settingService *service.SettingService,
 	compositeResolver *service.CompositeRouteResolver,
-	redisClient *redis.Client,
 ) *gin.Engine {
 	if cfg.Server.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
@@ -54,6 +52,5 @@ func ProvidePersonalRouter(
 		settingService,
 		compositeResolver,
 		cfg,
-		redisClient,
 	)
 }

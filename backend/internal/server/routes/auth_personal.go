@@ -9,7 +9,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 )
 
 // RegisterPersonalAuthRoutes exposes only the authentication surface needed by
@@ -21,11 +20,10 @@ func RegisterPersonalAuthRoutes(
 	h *handler.Handlers,
 	jwtAuth servermiddleware.JWTAuthMiddleware,
 	auditLog servermiddleware.AuditLogMiddleware,
-	redisClient *redis.Client,
 	settingService *service.SettingService,
 	panelRateLimiter *servermiddleware.PanelRateLimiter,
 ) {
-	rateLimiter := middleware.NewRateLimiter(redisClient)
+	rateLimiter := middleware.NewLocalRateLimiter()
 
 	auth := v1.Group("/auth")
 	auth.Use(servermiddleware.BackendModeAuthGuard(settingService))
