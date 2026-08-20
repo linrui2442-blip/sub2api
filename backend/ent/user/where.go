@@ -1454,29 +1454,6 @@ func HasUsageLogsWith(preds ...predicate.UsageLog) predicate.User {
 	})
 }
 
-// HasAttributeValues applies the HasEdge predicate on the "attribute_values" edge.
-func HasAttributeValues() predicate.User {
-	return predicate.User(func(s *sql.Selector) {
-		step := sqlgraph.NewStep(
-			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, AttributeValuesTable, AttributeValuesColumn),
-		)
-		sqlgraph.HasNeighbors(s, step)
-	})
-}
-
-// HasAttributeValuesWith applies the HasEdge predicate on the "attribute_values" edge with a given conditions (other predicates).
-func HasAttributeValuesWith(preds ...predicate.UserAttributeValue) predicate.User {
-	return predicate.User(func(s *sql.Selector) {
-		step := newAttributeValuesStep()
-		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
-			for _, p := range preds {
-				p(s)
-			}
-		})
-	})
-}
-
 // HasAuthIdentities applies the HasEdge predicate on the "auth_identities" edge.
 func HasAuthIdentities() predicate.User {
 	return predicate.User(func(s *sql.Selector) {

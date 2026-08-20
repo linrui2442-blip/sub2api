@@ -17,7 +17,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
-	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
 )
 
 // UserCreate is the builder for creating a User entity.
@@ -391,21 +390,6 @@ func (_c *UserCreate) AddUsageLogs(v ...*UsageLog) *UserCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddUsageLogIDs(ids...)
-}
-
-// AddAttributeValueIDs adds the "attribute_values" edge to the UserAttributeValue entity by IDs.
-func (_c *UserCreate) AddAttributeValueIDs(ids ...int64) *UserCreate {
-	_c.mutation.AddAttributeValueIDs(ids...)
-	return _c
-}
-
-// AddAttributeValues adds the "attribute_values" edges to the UserAttributeValue entity.
-func (_c *UserCreate) AddAttributeValues(v ...*UserAttributeValue) *UserCreate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _c.AddAttributeValueIDs(ids...)
 }
 
 // AddAuthIdentityIDs adds the "auth_identities" edge to the AuthIdentity entity by IDs.
@@ -802,22 +786,6 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(usagelog.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := _c.mutation.AttributeValuesIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.AttributeValuesTable,
-			Columns: []string{user.AttributeValuesColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(userattributevalue.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

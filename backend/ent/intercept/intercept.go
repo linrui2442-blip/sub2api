@@ -13,10 +13,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
 	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
-	"github.com/Wei-Shaw/sub2api/ent/channelmonitor"
-	"github.com/Wei-Shaw/sub2api/ent/channelmonitordailyrollup"
-	"github.com/Wei-Shaw/sub2api/ent/channelmonitorhistory"
-	"github.com/Wei-Shaw/sub2api/ent/channelmonitorrequesttemplate"
 	"github.com/Wei-Shaw/sub2api/ent/compositemodelroute"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
 	"github.com/Wei-Shaw/sub2api/ent/group"
@@ -32,8 +28,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
-	"github.com/Wei-Shaw/sub2api/ent/userattributedefinition"
-	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
 )
 
 // The Query interface represents an operation that queries a graph.
@@ -225,114 +219,6 @@ func (f TraverseAuthIdentityChannel) Traverse(ctx context.Context, q ent.Query) 
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.AuthIdentityChannelQuery", q)
-}
-
-// The ChannelMonitorFunc type is an adapter to allow the use of ordinary function as a Querier.
-type ChannelMonitorFunc func(context.Context, *ent.ChannelMonitorQuery) (ent.Value, error)
-
-// Query calls f(ctx, q).
-func (f ChannelMonitorFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
-	if q, ok := q.(*ent.ChannelMonitorQuery); ok {
-		return f(ctx, q)
-	}
-	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ChannelMonitorQuery", q)
-}
-
-// The TraverseChannelMonitor type is an adapter to allow the use of ordinary function as Traverser.
-type TraverseChannelMonitor func(context.Context, *ent.ChannelMonitorQuery) error
-
-// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
-func (f TraverseChannelMonitor) Intercept(next ent.Querier) ent.Querier {
-	return next
-}
-
-// Traverse calls f(ctx, q).
-func (f TraverseChannelMonitor) Traverse(ctx context.Context, q ent.Query) error {
-	if q, ok := q.(*ent.ChannelMonitorQuery); ok {
-		return f(ctx, q)
-	}
-	return fmt.Errorf("unexpected query type %T. expect *ent.ChannelMonitorQuery", q)
-}
-
-// The ChannelMonitorDailyRollupFunc type is an adapter to allow the use of ordinary function as a Querier.
-type ChannelMonitorDailyRollupFunc func(context.Context, *ent.ChannelMonitorDailyRollupQuery) (ent.Value, error)
-
-// Query calls f(ctx, q).
-func (f ChannelMonitorDailyRollupFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
-	if q, ok := q.(*ent.ChannelMonitorDailyRollupQuery); ok {
-		return f(ctx, q)
-	}
-	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ChannelMonitorDailyRollupQuery", q)
-}
-
-// The TraverseChannelMonitorDailyRollup type is an adapter to allow the use of ordinary function as Traverser.
-type TraverseChannelMonitorDailyRollup func(context.Context, *ent.ChannelMonitorDailyRollupQuery) error
-
-// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
-func (f TraverseChannelMonitorDailyRollup) Intercept(next ent.Querier) ent.Querier {
-	return next
-}
-
-// Traverse calls f(ctx, q).
-func (f TraverseChannelMonitorDailyRollup) Traverse(ctx context.Context, q ent.Query) error {
-	if q, ok := q.(*ent.ChannelMonitorDailyRollupQuery); ok {
-		return f(ctx, q)
-	}
-	return fmt.Errorf("unexpected query type %T. expect *ent.ChannelMonitorDailyRollupQuery", q)
-}
-
-// The ChannelMonitorHistoryFunc type is an adapter to allow the use of ordinary function as a Querier.
-type ChannelMonitorHistoryFunc func(context.Context, *ent.ChannelMonitorHistoryQuery) (ent.Value, error)
-
-// Query calls f(ctx, q).
-func (f ChannelMonitorHistoryFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
-	if q, ok := q.(*ent.ChannelMonitorHistoryQuery); ok {
-		return f(ctx, q)
-	}
-	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ChannelMonitorHistoryQuery", q)
-}
-
-// The TraverseChannelMonitorHistory type is an adapter to allow the use of ordinary function as Traverser.
-type TraverseChannelMonitorHistory func(context.Context, *ent.ChannelMonitorHistoryQuery) error
-
-// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
-func (f TraverseChannelMonitorHistory) Intercept(next ent.Querier) ent.Querier {
-	return next
-}
-
-// Traverse calls f(ctx, q).
-func (f TraverseChannelMonitorHistory) Traverse(ctx context.Context, q ent.Query) error {
-	if q, ok := q.(*ent.ChannelMonitorHistoryQuery); ok {
-		return f(ctx, q)
-	}
-	return fmt.Errorf("unexpected query type %T. expect *ent.ChannelMonitorHistoryQuery", q)
-}
-
-// The ChannelMonitorRequestTemplateFunc type is an adapter to allow the use of ordinary function as a Querier.
-type ChannelMonitorRequestTemplateFunc func(context.Context, *ent.ChannelMonitorRequestTemplateQuery) (ent.Value, error)
-
-// Query calls f(ctx, q).
-func (f ChannelMonitorRequestTemplateFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
-	if q, ok := q.(*ent.ChannelMonitorRequestTemplateQuery); ok {
-		return f(ctx, q)
-	}
-	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ChannelMonitorRequestTemplateQuery", q)
-}
-
-// The TraverseChannelMonitorRequestTemplate type is an adapter to allow the use of ordinary function as Traverser.
-type TraverseChannelMonitorRequestTemplate func(context.Context, *ent.ChannelMonitorRequestTemplateQuery) error
-
-// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
-func (f TraverseChannelMonitorRequestTemplate) Intercept(next ent.Querier) ent.Querier {
-	return next
-}
-
-// Traverse calls f(ctx, q).
-func (f TraverseChannelMonitorRequestTemplate) Traverse(ctx context.Context, q ent.Query) error {
-	if q, ok := q.(*ent.ChannelMonitorRequestTemplateQuery); ok {
-		return f(ctx, q)
-	}
-	return fmt.Errorf("unexpected query type %T. expect *ent.ChannelMonitorRequestTemplateQuery", q)
 }
 
 // The CompositeModelRouteFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -713,60 +599,6 @@ func (f TraverseUserAllowedGroup) Traverse(ctx context.Context, q ent.Query) err
 	return fmt.Errorf("unexpected query type %T. expect *ent.UserAllowedGroupQuery", q)
 }
 
-// The UserAttributeDefinitionFunc type is an adapter to allow the use of ordinary function as a Querier.
-type UserAttributeDefinitionFunc func(context.Context, *ent.UserAttributeDefinitionQuery) (ent.Value, error)
-
-// Query calls f(ctx, q).
-func (f UserAttributeDefinitionFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
-	if q, ok := q.(*ent.UserAttributeDefinitionQuery); ok {
-		return f(ctx, q)
-	}
-	return nil, fmt.Errorf("unexpected query type %T. expect *ent.UserAttributeDefinitionQuery", q)
-}
-
-// The TraverseUserAttributeDefinition type is an adapter to allow the use of ordinary function as Traverser.
-type TraverseUserAttributeDefinition func(context.Context, *ent.UserAttributeDefinitionQuery) error
-
-// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
-func (f TraverseUserAttributeDefinition) Intercept(next ent.Querier) ent.Querier {
-	return next
-}
-
-// Traverse calls f(ctx, q).
-func (f TraverseUserAttributeDefinition) Traverse(ctx context.Context, q ent.Query) error {
-	if q, ok := q.(*ent.UserAttributeDefinitionQuery); ok {
-		return f(ctx, q)
-	}
-	return fmt.Errorf("unexpected query type %T. expect *ent.UserAttributeDefinitionQuery", q)
-}
-
-// The UserAttributeValueFunc type is an adapter to allow the use of ordinary function as a Querier.
-type UserAttributeValueFunc func(context.Context, *ent.UserAttributeValueQuery) (ent.Value, error)
-
-// Query calls f(ctx, q).
-func (f UserAttributeValueFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
-	if q, ok := q.(*ent.UserAttributeValueQuery); ok {
-		return f(ctx, q)
-	}
-	return nil, fmt.Errorf("unexpected query type %T. expect *ent.UserAttributeValueQuery", q)
-}
-
-// The TraverseUserAttributeValue type is an adapter to allow the use of ordinary function as Traverser.
-type TraverseUserAttributeValue func(context.Context, *ent.UserAttributeValueQuery) error
-
-// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
-func (f TraverseUserAttributeValue) Intercept(next ent.Querier) ent.Querier {
-	return next
-}
-
-// Traverse calls f(ctx, q).
-func (f TraverseUserAttributeValue) Traverse(ctx context.Context, q ent.Query) error {
-	if q, ok := q.(*ent.UserAttributeValueQuery); ok {
-		return f(ctx, q)
-	}
-	return fmt.Errorf("unexpected query type %T. expect *ent.UserAttributeValueQuery", q)
-}
-
 // NewQuery returns the generic Query interface for the given typed query.
 func NewQuery(q ent.Query) (Query, error) {
 	switch q := q.(type) {
@@ -780,14 +612,6 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.AuthIdentityQuery, predicate.AuthIdentity, authidentity.OrderOption]{typ: ent.TypeAuthIdentity, tq: q}, nil
 	case *ent.AuthIdentityChannelQuery:
 		return &query[*ent.AuthIdentityChannelQuery, predicate.AuthIdentityChannel, authidentitychannel.OrderOption]{typ: ent.TypeAuthIdentityChannel, tq: q}, nil
-	case *ent.ChannelMonitorQuery:
-		return &query[*ent.ChannelMonitorQuery, predicate.ChannelMonitor, channelmonitor.OrderOption]{typ: ent.TypeChannelMonitor, tq: q}, nil
-	case *ent.ChannelMonitorDailyRollupQuery:
-		return &query[*ent.ChannelMonitorDailyRollupQuery, predicate.ChannelMonitorDailyRollup, channelmonitordailyrollup.OrderOption]{typ: ent.TypeChannelMonitorDailyRollup, tq: q}, nil
-	case *ent.ChannelMonitorHistoryQuery:
-		return &query[*ent.ChannelMonitorHistoryQuery, predicate.ChannelMonitorHistory, channelmonitorhistory.OrderOption]{typ: ent.TypeChannelMonitorHistory, tq: q}, nil
-	case *ent.ChannelMonitorRequestTemplateQuery:
-		return &query[*ent.ChannelMonitorRequestTemplateQuery, predicate.ChannelMonitorRequestTemplate, channelmonitorrequesttemplate.OrderOption]{typ: ent.TypeChannelMonitorRequestTemplate, tq: q}, nil
 	case *ent.CompositeModelRouteQuery:
 		return &query[*ent.CompositeModelRouteQuery, predicate.CompositeModelRoute, compositemodelroute.OrderOption]{typ: ent.TypeCompositeModelRoute, tq: q}, nil
 	case *ent.ErrorPassthroughRuleQuery:
@@ -816,10 +640,6 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.UserQuery, predicate.User, user.OrderOption]{typ: ent.TypeUser, tq: q}, nil
 	case *ent.UserAllowedGroupQuery:
 		return &query[*ent.UserAllowedGroupQuery, predicate.UserAllowedGroup, userallowedgroup.OrderOption]{typ: ent.TypeUserAllowedGroup, tq: q}, nil
-	case *ent.UserAttributeDefinitionQuery:
-		return &query[*ent.UserAttributeDefinitionQuery, predicate.UserAttributeDefinition, userattributedefinition.OrderOption]{typ: ent.TypeUserAttributeDefinition, tq: q}, nil
-	case *ent.UserAttributeValueQuery:
-		return &query[*ent.UserAttributeValueQuery, predicate.UserAttributeValue, userattributevalue.OrderOption]{typ: ent.TypeUserAttributeValue, tq: q}, nil
 	default:
 		return nil, fmt.Errorf("unknown query type %T", q)
 	}

@@ -280,14 +280,6 @@ type Account struct {
 	QuotaDailyResetAt    *string `json:"quota_daily_reset_at,omitempty"`
 	QuotaWeeklyResetAt   *string `json:"quota_weekly_reset_at,omitempty"`
 
-	// 配额通知配置
-	QuotaNotifyDailyEnabled    *bool    `json:"quota_notify_daily_enabled,omitempty"`
-	QuotaNotifyDailyThreshold  *float64 `json:"quota_notify_daily_threshold,omitempty"`
-	QuotaNotifyWeeklyEnabled   *bool    `json:"quota_notify_weekly_enabled,omitempty"`
-	QuotaNotifyWeeklyThreshold *float64 `json:"quota_notify_weekly_threshold,omitempty"`
-	QuotaNotifyTotalEnabled    *bool    `json:"quota_notify_total_enabled,omitempty"`
-	QuotaNotifyTotalThreshold  *float64 `json:"quota_notify_total_threshold,omitempty"`
-
 	// 影子账号关系（spark 维度影子）
 	ParentAccountID *int64 `json:"parent_account_id,omitempty"`
 	QuotaDimension  string `json:"quota_dimension,omitempty"`

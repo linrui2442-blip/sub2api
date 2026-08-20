@@ -24,14 +24,6 @@ type Tx struct {
 	AuthIdentity *AuthIdentityClient
 	// AuthIdentityChannel is the client for interacting with the AuthIdentityChannel builders.
 	AuthIdentityChannel *AuthIdentityChannelClient
-	// ChannelMonitor is the client for interacting with the ChannelMonitor builders.
-	ChannelMonitor *ChannelMonitorClient
-	// ChannelMonitorDailyRollup is the client for interacting with the ChannelMonitorDailyRollup builders.
-	ChannelMonitorDailyRollup *ChannelMonitorDailyRollupClient
-	// ChannelMonitorHistory is the client for interacting with the ChannelMonitorHistory builders.
-	ChannelMonitorHistory *ChannelMonitorHistoryClient
-	// ChannelMonitorRequestTemplate is the client for interacting with the ChannelMonitorRequestTemplate builders.
-	ChannelMonitorRequestTemplate *ChannelMonitorRequestTemplateClient
 	// CompositeModelRoute is the client for interacting with the CompositeModelRoute builders.
 	CompositeModelRoute *CompositeModelRouteClient
 	// ErrorPassthroughRule is the client for interacting with the ErrorPassthroughRule builders.
@@ -60,10 +52,6 @@ type Tx struct {
 	User *UserClient
 	// UserAllowedGroup is the client for interacting with the UserAllowedGroup builders.
 	UserAllowedGroup *UserAllowedGroupClient
-	// UserAttributeDefinition is the client for interacting with the UserAttributeDefinition builders.
-	UserAttributeDefinition *UserAttributeDefinitionClient
-	// UserAttributeValue is the client for interacting with the UserAttributeValue builders.
-	UserAttributeValue *UserAttributeValueClient
 
 	// lazily loaded.
 	client     *Client
@@ -200,10 +188,6 @@ func (tx *Tx) init() {
 	tx.AccountGroup = NewAccountGroupClient(tx.config)
 	tx.AuthIdentity = NewAuthIdentityClient(tx.config)
 	tx.AuthIdentityChannel = NewAuthIdentityChannelClient(tx.config)
-	tx.ChannelMonitor = NewChannelMonitorClient(tx.config)
-	tx.ChannelMonitorDailyRollup = NewChannelMonitorDailyRollupClient(tx.config)
-	tx.ChannelMonitorHistory = NewChannelMonitorHistoryClient(tx.config)
-	tx.ChannelMonitorRequestTemplate = NewChannelMonitorRequestTemplateClient(tx.config)
 	tx.CompositeModelRoute = NewCompositeModelRouteClient(tx.config)
 	tx.ErrorPassthroughRule = NewErrorPassthroughRuleClient(tx.config)
 	tx.Group = NewGroupClient(tx.config)
@@ -218,8 +202,6 @@ func (tx *Tx) init() {
 	tx.UsageLog = NewUsageLogClient(tx.config)
 	tx.User = NewUserClient(tx.config)
 	tx.UserAllowedGroup = NewUserAllowedGroupClient(tx.config)
-	tx.UserAttributeDefinition = NewUserAttributeDefinitionClient(tx.config)
-	tx.UserAttributeValue = NewUserAttributeValueClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.

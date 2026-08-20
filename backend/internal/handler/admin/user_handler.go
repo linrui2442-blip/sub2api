@@ -28,11 +28,11 @@ type UserWithConcurrency struct {
 
 // UserHandler handles admin user management
 type UserHandler struct {
-	adminService          service.AdminService
-	concurrencyService    *service.ConcurrencyService
-	totpService           *service.TotpService                // 角色提升为管理员的 step-up 门控
-	userService           *service.UserService
-	settingService        *service.SettingService // step-up 功能开关
+	adminService       service.AdminService
+	concurrencyService *service.ConcurrencyService
+	totpService        *service.TotpService // 角色提升为管理员的 step-up 门控
+	userService        *service.UserService
+	settingService     *service.SettingService // step-up 功能开关
 }
 
 // CreateUserRequest represents admin create user request
@@ -88,7 +88,6 @@ type BindUserAuthIdentityChannelRequest struct {
 //   - status: filter by user status
 //   - role: filter by user role
 //   - search: search in email, username
-//   - attr[{id}]: filter by custom attribute value, e.g. attr[1]=company
 //   - group_name: fuzzy filter by allowed group name
 //   - api_key_group_id: filter by the exact group bound to the user's API keys
 func (h *UserHandler) List(c *gin.Context) {
@@ -102,11 +101,10 @@ func (h *UserHandler) List(c *gin.Context) {
 	}
 
 	filters := service.UserListFilters{
-		Status:     c.Query("status"),
-		Role:       c.Query("role"),
-		Search:     search,
-		GroupName:  strings.TrimSpace(c.Query("group_name")),
-		Attributes: parseAttributeFilters(c),
+		Status:    c.Query("status"),
+		Role:      c.Query("role"),
+		Search:    search,
+		GroupName: strings.TrimSpace(c.Query("group_name")),
 	}
 	if raw := strings.TrimSpace(c.Query("api_key_group_id")); raw != "" {
 		if id, parseErr := strconv.ParseInt(raw, 10, 64); parseErr == nil && id > 0 {
@@ -151,29 +149,6 @@ func (h *UserHandler) List(c *gin.Context) {
 	}
 
 	response.Paginated(c, out, total, page, pageSize)
-}
-
-// parseAttributeFilters extracts attribute filters from query params
-// Format: attr[{attributeID}]=value, e.g. attr[1]=company&attr[2]=developer
-func parseAttributeFilters(c *gin.Context) map[int64]string {
-	result := make(map[int64]string)
-
-	// Get all query params and look for attr[*] pattern
-	for key, values := range c.Request.URL.Query() {
-		if len(values) == 0 || values[0] == "" {
-			continue
-		}
-		// Check if key matches pattern attr[{id}]
-		if len(key) > 5 && key[:5] == "attr[" && key[len(key)-1] == ']' {
-			idStr := key[5 : len(key)-1]
-			id, err := strconv.ParseInt(idStr, 10, 64)
-			if err == nil && id > 0 {
-				result[id] = values[0]
-			}
-		}
-	}
-
-	return result
 }
 
 // GetByID handles getting a user by ID

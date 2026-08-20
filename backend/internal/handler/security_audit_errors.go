@@ -9,7 +9,6 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
 	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
-	"github.com/Wei-Shaw/sub2api/internal/service"
 	coderws "github.com/coder/websocket"
 	"github.com/gin-gonic/gin"
 )
@@ -110,7 +109,7 @@ func googleSecurityAuditError(c *gin.Context, decision *securityaudit.Decision) 
 	}
 	requestID := ""
 	if c != nil && c.Request != nil {
-		requestID = contentModerationRequestID(c.Request.Context())
+		requestID = gatewayRequestID(c.Request.Context())
 	}
 	c.JSON(status, gin.H{"error": gin.H{
 		"code": status, "message": securityAuditMessage(decision), "status": googleStatus,
@@ -126,11 +125,6 @@ func writeSecurityAuditWSError(ctx context.Context, conn *coderws.Conn, decision
 	if conn == nil || decision == nil {
 		return
 	}
-	if decision.Legacy != nil && decision.Legacy.Blocked {
-		legacy := decision.Legacy
-		writeContentModerationWSError(ctx, conn, (legacyContentModerationDecision{legacy}).toService())
-		return
-	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -144,15 +138,6 @@ func writeSecurityAuditWSError(ctx context.Context, conn *coderws.Conn, decision
 	writeCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	_ = conn.Write(writeCtx, coderws.MessageText, payload)
-}
-
-type legacyContentModerationDecision struct{ value *securityaudit.LegacyDecision }
-
-func (d legacyContentModerationDecision) toService() *service.ContentModerationDecision {
-	if d.value == nil {
-		return nil
-	}
-	return &service.ContentModerationDecision{Allowed: d.value.Allowed, Blocked: d.value.Blocked, Flagged: d.value.Flagged, Message: d.value.Message, StatusCode: d.value.StatusCode, Action: d.value.Action}
 }
 
 func securityAuditWSCloseStatus(decision *securityaudit.Decision) coderws.StatusCode {

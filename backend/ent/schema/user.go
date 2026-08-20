@@ -62,7 +62,6 @@ func (User) Fields() []ent.Field {
 		field.String("username").
 			MaxLen(100).
 			Default(""),
-		// wechat field migrated to user_attribute_values (see migration 019)
 		field.String("notes").
 			SchemaType(map[string]string{dialect.Postgres: "text"}).
 			Default(""),
@@ -124,7 +123,6 @@ func (User) Edges() []ent.Edge {
 		edge.To("allowed_groups", Group.Type).
 			Through("user_allowed_groups", UserAllowedGroup.Type),
 		edge.To("usage_logs", UsageLog.Type),
-		edge.To("attribute_values", UserAttributeValue.Type),
 		edge.To("auth_identities", AuthIdentity.Type).
 			Annotations(entsql.OnDelete(entsql.Cascade)),
 		edge.To("pending_auth_sessions", PendingAuthSession.Type),

@@ -20,7 +20,6 @@ func ProvideGatewayHandler(
 	apiKeyService *service.APIKeyService,
 	usageRecordWorkerPool *service.UsageRecordWorkerPool,
 	errorPassthroughService *service.ErrorPassthroughService,
-	contentModerationService *service.ContentModerationService,
 	userMsgQueueService *service.UserMessageQueueService,
 	cfg *config.Config,
 	settingService *service.SettingService,
@@ -28,7 +27,7 @@ func ProvideGatewayHandler(
 ) *GatewayHandler {
 	h := NewGatewayHandler(gatewayService, openAIGatewayService, geminiCompatService, antigravityGatewayService,
 		userService, concurrencyService, requestEligibility, usageService, apiKeyService, usageRecordWorkerPool,
-		errorPassthroughService, contentModerationService, userMsgQueueService, cfg, settingService)
+		errorPassthroughService, userMsgQueueService, cfg, settingService)
 	h.securityAuditCoordinator = coordinator
 	return h
 }
@@ -41,14 +40,13 @@ func ProvideOpenAIGatewayHandler(
 	apiKeyService *service.APIKeyService,
 	usageRecordWorkerPool *service.UsageRecordWorkerPool,
 	errorPassthroughService *service.ErrorPassthroughService,
-	contentModerationService *service.ContentModerationService,
 	opsService *service.OpsService,
 	grokQuotaService *service.GrokQuotaService,
 	cfg *config.Config,
 	coordinator *securityaudit.Coordinator,
 ) *OpenAIGatewayHandler {
 	h := NewOpenAIGatewayHandler(gatewayService, concurrencyService, requestEligibility, apiKeyService,
-		usageRecordWorkerPool, errorPassthroughService, contentModerationService, opsService, cfg)
+		usageRecordWorkerPool, errorPassthroughService, opsService, cfg)
 	h.securityAuditCoordinator = coordinator
 	h.grokMediaEligibilityProber = grokQuotaService
 	return h

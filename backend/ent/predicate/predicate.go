@@ -21,18 +21,6 @@ type AuthIdentity func(*sql.Selector)
 // AuthIdentityChannel is the predicate function for authidentitychannel builders.
 type AuthIdentityChannel func(*sql.Selector)
 
-// ChannelMonitor is the predicate function for channelmonitor builders.
-type ChannelMonitor func(*sql.Selector)
-
-// ChannelMonitorDailyRollup is the predicate function for channelmonitordailyrollup builders.
-type ChannelMonitorDailyRollup func(*sql.Selector)
-
-// ChannelMonitorHistory is the predicate function for channelmonitorhistory builders.
-type ChannelMonitorHistory func(*sql.Selector)
-
-// ChannelMonitorRequestTemplate is the predicate function for channelmonitorrequesttemplate builders.
-type ChannelMonitorRequestTemplate func(*sql.Selector)
-
 // CompositeModelRoute is the predicate function for compositemodelroute builders.
 type CompositeModelRoute func(*sql.Selector)
 
@@ -74,9 +62,3 @@ type User func(*sql.Selector)
 
 // UserAllowedGroup is the predicate function for userallowedgroup builders.
 type UserAllowedGroup func(*sql.Selector)
-
-// UserAttributeDefinition is the predicate function for userattributedefinition builders.
-type UserAttributeDefinition func(*sql.Selector)
-
-// UserAttributeValue is the predicate function for userattributevalue builders.
-type UserAttributeValue func(*sql.Selector)

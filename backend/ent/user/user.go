@@ -69,8 +69,6 @@ const (
 	EdgeAllowedGroups = "allowed_groups"
 	// EdgeUsageLogs holds the string denoting the usage_logs edge name in mutations.
 	EdgeUsageLogs = "usage_logs"
-	// EdgeAttributeValues holds the string denoting the attribute_values edge name in mutations.
-	EdgeAttributeValues = "attribute_values"
 	// EdgeAuthIdentities holds the string denoting the auth_identities edge name in mutations.
 	EdgeAuthIdentities = "auth_identities"
 	// EdgePendingAuthSessions holds the string denoting the pending_auth_sessions edge name in mutations.
@@ -98,13 +96,6 @@ const (
 	UsageLogsInverseTable = "usage_logs"
 	// UsageLogsColumn is the table column denoting the usage_logs relation/edge.
 	UsageLogsColumn = "user_id"
-	// AttributeValuesTable is the table that holds the attribute_values relation/edge.
-	AttributeValuesTable = "user_attribute_values"
-	// AttributeValuesInverseTable is the table name for the UserAttributeValue entity.
-	// It exists in this package in order to avoid circular dependency with the "userattributevalue" package.
-	AttributeValuesInverseTable = "user_attribute_values"
-	// AttributeValuesColumn is the table column denoting the attribute_values relation/edge.
-	AttributeValuesColumn = "user_id"
 	// AuthIdentitiesTable is the table that holds the auth_identities relation/edge.
 	AuthIdentitiesTable = "auth_identities"
 	// AuthIdentitiesInverseTable is the table name for the AuthIdentity entity.
@@ -399,20 +390,6 @@ func ByUsageLogs(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
-// ByAttributeValuesCount orders the results by attribute_values count.
-func ByAttributeValuesCount(opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newAttributeValuesStep(), opts...)
-	}
-}
-
-// ByAttributeValues orders the results by attribute_values terms.
-func ByAttributeValues(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newAttributeValuesStep(), append([]sql.OrderTerm{term}, terms...)...)
-	}
-}
-
 // ByAuthIdentitiesCount orders the results by auth_identities count.
 func ByAuthIdentitiesCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -473,13 +450,6 @@ func newUsageLogsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(UsageLogsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, UsageLogsTable, UsageLogsColumn),
-	)
-}
-func newAttributeValuesStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(AttributeValuesInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.O2M, false, AttributeValuesTable, AttributeValuesColumn),
 	)
 }
 func newAuthIdentitiesStep() *sqlgraph.Step {

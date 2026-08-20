@@ -208,7 +208,6 @@ const (
 	SettingKeyAffiliateRebatePerInviteeCap        = "affiliate_rebate_per_invitee_cap" // 单人返利上限（0=无上限）
 	SettingKeyAffiliateAdminRechargeEnabled       = "affiliate_admin_recharge_enabled" // 管理员充值是否产生返利
 	SettingKeyRiskControlEnabled                  = "risk_control_enabled"             // 是否启用风控中心入口与审计链路
-	SettingKeyContentModerationConfig             = "content_moderation_config"        // 内容审计配置（JSON）
 	SettingKeyCyberSessionBlockEnabled            = "cyber_session_block_enabled"      // cyber 命中后会话级自动屏蔽总开关(默认关)
 	SettingKeyCyberSessionBlockTTLSeconds         = "cyber_session_block_ttl_seconds"  // 会话屏蔽 TTL 秒数(默认 3600)
 	SettingKeyLoginAgreementEnabled               = "login_agreement_enabled"          // 登录前是否要求同意条款
@@ -430,59 +429,11 @@ const (
 	// SettingKeyOpsMonitoringEnabled is a DB-backed soft switch to enable/disable ops module at runtime.
 	SettingKeyOpsMonitoringEnabled = "ops_monitoring_enabled"
 
-	// SettingKeyOpsRealtimeMonitoringEnabled controls realtime features (e.g. WS/QPS push).
-	SettingKeyOpsRealtimeMonitoringEnabled = "ops_realtime_monitoring_enabled"
-
-	// SettingKeyOpsQueryModeDefault controls the default query mode for ops dashboard (auto/raw/preagg).
-	SettingKeyOpsQueryModeDefault = "ops_query_mode_default"
-
-	// SettingKeyOpsEmailNotificationConfig stores JSON config for ops email notifications.
-	SettingKeyOpsEmailNotificationConfig = "ops_email_notification_config"
-
-	// SettingKeyOpsAlertRuntimeSettings stores JSON config for ops alert evaluator runtime settings.
-	SettingKeyOpsAlertRuntimeSettings = "ops_alert_runtime_settings"
-
-	// SettingKeyOpsMetricsIntervalSeconds controls the ops metrics collector interval (>=60).
-	SettingKeyOpsMetricsIntervalSeconds = "ops_metrics_interval_seconds"
-
-	// SettingKeyOpsAdvancedSettings stores JSON config for ops advanced settings (data retention, aggregation).
+	// SettingKeyOpsAdvancedSettings stores local error-log retention and routing diagnostics policy.
 	SettingKeyOpsAdvancedSettings = "ops_advanced_settings"
 
 	// SettingKeyOpsRuntimeLogConfig stores JSON config for runtime log settings.
 	SettingKeyOpsRuntimeLogConfig = "ops_runtime_log_config"
-
-	// =========================
-	// Channel Monitor (渠道监控)
-	// =========================
-
-	// SettingKeyChannelMonitorEnabled is a DB-backed soft switch for the channel monitor feature.
-	// When false: runner skips scheduling and user-facing endpoints return an empty list.
-	SettingKeyChannelMonitorEnabled = "channel_monitor_enabled"
-
-	// SettingKeyChannelMonitorMode selects exclusive implementation:
-	// "v1" active probes, "v2" passive aggregation. Default "v1" (opt-in to v2).
-	SettingKeyChannelMonitorMode = "channel_monitor_mode"
-
-	// ChannelMonitorModeV1/V2 are the only accepted mode values.
-	ChannelMonitorModeV1 = "v1"
-	ChannelMonitorModeV2 = "v2"
-
-	// SettingKeyChannelMonitorDefaultIntervalSeconds controls the default interval (seconds)
-	// pre-filled when creating a new channel monitor from the admin UI. Range: [15, 3600].
-	SettingKeyChannelMonitorDefaultIntervalSeconds = "channel_monitor_default_interval_seconds"
-
-	// SettingKeyChannelMonitorHideThroughput hides RPM/TPM (and similar absolute
-	// throughput rates) from non-admin user-facing monitor APIs and UI, so users
-	// cannot reverse-estimate fleet volume from rates × window length.
-	// Default false (show rates). Admin endpoints always keep full metrics.
-	SettingKeyChannelMonitorHideThroughput = "channel_monitor_hide_throughput"
-
-	// SettingKeyChannelMonitorShowQuota controls whether quota/balance snapshots
-	// attached to channel monitors (check_mode=quota/quota_probe) are exposed on
-	// the user-facing monitor APIs and UI. Default false (hidden); parsed
-	// fail-closed (only the literal "true" enables it). Admin endpoints always
-	// keep the full snapshots regardless of this flag.
-	SettingKeyChannelMonitorShowQuota = "channel_monitor_show_quota"
 
 	// SettingKeyGrokDefaultTextModel is the fallback Grok text model for empty
 	// request models and built-in Grok aliases (e.g. "grok" → this id). Default grok-4.5.

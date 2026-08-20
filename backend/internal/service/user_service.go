@@ -74,7 +74,6 @@ type UserListFilters struct {
 	// bound to this group (api_keys.group_id). 0 = no filter. Covers all three
 	// group types since it matches the key's group directly, not allowed_groups.
 	APIKeyGroupID int64
-	Attributes    map[int64]string // Custom attribute filters: attributeID -> value
 	// IncludeSubscriptions controls whether ListWithFilters should load active subscriptions.
 	// For large datasets this can be expensive; admin list pages should enable it on demand.
 	// nil means not specified (default: load subscriptions for backward compatibility).
@@ -1251,26 +1250,6 @@ func (s *UserService) sendNotifyVerifyEmail(ctx context.Context, emailService *E
 	if s.settingRepo != nil {
 		if name, err := s.settingRepo.GetValue(ctx, SettingKeySiteName); err == nil && name != "" {
 			siteName = name
-		}
-	}
-	if emailService.notificationEmailService != nil {
-		if err := emailService.notificationEmailService.Send(ctx, NotificationEmailSendInput{
-			Event:          NotificationEmailEventNotificationEmailVerifyCode,
-			Locale:         locale,
-			RecipientEmail: email,
-			RecipientName:  emailRecipientName(email),
-			UserID:         userID,
-			Variables: map[string]string{
-				"verification_code":  code,
-				"expires_in_minutes": strconv.Itoa(int(verifyCodeTTL / time.Minute)),
-			},
-		}); err == nil {
-			return nil
-		} else {
-			if !shouldFallbackNotificationEmail(err) {
-				return err
-			}
-			slog.Warn("template notification email verification failed; falling back to built-in body", "recipient_hash", notificationEmailHash(email), "err", err.Error())
 		}
 	}
 	subject := fmt.Sprintf("[%s] 通知邮箱验证码 / Notification Email Verification", siteName)

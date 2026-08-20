@@ -335,25 +335,6 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 			}
 		}
 
-		// 配额通知配置
-		if enabled := a.GetQuotaNotifyDailyEnabled(); enabled {
-			out.QuotaNotifyDailyEnabled = &enabled
-		}
-		if threshold := a.GetQuotaNotifyDailyThreshold(); threshold > 0 {
-			out.QuotaNotifyDailyThreshold = &threshold
-		}
-		if enabled := a.GetQuotaNotifyWeeklyEnabled(); enabled {
-			out.QuotaNotifyWeeklyEnabled = &enabled
-		}
-		if threshold := a.GetQuotaNotifyWeeklyThreshold(); threshold > 0 {
-			out.QuotaNotifyWeeklyThreshold = &threshold
-		}
-		if enabled := a.GetQuotaNotifyTotalEnabled(); enabled {
-			out.QuotaNotifyTotalEnabled = &enabled
-		}
-		if threshold := a.GetQuotaNotifyTotalThreshold(); threshold > 0 {
-			out.QuotaNotifyTotalThreshold = &threshold
-		}
 	}
 
 	return out

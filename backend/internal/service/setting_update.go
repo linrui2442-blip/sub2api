@@ -390,20 +390,6 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 
 	// Ops monitoring (vNext)
 	updates[SettingKeyOpsMonitoringEnabled] = strconv.FormatBool(settings.OpsMonitoringEnabled)
-	updates[SettingKeyOpsRealtimeMonitoringEnabled] = strconv.FormatBool(settings.OpsRealtimeMonitoringEnabled)
-	updates[SettingKeyOpsQueryModeDefault] = string(ParseOpsQueryMode(settings.OpsQueryModeDefault))
-	if settings.OpsMetricsIntervalSeconds > 0 {
-		updates[SettingKeyOpsMetricsIntervalSeconds] = strconv.Itoa(settings.OpsMetricsIntervalSeconds)
-	}
-
-	// Channel monitor feature switch
-	updates[SettingKeyChannelMonitorEnabled] = strconv.FormatBool(settings.ChannelMonitorEnabled)
-	updates[SettingKeyChannelMonitorMode] = normalizeChannelMonitorMode(settings.ChannelMonitorMode)
-	if v := clampChannelMonitorInterval(settings.ChannelMonitorDefaultIntervalSeconds); v > 0 {
-		updates[SettingKeyChannelMonitorDefaultIntervalSeconds] = strconv.Itoa(v)
-	}
-	updates[SettingKeyChannelMonitorHideThroughput] = strconv.FormatBool(settings.ChannelMonitorHideThroughput)
-	updates[SettingKeyChannelMonitorShowQuota] = strconv.FormatBool(settings.ChannelMonitorShowQuota)
 
 	// Grok model mapping policy
 	if v := strings.TrimSpace(settings.GrokDefaultTextModel); v != "" {
@@ -752,7 +738,6 @@ func (s *SettingService) refreshCachedSettings(settings *SystemSettings) {
 	if s.onUpdate != nil {
 		s.onUpdate() // Invalidate cache after settings update
 	}
-	s.notifyChannelMonitorRuntimeListeners()
 }
 
 func (s *SettingService) defaultRewriteMessageCacheControl() bool {

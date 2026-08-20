@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"database/sql"
-	"os"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -398,48 +397,6 @@ func ProvideRateLimitService(
 	return svc
 }
 
-// ProvideOpsMetricsCollector creates and starts OpsMetricsCollector.
-func ProvideOpsMetricsCollector(
-	opsRepo OpsRepository,
-	settingRepo SettingRepository,
-	accountRepo AccountRepository,
-	concurrencyService *ConcurrencyService,
-	db *sql.DB,
-	redisClient *redis.Client,
-	cfg *config.Config,
-) *OpsMetricsCollector {
-	collector := NewOpsMetricsCollector(opsRepo, settingRepo, accountRepo, concurrencyService, db, redisClient, cfg)
-	collector.Start()
-	return collector
-}
-
-// ProvideOpsAggregationService creates and starts OpsAggregationService (hourly/daily pre-aggregation).
-func ProvideOpsAggregationService(
-	opsRepo OpsRepository,
-	settingRepo SettingRepository,
-	db *sql.DB,
-	redisClient *redis.Client,
-	cfg *config.Config,
-) *OpsAggregationService {
-	svc := NewOpsAggregationService(opsRepo, settingRepo, db, redisClient, cfg)
-	svc.Start()
-	return svc
-}
-
-// ProvideOpsAlertEvaluatorService creates and starts OpsAlertEvaluatorService.
-func ProvideOpsAlertEvaluatorService(
-	opsService *OpsService,
-	opsRepo OpsRepository,
-	emailService *EmailService,
-	redisClient *redis.Client,
-	cfg *config.Config,
-	proxyRepo ProxyRepository,
-) *OpsAlertEvaluatorService {
-	svc := NewOpsAlertEvaluatorService(opsService, opsRepo, emailService, redisClient, cfg, proxyRepo)
-	svc.Start()
-	return svc
-}
-
 // ProvideOpsCleanupService creates and starts OpsCleanupService (cron scheduled).
 // channelMonitorSvc 让维护任务（聚合 + 历史/聚合软删）跟随 ops 清理 cron 一起跑，
 // 共享 leader lock + heartbeat。
@@ -450,11 +407,10 @@ func ProvideOpsCleanupService(
 	db *sql.DB,
 	redisClient *redis.Client,
 	cfg *config.Config,
-	channelMonitorSvc *ChannelMonitorService,
 	settingRepo SettingRepository,
 	opsService *OpsService,
 ) *OpsCleanupService {
-	svc := NewOpsCleanupService(opsRepo, db, redisClient, cfg, channelMonitorSvc, settingRepo)
+	svc := NewOpsCleanupService(opsRepo, db, redisClient, cfg, settingRepo)
 	svc.Start()
 	if opsService != nil {
 		opsService.SetCleanupReloader(svc)
@@ -533,19 +489,6 @@ func ProvideScheduledTestRunnerService(
 	cfg *config.Config,
 ) *ScheduledTestRunnerService {
 	svc := NewScheduledTestRunnerService(planRepo, scheduledSvc, accountTestSvc, rateLimitSvc, cfg)
-	svc.Start()
-	return svc
-}
-
-// ProvideOpsScheduledReportService creates and starts OpsScheduledReportService.
-func ProvideOpsScheduledReportService(
-	opsService *OpsService,
-	userService *UserService,
-	emailService *EmailService,
-	redisClient *redis.Client,
-	cfg *config.Config,
-) *OpsScheduledReportService {
-	svc := NewOpsScheduledReportService(opsService, userService, emailService, redisClient, cfg)
 	svc.Start()
 	return svc
 }
@@ -745,13 +688,8 @@ var ProviderSet = wire.NewSet(
 	ProvideOpsService,
 	ProvideOpsIngressRejectAggregator,
 	ProvideAuditLogService,
-	ProvideOpsMetricsCollector,
-	ProvideOpsAggregationService,
-	ProvideOpsAlertEvaluatorService,
 	ProvideOpsCleanupService,
-	ProvideOpsScheduledReportService,
 	NewEmailService,
-	NewNotificationEmailService,
 	ProvideEmailQueueService,
 	NewTurnstileService,
 	NewTencentCaptchaService,
@@ -774,7 +712,6 @@ var ProviderSet = wire.NewSet(
 	ProvideDeferredService,
 	NewAntigravityQuotaFetcher,
 	NewGrokQuotaFetcher,
-	NewUserAttributeService,
 	NewUsageCache,
 	NewTotpService,
 	NewErrorPassthroughService,
@@ -786,75 +723,4 @@ var ProviderSet = wire.NewSet(
 	ProvideScheduledTestService,
 	ProvideScheduledTestRunnerService,
 	NewGroupCapacityService,
-	NewContentModerationService,
-	ProvideBalanceNotifyService,
-	ProvideChannelMonitorService,
-	ProvideChannelMonitorRunner,
-	NewChannelMonitorQuotaFetcher,
-	ProvideChannelMonitorV2Service,
-	ProvideChannelMonitorV2Aggregator,
-	NewChannelMonitorRequestTemplateService,
 )
-
-// ProvideBalanceNotifyService creates BalanceNotifyService
-func ProvideBalanceNotifyService(emailService *EmailService, settingRepo SettingRepository, accountRepo AccountRepository, notificationEmailService *NotificationEmailService) *BalanceNotifyService {
-	svc := NewBalanceNotifyService(emailService, settingRepo, accountRepo)
-	svc.SetNotificationEmailService(notificationEmailService)
-	return svc
-}
-
-// ProvideChannelMonitorService 创建渠道监控服务（CRUD + RunCheck + 用户视图聚合）。
-// 加密器复用 wire 中已注入的 SecretEncryptor（AES-256-GCM）。
-// settingService gates RunCheck via channel_monitor_enabled + channel_monitor_mode.
-func ProvideChannelMonitorService(
-	repo ChannelMonitorRepository,
-	encryptor SecretEncryptor,
-	settingService *SettingService,
-) *ChannelMonitorService {
-	svc := NewChannelMonitorService(repo, encryptor)
-	svc.SetRuntimeReader(settingService)
-	return svc
-}
-
-// ProvideChannelMonitorRunner 创建并启动渠道监控调度器。
-// 通过 SetScheduler 注入回 service 后再 Start，确保启动时加载所有 enabled monitor，
-// 后续 CRUD 也能即时同步任务表。Runner.Stop 由 cleanup function 调用。
-// settingService 用于 runner 每次 fire 读取功能开关。
-// quotaFetcher（账号侧用量聚合）也在此注入：accountUsage/CN 服务在 wire 图中
-// 晚于 channelMonitorService 构造，走 setter 注入避免调整既有构造顺序。
-func ProvideChannelMonitorRunner(
-	svc *ChannelMonitorService,
-	settingService *SettingService,
-	quotaFetcher *ChannelMonitorQuotaFetcher,
-) *ChannelMonitorRunner {
-	r := NewChannelMonitorRunner(svc, settingService)
-	if svc != nil {
-		// Ensure runtime reader is set even if ProvideChannelMonitorService
-		// was constructed without settings (tests / alternate providers).
-		svc.SetRuntimeReader(settingService)
-		svc.SetScheduler(r)
-		svc.SetQuotaFetcher(quotaFetcher)
-	}
-	r.Start()
-	return r
-}
-
-// ProvideChannelMonitorV2Service wires settings for user-facing privacy flags
-// (e.g. hide RPM/TPM throughput).
-func ProvideChannelMonitorV2Service(repo ChannelMonitorV2Repository, settingService *SettingService) *ChannelMonitorV2Service {
-	svc := NewChannelMonitorV2Service(repo)
-	svc.SetRuntimeReader(settingService)
-	return svc
-}
-
-// ProvideChannelMonitorV2Aggregator starts the passive minute-rollup worker.
-// Aggregation only runs when channel_monitor_enabled=true and mode=v2 (and V2 config enabled).
-// Set CHANNEL_MONITOR_V2_DISABLE_AGGREGATOR=1 to skip Start (local demo with seeded facts).
-func ProvideChannelMonitorV2Aggregator(repo ChannelMonitorV2Repository, db *sql.DB, settingService *SettingService) *ChannelMonitorV2Aggregator {
-	aggregator := NewChannelMonitorV2Aggregator(repo, db, settingService)
-	if os.Getenv("CHANNEL_MONITOR_V2_DISABLE_AGGREGATOR") == "1" {
-		return aggregator
-	}
-	aggregator.Start()
-	return aggregator
-}

@@ -26,13 +26,11 @@ func tryAcquireDBAdvisoryLockWithError(ctx context.Context, db *sql.DB, lockID i
 	if ctx == nil {
 		ctx = context.Background()
 	}
-
 	conn, err := db.Conn(ctx)
 	if err != nil {
 		return nil, false, fmt.Errorf("open advisory-lock connection: %w", err)
 	}
-
-	acquired := false
+	var acquired bool
 	if err := conn.QueryRowContext(ctx, "SELECT pg_try_advisory_lock($1)", lockID).Scan(&acquired); err != nil {
 		_ = conn.Close()
 		return nil, false, fmt.Errorf("query advisory lock: %w", err)
@@ -41,12 +39,10 @@ func tryAcquireDBAdvisoryLockWithError(ctx context.Context, db *sql.DB, lockID i
 		_ = conn.Close()
 		return nil, false, nil
 	}
-
-	release := func() {
+	return func() {
 		unlockCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		_, _ = conn.ExecContext(unlockCtx, "SELECT pg_advisory_unlock($1)", lockID)
 		_ = conn.Close()
-	}
-	return release, true, nil
+	}, true, nil
 }

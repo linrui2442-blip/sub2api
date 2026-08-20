@@ -97,9 +97,8 @@ type SMTPConfig struct {
 
 // EmailService 邮件服务
 type EmailService struct {
-	settingRepo              SettingRepository
-	cache                    EmailCache
-	notificationEmailService *NotificationEmailService
+	settingRepo SettingRepository
+	cache       EmailCache
 }
 
 // NewEmailService 创建邮件服务实例
@@ -110,26 +109,11 @@ func NewEmailService(settingRepo SettingRepository, cache EmailCache) *EmailServ
 	}
 }
 
-func (s *EmailService) SetNotificationEmailService(notificationEmailService *NotificationEmailService) {
-	s.notificationEmailService = notificationEmailService
-}
-
 func firstEmailLocale(locales []string) string {
 	if len(locales) == 0 {
 		return ""
 	}
 	return strings.TrimSpace(locales[0])
-}
-
-func emailRecipientName(email string) string {
-	trimmed := strings.TrimSpace(email)
-	if trimmed == "" {
-		return ""
-	}
-	if at := strings.Index(trimmed, "@"); at > 0 {
-		return trimmed[:at]
-	}
-	return trimmed
 }
 
 // GetSMTPConfig 从数据库获取SMTP配置
@@ -342,26 +326,6 @@ func (s *EmailService) SendVerifyCode(ctx context.Context, email, siteName strin
 		return fmt.Errorf("save verify code: %w", err)
 	}
 
-	if s.notificationEmailService != nil {
-		err := s.notificationEmailService.Send(ctx, NotificationEmailSendInput{
-			Event:          NotificationEmailEventAuthVerifyCode,
-			Locale:         firstEmailLocale(locale),
-			RecipientEmail: email,
-			RecipientName:  emailRecipientName(email),
-			Variables: map[string]string{
-				"verification_code":  code,
-				"expires_in_minutes": strconv.Itoa(int(verifyCodeTTL / time.Minute)),
-			},
-		})
-		if err == nil {
-			return nil
-		}
-		if !shouldFallbackNotificationEmail(err) {
-			return err
-		}
-		slog.Warn("failed to send templated verification email, falling back to legacy template", "recipient_hash", notificationEmailHash(email), "error", err)
-	}
-
 	// 构建邮件内容
 	subject := fmt.Sprintf("[%s] Email Verification Code", siteName)
 	body := s.buildVerifyCodeEmailBody(code, siteName)
@@ -511,26 +475,6 @@ func (s *EmailService) SendPasswordResetEmail(ctx context.Context, email, siteNa
 
 	// Build full reset URL with URL-encoded token and email
 	fullResetURL := fmt.Sprintf("%s?email=%s&token=%s", resetURL, url.QueryEscape(email), url.QueryEscape(token))
-
-	if s.notificationEmailService != nil {
-		err := s.notificationEmailService.Send(ctx, NotificationEmailSendInput{
-			Event:          NotificationEmailEventAuthPasswordReset,
-			Locale:         firstEmailLocale(locale),
-			RecipientEmail: email,
-			RecipientName:  emailRecipientName(email),
-			Variables: map[string]string{
-				"reset_url":          fullResetURL,
-				"expires_in_minutes": strconv.Itoa(int(passwordResetTokenTTL / time.Minute)),
-			},
-		})
-		if err == nil {
-			return nil
-		}
-		if !shouldFallbackNotificationEmail(err) {
-			return err
-		}
-		slog.Warn("failed to send templated password reset email, falling back to legacy template", "recipient_hash", notificationEmailHash(email), "error", err)
-	}
 
 	// Build email content
 	subject := fmt.Sprintf("[%s] 密码重置请求", siteName)

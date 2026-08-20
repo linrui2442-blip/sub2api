@@ -561,21 +561,6 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 		))
 	}
 
-	// If attribute filters are specified, we need to filter by user IDs first
-	var allowedUserIDs []int64
-	if len(filters.Attributes) > 0 {
-		var attrErr error
-		allowedUserIDs, attrErr = r.filterUsersByAttributes(ctx, filters.Attributes)
-		if attrErr != nil {
-			return nil, nil, attrErr
-		}
-		if len(allowedUserIDs) == 0 {
-			// No users match the attribute filters
-			return []service.User{}, paginationResultFromTotal(0, params), nil
-		}
-		q = q.Where(dbuser.IDIn(allowedUserIDs...))
-	}
-
 	total, err := q.Clone().Count(userCtx)
 	if err != nil {
 		return nil, nil, err
@@ -749,56 +734,6 @@ func userLastUsedAtOrder(sortOrder string) []func(*entsql.Selector) {
 	return []func(*entsql.Selector){
 		orderExpr("DESC", "LAST", entsql.Desc),
 	}
-}
-
-// filterUsersByAttributes returns user IDs that match ALL the given attribute filters
-func (r *userRepository) filterUsersByAttributes(ctx context.Context, attrs map[int64]string) ([]int64, error) {
-	if len(attrs) == 0 {
-		return nil, nil
-	}
-
-	if r.sql == nil {
-		return nil, fmt.Errorf("sql executor is not configured")
-	}
-
-	clauses := make([]string, 0, len(attrs))
-	args := make([]any, 0, len(attrs)*2+1)
-	argIndex := 1
-	for attrID, value := range attrs {
-		clauses = append(clauses, fmt.Sprintf("(attribute_id = $%d AND value ILIKE $%d)", argIndex, argIndex+1))
-		args = append(args, attrID, "%"+value+"%")
-		argIndex += 2
-	}
-
-	query := fmt.Sprintf(
-		`SELECT user_id
-		 FROM user_attribute_values
-		 WHERE %s
-		 GROUP BY user_id
-		 HAVING COUNT(DISTINCT attribute_id) = $%d`,
-		strings.Join(clauses, " OR "),
-		argIndex,
-	)
-	args = append(args, len(attrs))
-
-	rows, err := r.sql.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	result := make([]int64, 0)
-	for rows.Next() {
-		var userID int64
-		if scanErr := rows.Scan(&userID); scanErr != nil {
-			return nil, scanErr
-		}
-		result = append(result, userID)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return result, nil
 }
 
 func (r *userRepository) UpdateBalance(ctx context.Context, id int64, amount float64) error {

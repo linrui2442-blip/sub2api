@@ -19,8 +19,6 @@ import (
 )
 
 const (
-	opsCleanupJobName = "ops_cleanup"
-
 	opsCleanupLeaderLockKeyDefault = "ops:cleanup:leader"
 	opsCleanupLeaderLockTTLDefault = 30 * time.Minute
 )
@@ -39,16 +37,12 @@ return 0
 // - Scheduling: 5-field cron spec (minute hour dom month dow).
 // - Multi-instance: best-effort Redis leader lock so only one node runs cleanup.
 // - Safety: deletes in batches to avoid long transactions.
-//
-// 附带：在 runCleanupOnce 末尾调用 ChannelMonitorService.RunDailyMaintenance，
-// 统一共享 cron schedule + leader lock + heartbeat，避免再引一套调度。
 type OpsCleanupService struct {
-	opsRepo           OpsRepository
-	db                *sql.DB
-	redisClient       *redis.Client
-	cfg               *config.Config
-	channelMonitorSvc *ChannelMonitorService
-	settingRepo       SettingRepository
+	opsRepo     OpsRepository
+	db          *sql.DB
+	redisClient *redis.Client
+	cfg         *config.Config
+	settingRepo SettingRepository
 
 	instanceID string
 
@@ -69,17 +63,15 @@ func NewOpsCleanupService(
 	db *sql.DB,
 	redisClient *redis.Client,
 	cfg *config.Config,
-	channelMonitorSvc *ChannelMonitorService,
 	settingRepo SettingRepository,
 ) *OpsCleanupService {
 	return &OpsCleanupService{
-		opsRepo:           opsRepo,
-		db:                db,
-		redisClient:       redisClient,
-		cfg:               cfg,
-		channelMonitorSvc: channelMonitorSvc,
-		settingRepo:       settingRepo,
-		instanceID:        uuid.NewString(),
+		opsRepo:     opsRepo,
+		db:          db,
+		redisClient: redisClient,
+		cfg:         cfg,
+		settingRepo: settingRepo,
+		instanceID:  uuid.NewString(),
 	}
 }
 
@@ -166,11 +158,9 @@ func (s *OpsCleanupService) applyScheduleLocked(ctx context.Context) error {
 	c.Start()
 	s.cron = c
 	logger.LegacyPrintf("service.ops_cleanup",
-		"[OpsCleanup] scheduled (schedule=%q tz=%s retention_days=err:%d/min:%d/hour:%d)",
+		"[OpsCleanup] scheduled (schedule=%q tz=%s retention_days=%d)",
 		schedule, loc.String(),
 		s.effective.ErrorLogRetentionDays,
-		s.effective.MinuteMetricsRetentionDays,
-		s.effective.HourlyMetricsRetentionDays,
 	)
 	return nil
 }
@@ -234,12 +224,6 @@ func (s *OpsCleanupService) computeEffectiveLocked(ctx context.Context) {
 	if dr.ErrorLogRetentionDays >= 0 {
 		base.ErrorLogRetentionDays = dr.ErrorLogRetentionDays
 	}
-	if dr.MinuteMetricsRetentionDays >= 0 {
-		base.MinuteMetricsRetentionDays = dr.MinuteMetricsRetentionDays
-	}
-	if dr.HourlyMetricsRetentionDays >= 0 {
-		base.HourlyMetricsRetentionDays = dr.HourlyMetricsRetentionDays
-	}
 }
 
 // snapshotEffective 取一份 effective 副本（runCleanupOnce 等读路径使用）。
@@ -276,16 +260,11 @@ func (s *OpsCleanupService) runScheduled() {
 		defer release()
 	}
 
-	startedAt := time.Now().UTC()
-	runAt := startedAt
-
 	counts, err := s.runCleanupOnce(ctx)
 	if err != nil {
-		s.recordHeartbeatError(runAt, time.Since(startedAt), err)
 		logger.LegacyPrintf("service.ops_cleanup", "[OpsCleanup] cleanup failed: %v", err)
 		return
 	}
-	s.recordHeartbeatSuccess(runAt, time.Since(startedAt), counts)
 	logger.L().Info("[OpsCleanup] cleanup complete",
 		zap.String("component", "service.ops_cleanup"),
 		zap.String("deleted_counts", counts.String()),
@@ -304,12 +283,8 @@ func (s *OpsCleanupService) runCleanupOnce(ctx context.Context) (opsCleanupDelet
 	targets := []opsCleanupTarget{
 		{effective.ErrorLogRetentionDays, "ops_error_logs", "created_at", false, &out.errorLogs},
 		{effective.ErrorLogRetentionDays, "ops_ingress_reject_aggregates", "bucket_start", false, &out.ingressRejects},
-		{effective.ErrorLogRetentionDays, "ops_alert_events", "created_at", false, &out.alertEvents},
 		{effective.ErrorLogRetentionDays, "ops_system_logs", "created_at", false, &out.systemLogs},
 		{effective.ErrorLogRetentionDays, "ops_system_log_cleanup_audits", "created_at", false, &out.logAudits},
-		{effective.MinuteMetricsRetentionDays, "ops_system_metrics", "created_at", false, &out.systemMetrics},
-		{effective.HourlyMetricsRetentionDays, "ops_metrics_hourly", "bucket_start", false, &out.hourlyPreagg},
-		{effective.HourlyMetricsRetentionDays, "ops_metrics_daily", "bucket_date", true, &out.dailyPreagg},
 	}
 
 	for _, t := range targets {
@@ -322,15 +297,6 @@ func (s *OpsCleanupService) runCleanupOnce(ctx context.Context) (opsCleanupDelet
 			return out, err
 		}
 		*t.counter = n
-	}
-
-	// Channel monitor 每日维护（聚合昨日明细 + 软删过期明细/聚合）。
-	// 失败只记日志，不影响 ops 清理的成功状态（与 ops 各步骤风格一致）；
-	// 维护本身已经把每步错误打到 slog，heartbeat result 不再分项记录。
-	if s.channelMonitorSvc != nil {
-		if err := s.channelMonitorSvc.RunDailyMaintenance(ctx); err != nil {
-			logger.LegacyPrintf("service.ops_cleanup", "[OpsCleanup] channel monitor maintenance failed: %v", err)
-		}
 	}
 
 	return out, nil
@@ -375,40 +341,4 @@ func (s *OpsCleanupService) tryAcquireLeaderLock(ctx context.Context) (func(), b
 		return nil, false
 	}
 	return release, true
-}
-
-func (s *OpsCleanupService) recordHeartbeatSuccess(runAt time.Time, duration time.Duration, counts opsCleanupDeletedCounts) {
-	if s == nil || s.opsRepo == nil {
-		return
-	}
-	now := time.Now().UTC()
-	durMs := duration.Milliseconds()
-	result := truncateString(counts.String(), 2048)
-	ctx, cancel := context.WithTimeout(context.Background(), opsCleanupHeartbeatTimeout)
-	defer cancel()
-	_ = s.opsRepo.UpsertJobHeartbeat(ctx, &OpsUpsertJobHeartbeatInput{
-		JobName:        opsCleanupJobName,
-		LastRunAt:      &runAt,
-		LastSuccessAt:  &now,
-		LastDurationMs: &durMs,
-		LastResult:     &result,
-	})
-}
-
-func (s *OpsCleanupService) recordHeartbeatError(runAt time.Time, duration time.Duration, err error) {
-	if s == nil || s.opsRepo == nil || err == nil {
-		return
-	}
-	now := time.Now().UTC()
-	durMs := duration.Milliseconds()
-	msg := truncateString(err.Error(), 2048)
-	ctx, cancel := context.WithTimeout(context.Background(), opsCleanupHeartbeatTimeout)
-	defer cancel()
-	_ = s.opsRepo.UpsertJobHeartbeat(ctx, &OpsUpsertJobHeartbeatInput{
-		JobName:        opsCleanupJobName,
-		LastRunAt:      &runAt,
-		LastErrorAt:    &now,
-		LastError:      &msg,
-		LastDurationMs: &durMs,
-	})
 }

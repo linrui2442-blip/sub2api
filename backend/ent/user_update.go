@@ -18,7 +18,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
-	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
 )
 
 // UserUpdate is the builder for updating User entities.
@@ -471,21 +470,6 @@ func (_u *UserUpdate) AddUsageLogs(v ...*UsageLog) *UserUpdate {
 	return _u.AddUsageLogIDs(ids...)
 }
 
-// AddAttributeValueIDs adds the "attribute_values" edge to the UserAttributeValue entity by IDs.
-func (_u *UserUpdate) AddAttributeValueIDs(ids ...int64) *UserUpdate {
-	_u.mutation.AddAttributeValueIDs(ids...)
-	return _u
-}
-
-// AddAttributeValues adds the "attribute_values" edges to the UserAttributeValue entity.
-func (_u *UserUpdate) AddAttributeValues(v ...*UserAttributeValue) *UserUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddAttributeValueIDs(ids...)
-}
-
 // AddAuthIdentityIDs adds the "auth_identities" edge to the AuthIdentity entity by IDs.
 func (_u *UserUpdate) AddAuthIdentityIDs(ids ...int64) *UserUpdate {
 	_u.mutation.AddAuthIdentityIDs(ids...)
@@ -582,27 +566,6 @@ func (_u *UserUpdate) RemoveUsageLogs(v ...*UsageLog) *UserUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveUsageLogIDs(ids...)
-}
-
-// ClearAttributeValues clears all "attribute_values" edges to the UserAttributeValue entity.
-func (_u *UserUpdate) ClearAttributeValues() *UserUpdate {
-	_u.mutation.ClearAttributeValues()
-	return _u
-}
-
-// RemoveAttributeValueIDs removes the "attribute_values" edge to UserAttributeValue entities by IDs.
-func (_u *UserUpdate) RemoveAttributeValueIDs(ids ...int64) *UserUpdate {
-	_u.mutation.RemoveAttributeValueIDs(ids...)
-	return _u
-}
-
-// RemoveAttributeValues removes "attribute_values" edges to UserAttributeValue entities.
-func (_u *UserUpdate) RemoveAttributeValues(v ...*UserAttributeValue) *UserUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveAttributeValueIDs(ids...)
 }
 
 // ClearAuthIdentities clears all "auth_identities" edges to the AuthIdentity entity.
@@ -981,51 +944,6 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(usagelog.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.AttributeValuesCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.AttributeValuesTable,
-			Columns: []string{user.AttributeValuesColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(userattributevalue.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedAttributeValuesIDs(); len(nodes) > 0 && !_u.mutation.AttributeValuesCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.AttributeValuesTable,
-			Columns: []string{user.AttributeValuesColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(userattributevalue.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.AttributeValuesIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.AttributeValuesTable,
-			Columns: []string{user.AttributeValuesColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(userattributevalue.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {
@@ -1580,21 +1498,6 @@ func (_u *UserUpdateOne) AddUsageLogs(v ...*UsageLog) *UserUpdateOne {
 	return _u.AddUsageLogIDs(ids...)
 }
 
-// AddAttributeValueIDs adds the "attribute_values" edge to the UserAttributeValue entity by IDs.
-func (_u *UserUpdateOne) AddAttributeValueIDs(ids ...int64) *UserUpdateOne {
-	_u.mutation.AddAttributeValueIDs(ids...)
-	return _u
-}
-
-// AddAttributeValues adds the "attribute_values" edges to the UserAttributeValue entity.
-func (_u *UserUpdateOne) AddAttributeValues(v ...*UserAttributeValue) *UserUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddAttributeValueIDs(ids...)
-}
-
 // AddAuthIdentityIDs adds the "auth_identities" edge to the AuthIdentity entity by IDs.
 func (_u *UserUpdateOne) AddAuthIdentityIDs(ids ...int64) *UserUpdateOne {
 	_u.mutation.AddAuthIdentityIDs(ids...)
@@ -1691,27 +1594,6 @@ func (_u *UserUpdateOne) RemoveUsageLogs(v ...*UsageLog) *UserUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveUsageLogIDs(ids...)
-}
-
-// ClearAttributeValues clears all "attribute_values" edges to the UserAttributeValue entity.
-func (_u *UserUpdateOne) ClearAttributeValues() *UserUpdateOne {
-	_u.mutation.ClearAttributeValues()
-	return _u
-}
-
-// RemoveAttributeValueIDs removes the "attribute_values" edge to UserAttributeValue entities by IDs.
-func (_u *UserUpdateOne) RemoveAttributeValueIDs(ids ...int64) *UserUpdateOne {
-	_u.mutation.RemoveAttributeValueIDs(ids...)
-	return _u
-}
-
-// RemoveAttributeValues removes "attribute_values" edges to UserAttributeValue entities.
-func (_u *UserUpdateOne) RemoveAttributeValues(v ...*UserAttributeValue) *UserUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveAttributeValueIDs(ids...)
 }
 
 // ClearAuthIdentities clears all "auth_identities" edges to the AuthIdentity entity.
@@ -2120,51 +2002,6 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(usagelog.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.AttributeValuesCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.AttributeValuesTable,
-			Columns: []string{user.AttributeValuesColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(userattributevalue.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedAttributeValuesIDs(); len(nodes) > 0 && !_u.mutation.AttributeValuesCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.AttributeValuesTable,
-			Columns: []string{user.AttributeValuesColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(userattributevalue.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.AttributeValuesIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.AttributeValuesTable,
-			Columns: []string{user.AttributeValuesColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(userattributevalue.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

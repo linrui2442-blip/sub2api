@@ -32,14 +32,14 @@ type Account struct {
 	ProxyFallbackOriginName *string // 仅展示用
 	Concurrency             int
 	Priority                int
-	LoadFactor         *int // 调度负载因子；nil 表示使用 Concurrency
-	Status             string
-	ErrorMessage       string
-	LastUsedAt         *time.Time
-	ExpiresAt          *time.Time
-	AutoPauseOnExpired bool
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	LoadFactor              *int // 调度负载因子；nil 表示使用 Concurrency
+	Status                  string
+	ErrorMessage            string
+	LastUsedAt              *time.Time
+	ExpiresAt               *time.Time
+	AutoPauseOnExpired      bool
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
 
 	Schedulable bool
 
@@ -2444,62 +2444,6 @@ func (a *Account) GetQuotaResetTimezone() string {
 		return tz
 	}
 	return "UTC"
-}
-
-// --- Quota Notification Getters ---
-
-// QuotaNotifyConfig returns the notify configuration for a given quota dimension.
-// dim must be one of quotaDimDaily, quotaDimWeekly, quotaDimTotal.
-func (a *Account) QuotaNotifyConfig(dim string) (enabled bool, threshold float64, thresholdType string) {
-	enabled = a.getExtraBool("quota_notify_" + dim + "_enabled")
-	threshold = a.getExtraFloat64("quota_notify_" + dim + "_threshold")
-	thresholdType = a.getExtraStringDefault("quota_notify_"+dim+"_threshold_type", thresholdTypeFixed)
-	return
-}
-
-func (a *Account) GetQuotaNotifyDailyEnabled() bool {
-	e, _, _ := a.QuotaNotifyConfig(quotaDimDaily)
-	return e
-}
-
-func (a *Account) GetQuotaNotifyDailyThreshold() float64 {
-	_, t, _ := a.QuotaNotifyConfig(quotaDimDaily)
-	return t
-}
-
-func (a *Account) GetQuotaNotifyDailyThresholdType() string {
-	_, _, tt := a.QuotaNotifyConfig(quotaDimDaily)
-	return tt
-}
-
-func (a *Account) GetQuotaNotifyWeeklyEnabled() bool {
-	e, _, _ := a.QuotaNotifyConfig(quotaDimWeekly)
-	return e
-}
-
-func (a *Account) GetQuotaNotifyWeeklyThreshold() float64 {
-	_, t, _ := a.QuotaNotifyConfig(quotaDimWeekly)
-	return t
-}
-
-func (a *Account) GetQuotaNotifyWeeklyThresholdType() string {
-	_, _, tt := a.QuotaNotifyConfig(quotaDimWeekly)
-	return tt
-}
-
-func (a *Account) GetQuotaNotifyTotalEnabled() bool {
-	e, _, _ := a.QuotaNotifyConfig(quotaDimTotal)
-	return e
-}
-
-func (a *Account) GetQuotaNotifyTotalThreshold() float64 {
-	_, t, _ := a.QuotaNotifyConfig(quotaDimTotal)
-	return t
-}
-
-func (a *Account) GetQuotaNotifyTotalThresholdType() string {
-	_, _, tt := a.QuotaNotifyConfig(quotaDimTotal)
-	return tt
 }
 
 // nextFixedDailyReset 计算在 after 之后的下一个每日固定重置时间点

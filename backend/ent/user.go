@@ -79,8 +79,6 @@ type UserEdges struct {
 	AllowedGroups []*Group `json:"allowed_groups,omitempty"`
 	// UsageLogs holds the value of the usage_logs edge.
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
-	// AttributeValues holds the value of the attribute_values edge.
-	AttributeValues []*UserAttributeValue `json:"attribute_values,omitempty"`
 	// AuthIdentities holds the value of the auth_identities edge.
 	AuthIdentities []*AuthIdentity `json:"auth_identities,omitempty"`
 	// PendingAuthSessions holds the value of the pending_auth_sessions edge.
@@ -89,7 +87,7 @@ type UserEdges struct {
 	UserAllowedGroups []*UserAllowedGroup `json:"user_allowed_groups,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [7]bool
+	loadedTypes [6]bool
 }
 
 // APIKeysOrErr returns the APIKeys value or an error if the edge
@@ -119,19 +117,10 @@ func (e UserEdges) UsageLogsOrErr() ([]*UsageLog, error) {
 	return nil, &NotLoadedError{edge: "usage_logs"}
 }
 
-// AttributeValuesOrErr returns the AttributeValues value or an error if the edge
-// was not loaded in eager-loading.
-func (e UserEdges) AttributeValuesOrErr() ([]*UserAttributeValue, error) {
-	if e.loadedTypes[3] {
-		return e.AttributeValues, nil
-	}
-	return nil, &NotLoadedError{edge: "attribute_values"}
-}
-
 // AuthIdentitiesOrErr returns the AuthIdentities value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) AuthIdentitiesOrErr() ([]*AuthIdentity, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[3] {
 		return e.AuthIdentities, nil
 	}
 	return nil, &NotLoadedError{edge: "auth_identities"}
@@ -140,7 +129,7 @@ func (e UserEdges) AuthIdentitiesOrErr() ([]*AuthIdentity, error) {
 // PendingAuthSessionsOrErr returns the PendingAuthSessions value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) PendingAuthSessionsOrErr() ([]*PendingAuthSession, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[4] {
 		return e.PendingAuthSessions, nil
 	}
 	return nil, &NotLoadedError{edge: "pending_auth_sessions"}
@@ -149,7 +138,7 @@ func (e UserEdges) PendingAuthSessionsOrErr() ([]*PendingAuthSession, error) {
 // UserAllowedGroupsOrErr returns the UserAllowedGroups value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) UserAllowedGroupsOrErr() ([]*UserAllowedGroup, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[5] {
 		return e.UserAllowedGroups, nil
 	}
 	return nil, &NotLoadedError{edge: "user_allowed_groups"}
@@ -367,11 +356,6 @@ func (_m *User) QueryAllowedGroups() *GroupQuery {
 // QueryUsageLogs queries the "usage_logs" edge of the User entity.
 func (_m *User) QueryUsageLogs() *UsageLogQuery {
 	return NewUserClient(_m.config).QueryUsageLogs(_m)
-}
-
-// QueryAttributeValues queries the "attribute_values" edge of the User entity.
-func (_m *User) QueryAttributeValues() *UserAttributeValueQuery {
-	return NewUserClient(_m.config).QueryAttributeValues(_m)
 }
 
 // QueryAuthIdentities queries the "auth_identities" edge of the User entity.
