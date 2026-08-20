@@ -292,27 +292,17 @@ type UserService struct {
 	userRepo             UserRepository
 	settingRepo          SettingRepository
 	authCacheInvalidator APIKeyAuthCacheInvalidator
-	billingCache         BillingCache
 	lastActiveTouchL1    sync.Map
 	lastActiveTouchSF    singleflight.Group
 }
 
 // NewUserService 创建用户服务实例
-func NewUserService(userRepo UserRepository, settingRepo SettingRepository, authCacheInvalidator APIKeyAuthCacheInvalidator, billingCache BillingCache) *UserService {
+func NewUserService(userRepo UserRepository, settingRepo SettingRepository, authCacheInvalidator APIKeyAuthCacheInvalidator) *UserService {
 	return &UserService{
 		userRepo:             userRepo,
 		settingRepo:          settingRepo,
 		authCacheInvalidator: authCacheInvalidator,
-		billingCache:         billingCache,
 	}
-}
-
-func NewPersonalUserService(
-	userRepo UserRepository,
-	settingRepo SettingRepository,
-	authCacheInvalidator APIKeyAuthCacheInvalidator,
-) *UserService {
-	return NewUserService(userRepo, settingRepo, authCacheInvalidator, nil)
 }
 
 // GetFirstAdmin 获取首个管理员用户（用于 Admin API Key 认证）
@@ -1154,31 +1144,6 @@ func (s *UserService) List(ctx context.Context, params pagination.PaginationPara
 		return nil, nil, fmt.Errorf("list users: %w", err)
 	}
 	return users, pagination, nil
-}
-
-// UpdateBalance 更新用户余额（管理员功能）
-func (s *UserService) UpdateBalance(ctx context.Context, userID int64, amount float64) error {
-	if err := s.userRepo.UpdateBalance(ctx, userID, amount); err != nil {
-		return fmt.Errorf("update balance: %w", err)
-	}
-	if s.authCacheInvalidator != nil {
-		s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
-	}
-	if s.billingCache != nil {
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					slog.Error("panic in balance cache invalidation", "user_id", userID, "recover", r)
-				}
-			}()
-			cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := s.billingCache.InvalidateUserBalance(cacheCtx, userID); err != nil {
-				slog.Error("invalidate user balance cache failed", "user_id", userID, "error", err)
-			}
-		}()
-	}
-	return nil
 }
 
 // UpdateConcurrency 更新用户并发数（管理员功能）

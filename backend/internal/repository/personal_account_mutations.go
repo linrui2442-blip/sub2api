@@ -62,9 +62,6 @@ func (r *personalAccountRepository) Update(ctx context.Context, account *service
 		SetQuotaDimension(dbaccount.QuotaDimension(account.QuotaDimensionOrDefault())).
 		SetNillableParentAccountID(account.ParentAccountID)
 
-	if account.RateMultiplier != nil {
-		builder.SetRateMultiplier(*account.RateMultiplier)
-	}
 	if account.LoadFactor != nil {
 		builder.SetLoadFactor(*account.LoadFactor)
 	} else {

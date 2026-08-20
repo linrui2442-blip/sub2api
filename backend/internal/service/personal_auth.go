@@ -32,17 +32,10 @@ func ProvidePersonalAuthService(
 	svc := NewAuthService(
 		entClient,
 		userRepo,
-		nil, // redeem / invitation repository
 		refreshTokenCache,
 		cfg,
 		settingService,
-		nil, // registration email service
 		turnstileService,
-		nil, // registration email queue
-		nil, // promo service
-		nil, // default subscription assigner
-		nil, // affiliate service
-		nil, // signup platform quota repository
 	)
 	svc.SetTencentCaptchaService(tencentCaptchaService)
 	svc.SetAliyunCaptchaService(aliyunCaptchaService)

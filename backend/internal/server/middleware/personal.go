@@ -37,7 +37,7 @@ func ProvidePersonalAPIKeyAuthMiddleware(
 	apiKeyService *service.APIKeyService,
 	cfg *config.Config,
 ) APIKeyAuthMiddleware {
-	return APIKeyAuthMiddleware(apiKeyAuthWithSubscription(apiKeyService, nil, cfg))
+	return APIKeyAuthMiddleware(apiKeyAuth(apiKeyService, cfg))
 }
 
 // PersonalProviderSet excludes OptionalJWT/public-route middleware and, more

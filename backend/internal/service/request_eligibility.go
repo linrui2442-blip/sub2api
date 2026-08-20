@@ -2,22 +2,23 @@ package service
 
 import "context"
 
+var (
+	ErrGroupRPMExceeded = ErrAPIKeyRateLimited.WithMetadata(map[string]string{"scope": "group"})
+	ErrUserRPMExceeded  = ErrAPIKeyRateLimited.WithMetadata(map[string]string{"scope": "user"})
+)
+
 // RequestEligibilityChecker is the gateway admission boundary. Personal
 // Edition supplies an implementation with no commercial dependencies.
 type RequestEligibilityChecker interface {
-	CheckBillingEligibility(context.Context, *User, *APIKey, *Group, *UserSubscription, string) error
+	CheckRequestEligibility(context.Context, *User, *APIKey, *Group, any, string) error
 }
 
 type PersonalRequestEligibilityChecker struct{}
 
-func (PersonalRequestEligibilityChecker) CheckBillingEligibility(context.Context, *User, *APIKey, *Group, *UserSubscription, string) error {
+func (PersonalRequestEligibilityChecker) CheckRequestEligibility(context.Context, *User, *APIKey, *Group, any, string) error {
 	return nil
 }
 
 func ProvidePersonalRequestEligibilityChecker() RequestEligibilityChecker {
 	return PersonalRequestEligibilityChecker{}
-}
-
-func ProvideBillingRequestEligibilityChecker(service *BillingCacheService) RequestEligibilityChecker {
-	return service
 }

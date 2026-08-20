@@ -53,9 +53,8 @@ func main() {
 	logger.InitBootstrap()
 	defer logger.Sync()
 
-	// Dedicated Personal Edition builds activate themselves automatically.
-	// Source builds can opt in with SUB2_PERSONAL_MODE=1.
-	personalRuntime := personal.PrepareEnvironment(BuildType)
+	// Personal Edition is the only runtime shipped by this branch.
+	personal.PrepareEnvironment("personal")
 
 	setupMode := flag.Bool("setup", false, "Run setup wizard in CLI mode")
 	showVersion := flag.Bool("version", false, "Show version information")
@@ -66,43 +65,21 @@ func main() {
 		return
 	}
 
-	if personalRuntime {
-		log.Println("Personal Edition runtime enabled: private routes + upstream SIMPLE semantics")
-	}
+	log.Println("Personal Edition runtime enabled: private routes + upstream SIMPLE semantics")
 
 	if *setupMode {
-		if personalRuntime {
-			log.Println("Personal Edition setup uses the local owner-only browser wizard")
-			runSetupServer()
-			return
-		}
-		if err := setup.RunCLI(); err != nil {
-			log.Fatalf("Setup failed: %v", err)
-		}
+		log.Println("Personal Edition setup uses the local owner-only browser wizard")
+		runSetupServer()
 		return
 	}
 
 	if setup.NeedsSetup() {
-		// Personal Edition never enters upstream PostgreSQL/Redis auto-setup.
-		if personalRuntime {
-			log.Println("Personal Edition first run detected; starting owner setup wizard...")
-			runSetupServer()
-			return
-		}
-
-		if setup.AutoSetupEnabled() {
-			log.Println("Auto setup mode enabled...")
-			if err := setup.AutoSetupFromEnv(); err != nil {
-				log.Fatalf("Auto setup failed: %v", err)
-			}
-		} else {
-			log.Println("First run detected, starting setup wizard...")
-			runSetupServer()
-			return
-		}
+		log.Println("Personal Edition first run detected; starting owner setup wizard...")
+		runSetupServer()
+		return
 	}
 
-	runMainServer(personalRuntime)
+	runMainServer(true)
 }
 
 func runSetupServer() {
@@ -111,18 +88,13 @@ func runSetupServer() {
 	r.Use(middleware.CORS(config.CORSConfig{}))
 	r.Use(middleware.SecurityHeaders(config.CSPConfig{Enabled: true, Policy: config.DefaultCSPPolicy}, nil))
 
-	var personalInstalled chan struct{}
-	if personal.Enabled() {
-		personalInstalled = make(chan struct{}, 1)
-		setup.RegisterPersonalRoutes(r, func() {
-			select {
-			case personalInstalled <- struct{}{}:
-			default:
-			}
-		})
-	} else {
-		setup.RegisterRoutes(r)
-	}
+	personalInstalled := make(chan struct{}, 1)
+	setup.RegisterPersonalRoutes(r, func() {
+		select {
+		case personalInstalled <- struct{}{}:
+		default:
+		}
+	})
 
 	if web.HasEmbeddedFrontend() {
 		r.Use(web.ServeEmbeddedFrontend())
@@ -130,11 +102,7 @@ func runSetupServer() {
 
 	addr := config.GetServerAddress()
 	log.Printf("Setup wizard available at http://%s", addr)
-	if personal.Enabled() {
-		log.Println("Create the Personal Edition owner account to finish setup")
-	} else {
-		log.Println("Complete the setup wizard to configure Sub2API")
-	}
+	log.Println("Create the Personal Edition owner account to finish setup")
 
 	protocols := new(http.Protocols)
 	protocols.SetHTTP1(true)
@@ -146,13 +114,6 @@ func runSetupServer() {
 		ReadHeaderTimeout: 30 * time.Second,
 		IdleTimeout:       120 * time.Second,
 		Protocols:         protocols,
-	}
-
-	if !personal.Enabled() {
-		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("Failed to start setup server: %v", err)
-		}
-		return
 	}
 
 	serverErr := make(chan error, 1)
@@ -201,23 +162,14 @@ func runMainServer(openBrowser bool) {
 	if err := logger.Init(logger.OptionsFromConfig(cfg.Log)); err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
-	if personal.Enabled() {
-		log.Println("Personal Edition: public registration/payment/model-plaza routes are disabled")
-	} else if cfg.RunMode == config.RunModeSimple {
-		log.Println("⚠️  WARNING: Running in SIMPLE mode - billing and quota checks are DISABLED")
-	}
+	log.Println("Personal Edition: public registration/payment/model-plaza routes are disabled")
 
 	buildInfo := handler.BuildInfo{
 		Version:   Version,
 		BuildType: BuildType,
 	}
 
-	var app *Application
-	if personal.Enabled() {
-		app, err = initializePersonalApplication(buildInfo)
-	} else {
-		app, err = initializeApplication(buildInfo)
-	}
+	app, err := initializePersonalApplication(buildInfo)
 	if err != nil {
 		log.Fatalf("Failed to initialize application: %v", err)
 	}

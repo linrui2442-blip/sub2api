@@ -16,13 +16,11 @@ import (
 // ChannelHandler handles admin channel management
 type ChannelHandler struct {
 	channelService *service.ChannelService
-	billingService *service.BillingService
-	pricingService *service.PricingService
 }
 
 // NewChannelHandler creates a new admin channel handler
-func NewChannelHandler(channelService *service.ChannelService, billingService *service.BillingService, pricingService *service.PricingService) *ChannelHandler {
-	return &ChannelHandler{channelService: channelService, billingService: billingService, pricingService: pricingService}
+func NewChannelHandler(channelService *service.ChannelService) *ChannelHandler {
+	return &ChannelHandler{channelService: channelService}
 }
 
 // --- Request / Response types ---
@@ -533,67 +531,4 @@ func (h *ChannelHandler) Delete(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{"message": "Channel deleted successfully"})
-}
-
-// GetModelDefaultPricing 获取模型的默认定价（用于前端自动填充）
-// GET /api/v1/admin/channels/model-pricing?model=claude-sonnet-4
-func (h *ChannelHandler) GetModelDefaultPricing(c *gin.Context) {
-	model := strings.TrimSpace(c.Query("model"))
-	if model == "" {
-		response.ErrorFrom(c, infraerrors.BadRequest("MISSING_PARAMETER", "model parameter is required").
-			WithMetadata(map[string]string{"param": "model"}))
-		return
-	}
-
-	pricing, err := h.billingService.GetModelPricing(model)
-	if err != nil {
-		// 模型不在定价列表中
-		response.Success(c, gin.H{"found": false})
-		return
-	}
-
-	response.Success(c, gin.H{
-		"found":              true,
-		"input_price":        pricing.InputPricePerToken,
-		"output_price":       pricing.OutputPricePerToken,
-		"cache_write_price":  pricing.CacheCreationPricePerToken,
-		"cache_read_price":   pricing.CacheReadPricePerToken,
-		"image_input_price":  pricing.ImageInputPricePerToken,
-		"image_output_price": pricing.ImageOutputPricePerToken,
-	})
-}
-
-// platformToLiteLLMProvider maps a channel platform name to the corresponding
-// LiteLLM provider string used as the key in the pricing catalog.
-var platformToLiteLLMProvider = map[string]string{
-	service.PlatformAnthropic:   "anthropic",
-	service.PlatformOpenAI:      "openai",
-	service.PlatformGemini:      "gemini",
-	service.PlatformAntigravity: "anthropic",
-	service.PlatformGrok:        "xai",
-	service.PlatformKimi:        "moonshot",
-	service.PlatformZhipu:       "zhipu",
-	service.PlatformDeepseek:    "deepseek",
-}
-
-// SyncPricingModels 返回 LiteLLM 定价目录中指定平台的最新模型列表
-// GET /api/v1/admin/channels/pricing/sync-models?platform=anthropic
-func (h *ChannelHandler) SyncPricingModels(c *gin.Context) {
-	platform := strings.ToLower(strings.TrimSpace(c.Query("platform")))
-	if platform == "" {
-		response.ErrorFrom(c, infraerrors.BadRequest("MISSING_PARAMETER", "platform parameter is required").
-			WithMetadata(map[string]string{"param": "platform"}))
-		return
-	}
-
-	provider, ok := platformToLiteLLMProvider[platform]
-	if !ok {
-		response.ErrorFrom(c, infraerrors.BadRequest("UNSUPPORTED_PLATFORM",
-			fmt.Sprintf("unsupported platform: %s", platform)).
-			WithMetadata(map[string]string{"param": "platform"}))
-		return
-	}
-
-	models := h.pricingService.ListModelNamesByProvider(provider)
-	response.Success(c, gin.H{"models": models})
 }

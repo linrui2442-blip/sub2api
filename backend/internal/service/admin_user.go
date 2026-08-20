@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -118,13 +117,6 @@ func normalizeUserRole(role, fallback string) (string, error) {
 }
 
 func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInput) (*User, error) {
-	balance := 0.0
-	if input.Balance != nil {
-		balance = *input.Balance
-	} else if s.settingService != nil {
-		balance = s.settingService.GetDefaultBalance(ctx)
-	}
-
 	// 角色可由管理员在创建时指定(admin/user);未提供时默认 user。
 	role, err := normalizeUserRole(input.Role, RoleUser)
 	if err != nil {
@@ -136,7 +128,6 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 		Username:      input.Username,
 		Notes:         input.Notes,
 		Role:          role,
-		Balance:       balance,
 		Concurrency:   input.Concurrency,
 		RPMLimit:      input.RPMLimit,
 		Status:        StatusActive,
@@ -153,7 +144,6 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 		logger.LegacyPrintf("service.admin", "audit: admin user created actor_admin_id=%d target_user_id=%d",
 			input.ActorAdminID, user.ID)
 	}
-	s.assignDefaultSubscriptions(ctx, user.ID)
 	return user, nil
 }
 
@@ -173,23 +163,6 @@ func (s *adminServiceImpl) ensureNotLastAdmin(ctx context.Context) error {
 		return errors.New("cannot demote the last admin user")
 	}
 	return nil
-}
-
-func (s *adminServiceImpl) assignDefaultSubscriptions(ctx context.Context, userID int64) {
-	if s.settingService == nil || s.defaultSubAssigner == nil || userID <= 0 {
-		return
-	}
-	items := s.settingService.GetDefaultSubscriptions(ctx)
-	for _, item := range items {
-		if _, _, err := s.defaultSubAssigner.AssignOrExtendSubscription(ctx, &AssignSubscriptionInput{
-			UserID:       userID,
-			GroupID:      item.GroupID,
-			ValidityDays: item.ValidityDays,
-			Notes:        "auto assigned by default user subscriptions setting",
-		}); err != nil {
-			logger.LegacyPrintf("service.admin", "failed to assign default subscription: user_id=%d group_id=%d err=%v", userID, item.GroupID, err)
-		}
-	}
 }
 
 func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *UpdateUserInput) (*User, error) {
@@ -301,27 +274,6 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		// allowed_groups 参与 API Key 专属分组授权判断；不失效缓存会让修改在一个 L2 TTL 内失去效果。
 		if user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit || !sameInt64Set(user.AllowedGroups, oldAllowedGroups) {
 			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, user.ID)
-		}
-	}
-
-	concurrencyDiff := user.Concurrency - oldConcurrency
-	if concurrencyDiff != 0 {
-		code, err := GenerateRedeemCode()
-		if err != nil {
-			logger.LegacyPrintf("service.admin", "failed to generate adjustment redeem code: %v", err)
-			return user, nil
-		}
-		adjustmentRecord := &RedeemCode{
-			Code:   code,
-			Type:   AdjustmentTypeAdminConcurrency,
-			Value:  float64(concurrencyDiff),
-			Status: StatusUsed,
-			UsedBy: &user.ID,
-		}
-		now := time.Now()
-		adjustmentRecord.UsedAt = &now
-		if err := s.redeemCodeRepo.Create(ctx, adjustmentRecord); err != nil {
-			logger.LegacyPrintf("service.admin", "failed to create concurrency adjustment redeem code: %v", err)
 		}
 	}
 
@@ -505,94 +457,6 @@ func (s *adminServiceImpl) BatchUpdateLimits(ctx context.Context, userIDs []int6
 	return affected, nil
 }
 
-func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string) (*User, error) {
-	// 余额调整必须走原子接口：先读后整行写回会把并发的计费扣款覆盖掉。
-	var (
-		change BalanceChange
-		err    error
-	)
-	switch operation {
-	case "set":
-		change, err = s.userRepo.SetBalance(ctx, userID, balance)
-	case "add":
-		change, err = s.userRepo.AdjustBalance(ctx, userID, balance)
-	case "subtract":
-		change, err = s.userRepo.AdjustBalance(ctx, userID, -balance)
-	default:
-		return nil, fmt.Errorf("unsupported balance operation: %q", operation)
-	}
-	if errors.Is(err, ErrBalanceNegative) {
-		return nil, fmt.Errorf("balance cannot be negative, current balance: %.2f, requested operation would result in: %.2f", change.Old, change.New)
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	balanceDiff := change.New - change.Old
-	if s.authCacheInvalidator != nil && balanceDiff != 0 {
-		s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
-	}
-	s.tryAccrueAffiliateRebateForAdminRecharge(ctx, userID, operation, balance)
-
-	if s.billingCacheService != nil {
-		go func() {
-			cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := s.billingCacheService.InvalidateUserBalance(cacheCtx, userID); err != nil {
-				logger.LegacyPrintf("service.admin", "invalidate user balance cache failed: user_id=%d err=%v", userID, err)
-			}
-		}()
-	}
-
-	if balanceDiff != 0 {
-		code, err := GenerateRedeemCode()
-		if err != nil {
-			logger.LegacyPrintf("service.admin", "failed to generate adjustment redeem code: %v", err)
-			return user, nil
-		}
-
-		adjustmentRecord := &RedeemCode{
-			Code:   code,
-			Type:   AdjustmentTypeAdminBalance,
-			Value:  balanceDiff,
-			Status: StatusUsed,
-			UsedBy: &user.ID,
-			Notes:  notes,
-		}
-		now := time.Now()
-		adjustmentRecord.UsedAt = &now
-
-		if err := s.redeemCodeRepo.Create(ctx, adjustmentRecord); err != nil {
-			logger.LegacyPrintf("service.admin", "failed to create balance adjustment redeem code: %v", err)
-		}
-	}
-
-	return user, nil
-}
-
-func (s *adminServiceImpl) tryAccrueAffiliateRebateForAdminRecharge(ctx context.Context, userID int64, operation string, amount float64) {
-	if operation != "add" || amount <= 0 || s.settingService == nil || s.affiliateService == nil {
-		return
-	}
-	if !s.settingService.IsAffiliateAdminRechargeEnabled(ctx) {
-		return
-	}
-
-	rebate, err := s.affiliateService.AccrueInviteRebate(ctx, userID, amount)
-	if err != nil {
-		logger.LegacyPrintf("service.admin", "affiliate rebate failed for admin recharge: user_id=%d amount=%.8f err=%v", userID, amount, err)
-		return
-	}
-	if rebate > 0 {
-		logger.LegacyPrintf("service.admin", "affiliate rebate accrued for admin recharge: user_id=%d amount=%.8f rebate=%.8f", userID, amount, rebate)
-	}
-}
-
 func (s *adminServiceImpl) GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int, sortBy, sortOrder string) ([]APIKey, int64, error) {
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize, SortBy: sortBy, SortOrder: sortOrder}
 	keys, result, err := s.apiKeyRepo.ListByUserID(ctx, userID, params, APIKeyListFilters{})
@@ -686,218 +550,6 @@ func (s *adminServiceImpl) GetUserUsageStats(ctx context.Context, userID int64, 
 		"total_tokens":    0,
 		"avg_duration_ms": 0,
 	}, nil
-}
-
-// GetUserBalanceHistory returns paginated balance/concurrency change records for a user.
-func (s *adminServiceImpl) GetUserBalanceHistory(ctx context.Context, userID int64, page, pageSize int, codeType string) ([]RedeemCode, int64, float64, error) {
-	params := pagination.PaginationParams{Page: page, PageSize: pageSize}
-	if codeType == RedeemTypeAffiliateBalance {
-		codes, total, err := s.listAffiliateBalanceHistory(ctx, userID, params)
-		if err != nil {
-			return nil, 0, 0, err
-		}
-		totalRecharged, err := s.redeemCodeRepo.SumPositiveBalanceByUser(ctx, userID)
-		if err != nil {
-			return nil, 0, 0, err
-		}
-		return codes, total, totalRecharged, nil
-	}
-
-	if codeType == "" {
-		return s.getAllUserBalanceHistory(ctx, userID, params)
-	}
-
-	codes, result, err := s.redeemCodeRepo.ListByUserPaginated(ctx, userID, params, codeType)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-	total := result.Total
-	// Aggregate total recharged amount (only once, regardless of type filter)
-	totalRecharged, err := s.redeemCodeRepo.SumPositiveBalanceByUser(ctx, userID)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-	return codes, total, totalRecharged, nil
-}
-
-func (s *adminServiceImpl) getAllUserBalanceHistory(ctx context.Context, userID int64, params pagination.PaginationParams) ([]RedeemCode, int64, float64, error) {
-	needed := params.Offset() + params.Limit()
-	if needed < params.Limit() {
-		needed = params.Limit()
-	}
-
-	redeemCodes, redeemTotal, err := s.listRedeemBalanceHistoryForMerge(ctx, userID, needed)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-	affiliateCodes, affiliateTotal, err := s.listAffiliateBalanceHistoryForMerge(ctx, userID, needed)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-	codes := mergeBalanceHistoryCodes(redeemCodes, affiliateCodes, params)
-
-	totalRecharged, err := s.redeemCodeRepo.SumPositiveBalanceByUser(ctx, userID)
-	if err != nil {
-		return nil, 0, 0, err
-	}
-	return codes, redeemTotal + affiliateTotal, totalRecharged, nil
-}
-
-func (s *adminServiceImpl) listRedeemBalanceHistoryForMerge(ctx context.Context, userID int64, needed int) ([]RedeemCode, int64, error) {
-	if needed <= 0 {
-		return nil, 0, nil
-	}
-
-	var (
-		out   []RedeemCode
-		total int64
-	)
-	for page := 1; len(out) < needed; page++ {
-		params := pagination.PaginationParams{Page: page, PageSize: 1000}
-		codes, result, err := s.redeemCodeRepo.ListByUserPaginated(ctx, userID, params, "")
-		if err != nil {
-			return nil, 0, err
-		}
-		if result != nil {
-			total = result.Total
-		}
-		out = append(out, codes...)
-		if len(codes) < params.Limit() || int64(len(out)) >= total {
-			break
-		}
-	}
-	if len(out) > needed {
-		out = out[:needed]
-	}
-	return out, total, nil
-}
-
-func (s *adminServiceImpl) listAffiliateBalanceHistoryForMerge(ctx context.Context, userID int64, needed int) ([]RedeemCode, int64, error) {
-	if needed <= 0 {
-		return nil, 0, nil
-	}
-
-	var (
-		out   []RedeemCode
-		total int64
-	)
-	for page := 1; len(out) < needed; page++ {
-		params := pagination.PaginationParams{Page: page, PageSize: 1000}
-		codes, currentTotal, err := s.listAffiliateBalanceHistory(ctx, userID, params)
-		if err != nil {
-			return nil, 0, err
-		}
-		total = currentTotal
-		out = append(out, codes...)
-		if len(codes) < params.Limit() || int64(len(out)) >= total {
-			break
-		}
-	}
-	if len(out) > needed {
-		out = out[:needed]
-	}
-	return out, total, nil
-}
-
-func (s *adminServiceImpl) listAffiliateBalanceHistory(ctx context.Context, userID int64, params pagination.PaginationParams) ([]RedeemCode, int64, error) {
-	if s == nil || s.entClient == nil || userID <= 0 {
-		return nil, 0, nil
-	}
-
-	rows, err := s.entClient.QueryContext(ctx, `
-SELECT id,
-       amount::double precision,
-       created_at
-FROM user_affiliate_ledger
-WHERE user_id = $1
-  AND action = 'transfer'
-ORDER BY created_at DESC, id DESC
-OFFSET $2
-LIMIT $3`, userID, params.Offset(), params.Limit())
-	if err != nil {
-		return nil, 0, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	codes := make([]RedeemCode, 0, params.Limit())
-	for rows.Next() {
-		var id int64
-		var amount float64
-		var createdAt time.Time
-		if err := rows.Scan(&id, &amount, &createdAt); err != nil {
-			return nil, 0, err
-		}
-		usedBy := userID
-		usedAt := createdAt
-		codes = append(codes, RedeemCode{
-			ID:        -id,
-			Code:      fmt.Sprintf("AFF-%d", id),
-			Type:      RedeemTypeAffiliateBalance,
-			Value:     amount,
-			Status:    StatusUsed,
-			UsedBy:    &usedBy,
-			UsedAt:    &usedAt,
-			CreatedAt: createdAt,
-		})
-	}
-	if err := rows.Err(); err != nil {
-		return nil, 0, err
-	}
-
-	total, err := countAffiliateBalanceHistory(ctx, s.entClient, userID)
-	if err != nil {
-		return nil, 0, err
-	}
-	return codes, total, nil
-}
-
-func countAffiliateBalanceHistory(ctx context.Context, client *dbent.Client, userID int64) (int64, error) {
-	rows, err := client.QueryContext(ctx, `
-SELECT COUNT(*)
-FROM user_affiliate_ledger
-WHERE user_id = $1
-  AND action = 'transfer'`, userID)
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var total sql.NullInt64
-	if rows.Next() {
-		if err := rows.Scan(&total); err != nil {
-			return 0, err
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return 0, err
-	}
-	if !total.Valid {
-		return 0, nil
-	}
-	return total.Int64, nil
-}
-
-func mergeBalanceHistoryCodes(redeemCodes, affiliateCodes []RedeemCode, params pagination.PaginationParams) []RedeemCode {
-	combined := append(append([]RedeemCode{}, redeemCodes...), affiliateCodes...)
-	sort.SliceStable(combined, func(i, j int) bool {
-		return redeemCodeHistoryTime(combined[i]).After(redeemCodeHistoryTime(combined[j]))
-	})
-	offset := params.Offset()
-	if offset >= len(combined) {
-		return []RedeemCode{}
-	}
-	end := offset + params.Limit()
-	if end > len(combined) {
-		end = len(combined)
-	}
-	return combined[offset:end]
-}
-
-func redeemCodeHistoryTime(code RedeemCode) time.Time {
-	if code.UsedAt != nil {
-		return *code.UsedAt
-	}
-	return code.CreatedAt
 }
 
 func (s *adminServiceImpl) BindUserAuthIdentity(ctx context.Context, userID int64, input AdminBindAuthIdentityInput) (*AdminBoundAuthIdentity, error) {
@@ -1231,90 +883,3 @@ func cloneAdminAuthIdentityMetadata(input map[string]any) map[string]any {
 }
 
 // Redeem code management implementations
-func (s *adminServiceImpl) ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, search string, sortBy, sortOrder string) ([]RedeemCode, int64, error) {
-	params := pagination.PaginationParams{Page: page, PageSize: pageSize, SortBy: sortBy, SortOrder: sortOrder}
-	codes, result, err := s.redeemCodeRepo.ListWithFilters(ctx, params, codeType, status, search)
-	if err != nil {
-		return nil, 0, err
-	}
-	return codes, result.Total, nil
-}
-
-func (s *adminServiceImpl) GetRedeemCode(ctx context.Context, id int64) (*RedeemCode, error) {
-	return s.redeemCodeRepo.GetByID(ctx, id)
-}
-
-func (s *adminServiceImpl) GenerateRedeemCodes(ctx context.Context, input *GenerateRedeemCodesInput) ([]RedeemCode, error) {
-	if input.ExpiresAt != nil && !input.ExpiresAt.After(time.Now()) {
-		return nil, ErrRedeemCodeExpired
-	}
-
-	// 如果是订阅类型，验证必须有 GroupID
-	if input.Type == RedeemTypeSubscription {
-		if input.GroupID == nil {
-			return nil, errors.New("group_id is required for subscription type")
-		}
-		// 验证分组存在且为订阅类型
-		group, err := s.groupRepo.GetByID(ctx, *input.GroupID)
-		if err != nil {
-			return nil, fmt.Errorf("group not found: %w", err)
-		}
-		if !group.IsSubscriptionType() {
-			return nil, errors.New("group must be subscription type")
-		}
-	}
-
-	codes := make([]RedeemCode, 0, input.Count)
-	for i := 0; i < input.Count; i++ {
-		codeValue, err := GenerateRedeemCode()
-		if err != nil {
-			return nil, err
-		}
-		code := RedeemCode{
-			Code:      codeValue,
-			Type:      input.Type,
-			Value:     input.Value,
-			Status:    StatusUnused,
-			ExpiresAt: input.ExpiresAt,
-		}
-		// 订阅类型专用字段
-		if input.Type == RedeemTypeSubscription {
-			code.GroupID = input.GroupID
-			code.ValidityDays = input.ValidityDays
-			if code.ValidityDays <= 0 {
-				code.ValidityDays = 30 // 默认30天
-			}
-		}
-		if err := s.redeemCodeRepo.Create(ctx, &code); err != nil {
-			return nil, err
-		}
-		codes = append(codes, code)
-	}
-	return codes, nil
-}
-
-func (s *adminServiceImpl) DeleteRedeemCode(ctx context.Context, id int64) error {
-	return s.redeemCodeRepo.Delete(ctx, id)
-}
-
-func (s *adminServiceImpl) BatchDeleteRedeemCodes(ctx context.Context, ids []int64) (int64, error) {
-	var deleted int64
-	for _, id := range ids {
-		if err := s.redeemCodeRepo.Delete(ctx, id); err == nil {
-			deleted++
-		}
-	}
-	return deleted, nil
-}
-
-func (s *adminServiceImpl) ExpireRedeemCode(ctx context.Context, id int64) (*RedeemCode, error) {
-	code, err := s.redeemCodeRepo.GetByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	code.Status = StatusExpired
-	if err := s.redeemCodeRepo.Update(ctx, code); err != nil {
-		return nil, err
-	}
-	return code, nil
-}

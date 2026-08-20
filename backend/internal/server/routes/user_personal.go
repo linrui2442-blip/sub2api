@@ -31,7 +31,6 @@ func RegisterPersonalUserRoutes(
 		user.PUT("/password", h.User.ChangePassword)
 		user.PUT("", h.User.UpdateProfile)
 		user.GET("/api-keys/:id/usage/daily", panelRateLimiter.Heavy(), h.Usage.GetMyAPIKeyDailyUsage)
-		user.GET("/platform-quotas", h.User.GetMyPlatformQuotas)
 
 		totp := user.Group("/totp")
 		{

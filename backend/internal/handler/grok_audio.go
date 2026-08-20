@@ -35,7 +35,7 @@ func (h *OpenAIGatewayHandler) GrokRealtime(c *gin.Context) {
 		return
 	}
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
-	if err := h.eligibilityChecker().CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.eligibilityChecker().CheckRequestEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
@@ -139,7 +139,7 @@ func (h *OpenAIGatewayHandler) GrokVoice(c *gin.Context, endpoint string) {
 		return
 	}
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
-	if err := h.eligibilityChecker().CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.eligibilityChecker().CheckRequestEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
@@ -207,10 +207,6 @@ func (h *OpenAIGatewayHandler) GrokVoice(c *gin.Context, endpoint string) {
 		account := selection.Account
 		var started bool
 		release, status := h.acquireResponsesAccountSlot(c, apiKey.GroupID, "", selection, false, &started, reqLog)
-		if status == openAISlotAcquireProfitVetoed {
-			failed[account.ID] = struct{}{}
-			continue
-		}
 		if status != openAISlotAcquireOK {
 			// Failed already wrote error response (or transient reject).
 			if status == openAISlotAcquireFailed && len(failed) == 0 {
@@ -247,7 +243,7 @@ func (h *OpenAIGatewayHandler) recordGrokVoiceUsage(
 	c *gin.Context,
 	apiKey *service.APIKey,
 	account *service.Account,
-	subscription *service.UserSubscription,
+	subscription any,
 	endpoint string,
 	body []byte,
 	result *service.OpenAIForwardResult,

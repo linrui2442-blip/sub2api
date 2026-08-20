@@ -126,9 +126,9 @@ func ParseGrokMediaRequest(contentType string, body []byte) GrokMediaRequestInfo
 	info.Model = strings.TrimSpace(info.Model)
 	info.Prompt = strings.TrimSpace(info.Prompt)
 	info.Size = strings.TrimSpace(info.Size)
-	info.SizeTier = NormalizeImageBillingTierOrDefault(info.Size)
-	info.Resolution = NormalizeVideoBillingResolutionOrDefault(info.Resolution)
-	info.DurationSeconds = NormalizeVideoBillingDurationSecondsOrDefault(info.DurationSeconds)
+	info.SizeTier = NormalizeImageSizeTier(info.Size)
+	info.Resolution = NormalizeVideoResolution(info.Resolution)
+	info.DurationSeconds = NormalizeVideoDuration(info.DurationSeconds)
 	if info.N <= 0 {
 		info.N = 1
 	}
@@ -412,10 +412,10 @@ func (s *OpenAIGatewayService) StoreGrokVideoPendingBilling(
 	pending.UpstreamModel = strings.TrimSpace(pending.UpstreamModel)
 	pending.OriginalModel = strings.TrimSpace(pending.OriginalModel)
 	if pending.VideoResolution != "" {
-		pending.VideoResolution = NormalizeVideoBillingResolutionOrDefault(pending.VideoResolution)
+		pending.VideoResolution = NormalizeVideoResolution(pending.VideoResolution)
 	}
 	if pending.VideoDurationSeconds > 0 {
-		pending.VideoDurationSeconds = NormalizeVideoBillingDurationSecondsOrDefault(pending.VideoDurationSeconds)
+		pending.VideoDurationSeconds = NormalizeVideoDuration(pending.VideoDurationSeconds)
 	}
 	// Always stamp create-accept time when missing so deferred duration_ms is E2E.
 	if strings.TrimSpace(pending.CreatedAt) == "" {
@@ -577,10 +577,10 @@ func ExtractGrokVideoBillingFromStatusBody(statusBody []byte, pending *GrokVideo
 	}
 	// Resolution is request-only per docs; empty → handler applies official default 480p.
 	if resolution != "" {
-		resolution = NormalizeVideoBillingResolutionOrDefault(resolution)
+		resolution = NormalizeVideoResolution(resolution)
 	}
 	if durationSeconds > 0 {
-		durationSeconds = NormalizeVideoBillingDurationSecondsOrDefault(durationSeconds)
+		durationSeconds = NormalizeVideoDuration(durationSeconds)
 	}
 	responseID := extractGrokMediaVideoRequestID(statusBody)
 	if responseID == "" {

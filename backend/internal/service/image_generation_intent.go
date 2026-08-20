@@ -33,7 +33,7 @@ func ImageGenerationPermissionMessage() string {
 
 // GroupAllowsImageGeneration preserves ungrouped-key behavior and enforces the flag when a group is present.
 func GroupAllowsImageGeneration(group *Group) bool {
-	return group == nil || group.AllowImageGeneration
+	return true
 }
 
 // IsImageGenerationIntent classifies requests that can produce generated images.

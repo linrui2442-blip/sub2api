@@ -32,12 +32,6 @@ func ProvideGitHubReleaseClient(cfg *config.Config) service.GitHubReleaseClient 
 	return NewGitHubReleaseClient(cfg.Update.ProxyURL, cfg.Security.ProxyFallback.AllowDirectOnError)
 }
 
-// ProvidePricingRemoteClient 创建定价数据远程客户端
-// 从配置中读取代理设置，支持国内服务器通过代理访问 GitHub 上的定价数据
-func ProvidePricingRemoteClient(cfg *config.Config) service.PricingRemoteClient {
-	return NewPricingRemoteClient(cfg.Update.ProxyURL, cfg.Security.ProxyFallback.AllowDirectOnError)
-}
-
 // ProvideSessionLimitCache 创建会话限制缓存
 // 用于 Anthropic OAuth/SetupToken 账号的并发会话数量控制
 func ProvideSessionLimitCache(rdb *redis.Client, cfg *config.Config) service.SessionLimitCache {
@@ -75,13 +69,7 @@ var ProviderSet = wire.NewSet(
 	NewScheduledTestPlanRepository,   // 定时测试计划仓储
 	NewScheduledTestResultRepository, // 定时测试结果仓储
 	NewProxyRepository,
-	NewRedeemCodeRepository,
-	NewPromoCodeRepository,
-	NewAnnouncementRepository,
-	NewAnnouncementReadRepository,
 	NewUsageLogRepository,
-	NewUsageBillingRepository,
-	NewBatchImageRepository,
 	NewIdempotencyRepository,
 	NewUsageCleanupRepository,
 	NewDashboardAggregationRepository,
@@ -90,7 +78,6 @@ var ProviderSet = wire.NewSet(
 	NewAuditLogRepository,
 	NewPasskeyRepository,
 	NewPasskeySessionStore,
-	NewUserSubscriptionRepository,
 	NewUserAttributeDefinitionRepository,
 	NewUserAttributeValueRepository,
 	NewUserGroupRateRepository,
@@ -101,13 +88,9 @@ var ProviderSet = wire.NewSet(
 	NewChannelMonitorV2Repository,
 	NewChannelMonitorRequestTemplateRepository,
 	NewContentModerationRepository,
-	NewAffiliateRepository,
-	NewUserPlatformQuotaRepository,     // T14: user × platform quota
-	NewUserPlatformQuotaServiceAdapter, // T14: adapter → service.UserPlatformQuotaRepository
 
 	// Cache implementations
 	NewGatewayCache,
-	NewBillingCache,
 	NewAPIKeyCache,
 	NewTempUnschedCache,
 	NewTimeoutCounterCache,
@@ -121,12 +104,9 @@ var ProviderSet = wire.NewSet(
 	NewDashboardCache,
 	NewEmailCache,
 	NewIdentityCache,
-	NewRedeemCache,
 	NewUpdateCache,
 	NewGeminiTokenCache,
 	NewImageTaskStore,
-	NewBatchImageQueue,
-	NewBatchImageDownloadLimiter,
 	NewLeaderLockCache,
 	ProvideSchedulerCache,
 	NewSchedulerOutboxRepository,
@@ -152,7 +132,6 @@ var ProviderSet = wire.NewSet(
 	NewTurnstileVerifier,
 	NewTencentCaptchaVerifier,
 	NewAliyunCaptchaVerifier,
-	ProvidePricingRemoteClient,
 	ProvideGitHubReleaseClient,
 	NewProxyExitInfoProber,
 	NewClaudeUsageFetcher,

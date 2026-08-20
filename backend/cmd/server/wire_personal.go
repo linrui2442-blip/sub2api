@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"sync"
 	"time"
 
@@ -22,6 +23,17 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// Application is the Personal Edition runtime assembled by Wire.
+type Application struct {
+	Server      *http.Server
+	PromptAudit *securityaudit.PromptService
+	Cleanup     func()
+}
+
+func providePrivacyClientFactory() service.PrivacyClientFactory {
+	return repository.CreatePrivacyReqClient
+}
+
 // initializePersonalApplication is intentionally separate from the standard
 // SaaS injector. Wire is demand-driven: only providers reachable from the
 // Personal handler/server boundary and the explicit Personal lifecycle below
@@ -32,11 +44,11 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 		repository.ProviderSet,
 		service.ProviderSet,
 		service.ProvidePersonalAPIKeyService,
-		service.NewPersonalUserService,
-		service.NewPersonalGatewayService,
-		service.NewPersonalOpenAIGatewayService,
+		service.NewUserService,
+		service.NewGatewayService,
+		service.NewOpenAIGatewayService,
 		service.NewPersonalAdminService,
-		service.NewPersonalChannelService,
+		service.NewChannelService,
 		wire.Bind(new(service.ChannelCacheInvalidator), new(*service.ChannelService)),
 		wire.Bind(new(service.AccountRuntimeBlocker), new(*service.OpenAIGatewayService)),
 		service.ProvidePersonalAuthService,

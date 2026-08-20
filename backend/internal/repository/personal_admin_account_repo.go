@@ -111,18 +111,13 @@ func (r *personalAdminAccountRepository) ListOAuthRefreshCandidatePage(ctx conte
 	return r.compat.ListOAuthRefreshCandidatePage(ctx, options)
 }
 
-// Personal Edition disables commercial billing probes. Account editing still
-// accepts a manual rate value for upstream UI compatibility, but there is no
-// background probe/rate-sync ownership to merge or preserve.
+// Personal Edition updates account state directly without commercial probes.
 func (r *personalAdminAccountRepository) UpdateWithAccountBillingSettings(
 	ctx context.Context,
 	account *service.Account,
 	_ *bool,
 	_ *bool,
-	rateMultiplier *float64,
+	_ *float64,
 ) error {
-	if account != nil && rateMultiplier != nil {
-		account.RateMultiplier = rateMultiplier
-	}
 	return r.compat.Update(ctx, account)
 }

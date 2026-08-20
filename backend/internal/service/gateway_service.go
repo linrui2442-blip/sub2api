@@ -152,21 +152,7 @@ func GatewayUserPlatformQuotaIncrStats() (mainPathErr, legacyPathErr, sentinelSe
 }
 
 // GatewayUserPlatformQuotaFlusherStats 暴露 flusher 运行指标供 ops/health 面板查询。
-func GatewayUserPlatformQuotaFlusherStats(f *UserPlatformQuotaUsageFlusher) map[string]int64 {
-	if f == nil || f.metrics == nil {
-		return nil
-	}
-	m := f.metrics
-	return map[string]int64{
-		"flush_success":        m.FlushSuccessTotal.Load(),
-		"flush_error":          m.FlushErrorTotal.Load(),
-		"flush_batch_size":     m.FlushBatchSizeTotal.Load(),
-		"flush_latency_ms_max": m.FlushLatencyMsMax.Load(),
-		"dirty_readd":          m.DirtyReaddTotal.Load(),
-		"dirty_lost":           m.DirtyLostTotal.Load(),
-		"flush_fk_violation":   m.FlushFKViolationTotal.Load(),
-	}
-}
+func GatewayUserPlatformQuotaFlusherStats(any) map[string]int64 { return nil }
 
 func openAIStreamEventIsTerminal(data string) bool {
 	trimmed := strings.TrimSpace(data)
@@ -575,15 +561,6 @@ type AccountSelectionResult struct {
 	Acquired    bool
 	ReleaseFunc func()
 	WaitPlan    *AccountWaitPlan // nil means no wait allowed
-	// profitGate 携带本次选号真实生效的利润门（无门为 nil）。门安装在调度栈的
-	// 局部 ctx 上，handler 必须经 ContextWithSelectionProfitGate 重放后才能在
-	// 调度栈之外做抢槽后终检与准入后粘性绑定。
-	profitGate *openAIProfitControlGate
-}
-
-// ProfitGateActive 报告本次选号是否处于利润门之下。
-func (r *AccountSelectionResult) ProfitGateActive() bool {
-	return r != nil && r.profitGate != nil
 }
 
 // ClaudeUsage 表示Claude API返回的usage信息
@@ -743,17 +720,13 @@ type GatewayService struct {
 	accountRepo           AccountRepository
 	groupRepo             GroupRepository
 	usageLogRepo          UsageLogRepository
-	usageBillingRepo      UsageBillingRepository
 	userRepo              UserRepository
-	userSubRepo           UserSubscriptionRepository
 	userGroupRateRepo     UserGroupRateRepository
 	cache                 GatewayCache
 	digestStore           *DigestSessionStore
 	cfg                   *config.Config
 	schedulerSnapshot     *SchedulerSnapshotService
-	billingService        *BillingService
 	rateLimitService      *RateLimitService
-	billingCacheService   *BillingCacheService
 	identityService       *IdentityService
 	httpUpstream          HTTPUpstream
 	deferredService       *DeferredService
@@ -771,12 +744,9 @@ type GatewayService struct {
 	debugModelRouting     atomic.Bool
 	debugClaudeMimic      atomic.Bool
 	channelService        *ChannelService
-	resolver              *ModelPricingResolver
 	compositeResolver     *CompositeRouteResolver
 	debugGatewayBodyFile  atomic.Pointer[os.File] // non-nil when SUB2API_DEBUG_GATEWAY_BODY is set
 	tlsFPProfileService   *TLSFingerprintProfileService
-	balanceNotifyService  *BalanceNotifyService
-	userPlatformQuotaRepo UserPlatformQuotaRepository
 }
 
 // NewGatewayService creates a new GatewayService
@@ -784,17 +754,13 @@ func NewGatewayService(
 	accountRepo AccountRepository,
 	groupRepo GroupRepository,
 	usageLogRepo UsageLogRepository,
-	usageBillingRepo UsageBillingRepository,
 	userRepo UserRepository,
-	userSubRepo UserSubscriptionRepository,
 	userGroupRateRepo UserGroupRateRepository,
 	cache GatewayCache,
 	cfg *config.Config,
 	schedulerSnapshot *SchedulerSnapshotService,
 	concurrencyService *ConcurrencyService,
-	billingService *BillingService,
 	rateLimitService *RateLimitService,
-	billingCacheService *BillingCacheService,
 	identityService *IdentityService,
 	httpUpstream HTTPUpstream,
 	deferredService *DeferredService,
@@ -805,47 +771,37 @@ func NewGatewayService(
 	settingService *SettingService,
 	tlsFPProfileService *TLSFingerprintProfileService,
 	channelService *ChannelService,
-	resolver *ModelPricingResolver,
 	compositeResolver *CompositeRouteResolver,
-	balanceNotifyService *BalanceNotifyService,
-	userPlatformQuotaRepo UserPlatformQuotaRepository,
 ) *GatewayService {
 	userGroupRateTTL := resolveUserGroupRateCacheTTL(cfg)
 	modelsListTTL := resolveModelsListCacheTTL(cfg)
 
 	svc := &GatewayService{
-		accountRepo:           accountRepo,
-		groupRepo:             groupRepo,
-		usageLogRepo:          usageLogRepo,
-		usageBillingRepo:      usageBillingRepo,
-		userRepo:              userRepo,
-		userSubRepo:           userSubRepo,
-		userGroupRateRepo:     userGroupRateRepo,
-		cache:                 cache,
-		digestStore:           digestStore,
-		cfg:                   cfg,
-		schedulerSnapshot:     schedulerSnapshot,
-		concurrencyService:    concurrencyService,
-		billingService:        billingService,
-		rateLimitService:      rateLimitService,
-		billingCacheService:   billingCacheService,
-		identityService:       identityService,
-		httpUpstream:          httpUpstream,
-		deferredService:       deferredService,
-		claudeTokenProvider:   claudeTokenProvider,
-		sessionLimitCache:     sessionLimitCache,
-		rpmCache:              rpmCache,
-		userGroupRateCache:    gocache.New(userGroupRateTTL, time.Minute),
-		settingService:        settingService,
-		modelsListCache:       gocache.New(modelsListTTL, time.Minute),
-		modelsListCacheTTL:    modelsListTTL,
-		responseHeaderFilter:  compileResponseHeaderFilter(cfg),
-		tlsFPProfileService:   tlsFPProfileService,
-		channelService:        channelService,
-		resolver:              resolver,
-		compositeResolver:     compositeResolver,
-		balanceNotifyService:  balanceNotifyService,
-		userPlatformQuotaRepo: userPlatformQuotaRepo,
+		accountRepo:          accountRepo,
+		groupRepo:            groupRepo,
+		usageLogRepo:         usageLogRepo,
+		userRepo:             userRepo,
+		userGroupRateRepo:    userGroupRateRepo,
+		cache:                cache,
+		digestStore:          digestStore,
+		cfg:                  cfg,
+		schedulerSnapshot:    schedulerSnapshot,
+		concurrencyService:   concurrencyService,
+		rateLimitService:     rateLimitService,
+		identityService:      identityService,
+		httpUpstream:         httpUpstream,
+		deferredService:      deferredService,
+		claudeTokenProvider:  claudeTokenProvider,
+		sessionLimitCache:    sessionLimitCache,
+		rpmCache:             rpmCache,
+		userGroupRateCache:   gocache.New(userGroupRateTTL, time.Minute),
+		settingService:       settingService,
+		modelsListCache:      gocache.New(modelsListTTL, time.Minute),
+		modelsListCacheTTL:   modelsListTTL,
+		responseHeaderFilter: compileResponseHeaderFilter(cfg),
+		tlsFPProfileService:  tlsFPProfileService,
+		channelService:       channelService,
+		compositeResolver:    compositeResolver,
 	}
 	svc.userGroupRateResolver = newUserGroupRateResolver(
 		userGroupRateRepo,
@@ -860,39 +816,6 @@ func NewGatewayService(
 		svc.initDebugGatewayBodyFile(path)
 	}
 	return svc
-}
-
-// NewPersonalGatewayService builds the Anthropic/Gemini gateway core without
-// SaaS billing, subscriptions, user pricing overrides, or commercial quotas.
-func NewPersonalGatewayService(
-	accountRepo AccountRepository,
-	groupRepo GroupRepository,
-	usageLogRepo UsageLogRepository,
-	userRepo UserRepository,
-	cache GatewayCache,
-	cfg *config.Config,
-	schedulerSnapshot *SchedulerSnapshotService,
-	concurrencyService *ConcurrencyService,
-	rateLimitService *RateLimitService,
-	identityService *IdentityService,
-	httpUpstream HTTPUpstream,
-	deferredService *DeferredService,
-	claudeTokenProvider *ClaudeTokenProvider,
-	sessionLimitCache SessionLimitCache,
-	rpmCache RPMCache,
-	digestStore *DigestSessionStore,
-	settingService *SettingService,
-	tlsFPProfileService *TLSFingerprintProfileService,
-	channelService *ChannelService,
-	compositeResolver *CompositeRouteResolver,
-) *GatewayService {
-	return NewGatewayService(
-		accountRepo, groupRepo, usageLogRepo, nil, userRepo, nil, nil,
-		cache, cfg, schedulerSnapshot, concurrencyService, nil, rateLimitService,
-		nil, identityService, httpUpstream, deferredService, claudeTokenProvider,
-		sessionLimitCache, rpmCache, digestStore, settingService, tlsFPProfileService,
-		channelService, nil, compositeResolver, nil, nil,
-	)
 }
 
 // GenerateSessionHash 从预解析请求计算粘性会话 hash
@@ -970,39 +893,7 @@ func (s *GatewayService) BindStickySession(ctx context.Context, groupID *int64, 
 	return s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, accountID, stickySessionTTL)
 }
 
-// bindGatewayStickySessionDuringSelection preserves the normal eager sticky
-// behavior unless a profit gate is installed. Profit-controlled requests bind
-// only after the terminal post-slot check, otherwise a rejected candidate could
-// overwrite a healthy pre-existing sticky binding.
 func (s *GatewayService) bindGatewayStickySessionDuringSelection(ctx context.Context, groupID *int64, sessionHash string, accountID int64) error {
-	if gatewayProfitControlGateActive(ctx) {
-		return nil
-	}
-	return s.BindStickySession(ctx, groupID, sessionHash, accountID)
-}
-
-// BindStickySessionAfterProfitAdmission records a terminally admitted
-// account. Without a profit gate it preserves the pre-existing eager binding
-// behavior at the handler bind points. With a gate it never replaces a
-// different binding that already exists: a temporarily ineligible sticky
-// account remains bound and automatically becomes eligible again if its
-// account rate recovers.
-func (s *GatewayService) BindStickySessionAfterProfitAdmission(ctx context.Context, groupID *int64, sessionHash string, accountID int64) error {
-	if sessionHash == "" || accountID <= 0 || s.cache == nil {
-		return nil
-	}
-	if !gatewayProfitControlGateActive(ctx) {
-		return s.BindStickySession(ctx, groupID, sessionHash, accountID)
-	}
-	existingAccountID, err := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
-	if err != nil && !errors.Is(err, ErrStickySessionNotFound) {
-		// 读失败时无法判断既有绑定，保守跳过而不是冒着覆盖健康绑定的风险写入。
-		slog.Warn("profit_control_sticky_binding_read_failed", "group_id", derefGroupID(groupID), "account_id", accountID, "error", err)
-		return nil
-	}
-	if existingAccountID > 0 && existingAccountID != accountID {
-		return nil
-	}
 	return s.BindStickySession(ctx, groupID, sessionHash, accountID)
 }
 

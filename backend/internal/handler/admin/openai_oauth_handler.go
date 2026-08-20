@@ -182,7 +182,6 @@ type OpenAICodexPATCreateRequest struct {
 	ProxyID                 *int64         `json:"proxy_id"`
 	Concurrency             *int           `json:"concurrency"`
 	Priority                *int           `json:"priority"`
-	RateMultiplier          *float64       `json:"rate_multiplier"`
 	LoadFactor              *int           `json:"load_factor"`
 	ExpiresAt               *int64         `json:"expires_at"`
 	AutoPauseOnExpired      *bool          `json:"auto_pause_on_expired"`
@@ -383,10 +382,6 @@ func (h *OpenAIOAuthHandler) CreateAccountFromCodexPAT(c *gin.Context) {
 		response.BadRequest(c, "priority must be >= 0")
 		return
 	}
-	if req.RateMultiplier != nil && *req.RateMultiplier < 0 {
-		response.BadRequest(c, "rate_multiplier must be >= 0")
-		return
-	}
 	if req.LoadFactor != nil && *req.LoadFactor > 10000 {
 		response.BadRequest(c, "load_factor must be <= 10000")
 		return
@@ -444,7 +439,6 @@ func (h *OpenAIOAuthHandler) CreateAccountFromCodexPAT(c *gin.Context) {
 		ProxyID:               req.ProxyID,
 		Concurrency:           concurrency,
 		Priority:              priority,
-		RateMultiplier:        req.RateMultiplier,
 		LoadFactor:            req.LoadFactor,
 		GroupIDs:              req.GroupIDs,
 		ExpiresAt:             req.ExpiresAt,

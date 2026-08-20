@@ -666,7 +666,6 @@ func TestOpenAIGatewayService_ProxyResponsesWebSocketFromClient_CodexImageBridge
 		GroupID: &groupID,
 		Group: &Group{
 			ID:                   groupID,
-			AllowImageGeneration: true,
 		},
 	}
 	account := &Account{

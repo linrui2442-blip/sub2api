@@ -19,7 +19,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
-	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
@@ -606,27 +605,6 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 		u := userEntityToService(users[i])
 		outUsers = append(outUsers, *u)
 		userMap[u.ID] = &outUsers[len(outUsers)-1]
-	}
-
-	shouldLoadSubscriptions := filters.IncludeSubscriptions == nil || *filters.IncludeSubscriptions
-	if shouldLoadSubscriptions {
-		// Batch load active subscriptions with groups to avoid N+1.
-		subs, err := r.client.UserSubscription.Query().
-			Where(
-				usersubscription.UserIDIn(userIDs...),
-				usersubscription.StatusEQ(service.SubscriptionStatusActive),
-			).
-			WithGroup().
-			All(ctx)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		for i := range subs {
-			if u, ok := userMap[subs[i].UserID]; ok {
-				u.Subscriptions = append(u.Subscriptions, *userSubscriptionEntityToService(subs[i]))
-			}
-		}
 	}
 
 	allowedGroupsByUser, err := r.loadAllowedGroups(ctx, userIDs)

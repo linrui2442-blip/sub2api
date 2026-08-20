@@ -81,7 +81,7 @@ func (h *OpenAIGatewayHandler) Live(c *gin.Context) {
 		h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "Billing service unavailable")
 		return
 	}
-	if err := h.eligibilityChecker().CheckBillingEligibility(
+	if err := h.eligibilityChecker().CheckRequestEligibility(
 		c.Request.Context(),
 		apiKey.User,
 		apiKey,
@@ -112,7 +112,7 @@ func (h *OpenAIGatewayHandler) Live(c *gin.Context) {
 	}
 	defer userRelease()
 
-	identity := liveCallIdentity(c, apiKey, subject.UserID, subscription)
+	identity := liveCallIdentity(c, apiKey, subject.UserID)
 	created, err := h.gatewayService.CreateLiveCall(c.Request.Context(), request, identity, subject.Concurrency)
 	if err != nil {
 		h.writeLiveCreateError(c, err)
@@ -159,18 +159,11 @@ func liveCallIdentity(
 	c *gin.Context,
 	apiKey *service.APIKey,
 	userID int64,
-	subscription *service.UserSubscription,
 ) service.LiveCallIdentity {
-	var subscriptionID *int64
-	if subscription != nil {
-		value := subscription.ID
-		subscriptionID = &value
-	}
 	return service.LiveCallIdentity{
 		APIKeyID:        apiKey.ID,
 		UserID:          userID,
 		GroupID:         apiKey.GroupID,
-		SubscriptionID:  subscriptionID,
 		UserAgent:       c.GetHeader("User-Agent"),
 		IPAddress:       ip.GetClientIP(c),
 		InboundEndpoint: GetInboundEndpoint(c),

@@ -238,63 +238,6 @@ func TestOpenAIGatewayService_Forward_NormalizesMaxTokensAndStripsPromptCacheOpt
 	})
 }
 
-func TestOpenAIGatewayService_Forward_MappedImageModelUsesImageGate(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	upstream := &httpUpstreamRecorder{
-		resp: &http.Response{
-			StatusCode: http.StatusOK,
-			Header:     http.Header{"Content-Type": []string{"application/json"}},
-			Body:       io.NopCloser(strings.NewReader(`{"usage":{"input_tokens":1,"output_tokens":2}}`)),
-		},
-	}
-	cfg := &config.Config{}
-	cfg.Security.URLAllowlist.Enabled = false
-	svc := &OpenAIGatewayService{cfg: cfg, httpUpstream: upstream}
-	account := &Account{
-		ID:          3,
-		Name:        "openai-apikey",
-		Platform:    PlatformOpenAI,
-		Type:        AccountTypeAPIKey,
-		Concurrency: 1,
-		Credentials: map[string]any{
-			"api_key":       "sk-test",
-			"base_url":      "https://example.com",
-			"model_mapping": map[string]any{"draw-alias": "gpt-image-2"},
-		},
-		Extra: map[string]any{"use_responses_api": true},
-	}
-	rec := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(rec)
-	c.Request = httptest.NewRequest(http.MethodPost, "/openai/v1/responses", nil)
-	c.Set("api_key", &APIKey{Group: &Group{AllowImageGeneration: false}})
-	SetOpenAIClientTransport(c, OpenAIClientTransportHTTP)
-
-	body := []byte(`{"model":"draw-alias","stream":false,"input":"draw"}`)
-	result, err := svc.Forward(context.Background(), c, account, body)
-	require.Error(t, err)
-	require.Nil(t, result)
-	require.Nil(t, upstream.lastReq)
-	require.Equal(t, http.StatusForbidden, rec.Code)
-	cached, known := getOpenAIImageIntentHint(c)
-	require.True(t, known)
-	require.False(t, cached)
-
-	textAccount := *account
-	textAccount.ID = 4
-	textAccount.Credentials = map[string]any{
-		"api_key":  "sk-test",
-		"base_url": "https://example.com",
-	}
-	result, err = svc.Forward(context.Background(), c, &textAccount, body)
-	require.NoError(t, err)
-	require.NotNil(t, result)
-	require.NotNil(t, upstream.lastReq)
-	require.Len(t, upstream.bodies, 1)
-	cached, known = getOpenAIImageIntentHint(c)
-	require.True(t, known)
-	require.False(t, cached)
-}
-
 func TestOpenAIGatewayService_Forward_TextResponsesSetsBillingModelToMappedModel(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	upstream := &httpUpstreamRecorder{
@@ -707,7 +650,7 @@ func TestOpenAIGatewayService_Forward_CodexBridgeInjectionSetsImageBilling(t *te
 	rec := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(rec)
 	c.Request = httptest.NewRequest(http.MethodPost, "/openai/v1/responses", nil)
-	c.Set("api_key", &APIKey{Group: &Group{AllowImageGeneration: true}})
+	c.Set("api_key", &APIKey{Group: &Group{}})
 	SetOpenAIClientTransport(c, OpenAIClientTransportHTTP)
 
 	body := []byte(`{"model":"gpt-5","stream":false,"input":"draw if needed"}`)
@@ -789,7 +732,7 @@ func TestOpenAIGatewayService_Forward_StripsImageGenerationToolForSparkAPIKey(t 
 	c.Request = httptest.NewRequest(http.MethodPost, "/openai/v1/responses", nil)
 	// Allow image generation so the tool is normalized (not gated out), reproducing
 	// the leak the strip must override.
-	c.Set("api_key", &APIKey{Group: &Group{AllowImageGeneration: true}})
+	c.Set("api_key", &APIKey{Group: &Group{}})
 	SetOpenAIClientTransport(c, OpenAIClientTransportHTTP)
 
 	body := []byte(`{"model":"gpt-5.3-codex-spark","stream":false,"input":"hi","tools":[{"type":"function","name":"shell"},{"type":"image_generation","output_format":"png"}]}`)

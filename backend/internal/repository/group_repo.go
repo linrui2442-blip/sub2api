@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -57,45 +56,13 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 	if groupIn == nil {
 		return errors.New("group is nil")
 	}
-	modelPricing, err := json.Marshal(groupIn.ModelPricing)
-	if err != nil {
-		return fmt.Errorf("marshal group model pricing: %w", err)
-	}
 	builder := client.Group.Create().
 		SetName(groupIn.Name).
 		SetDescription(groupIn.Description).
 		SetPlatform(groupIn.Platform).
-		SetRateMultiplier(groupIn.RateMultiplier).
 		SetSortOrder(groupIn.SortOrder).
 		SetIsExclusive(groupIn.IsExclusive).
 		SetStatus(groupIn.Status).
-		SetSubscriptionType(groupIn.SubscriptionType).
-		SetNillableDailyLimitUsd(groupIn.DailyLimitUSD).
-		SetNillableWeeklyLimitUsd(groupIn.WeeklyLimitUSD).
-		SetNillableMonthlyLimitUsd(groupIn.MonthlyLimitUSD).
-		SetAllowImageGeneration(groupIn.AllowImageGeneration).
-		SetAllowBatchImageGeneration(groupIn.AllowBatchImageGeneration).
-		SetImageRateIndependent(groupIn.ImageRateIndependent).
-		SetImageRateMultiplier(groupIn.ImageRateMultiplier).
-		SetNillableImagePrice1k(groupIn.ImagePrice1K).
-		SetNillableImagePrice2k(groupIn.ImagePrice2K).
-		SetNillableImagePrice4k(groupIn.ImagePrice4K).
-		SetBatchImageDiscountMultiplier(groupIn.BatchImageDiscountMultiplier).
-		SetBatchImageHoldMultiplier(groupIn.BatchImageHoldMultiplier).
-		SetVideoRateIndependent(groupIn.VideoRateIndependent).
-		SetVideoRateMultiplier(groupIn.VideoRateMultiplier).
-		SetNillableVideoPrice480p(groupIn.VideoPrice480P).
-		SetNillableVideoPrice720p(groupIn.VideoPrice720P).
-		SetNillableVideoPrice1080p(groupIn.VideoPrice1080P).
-		SetVideoModelPrices(service.NormalizeVideoModelPrices(groupIn.VideoModelPrices)).
-		SetNillableWebSearchPricePerCall(groupIn.WebSearchPricePerCall).
-		SetNillableSearchPricePer1k(groupIn.SearchPricePer1k).
-		SetNillableAudioRealtimePricePerMin(groupIn.AudioRealtimePricePerMin).
-		SetNillableAudioTtsPricePerMillionChars(groupIn.AudioTTSPricePerMillionChars).
-		SetNillableAudioSttPricePerHour(groupIn.AudioSTTPricePerHour).
-		SetLongContextPricingEnabled(groupIn.LongContextPricingEnabled).
-		SetModelPricing(modelPricing).
-		SetDefaultValidityDays(groupIn.DefaultValidityDays).
 		SetClaudeCodeOnly(groupIn.ClaudeCodeOnly).
 		SetNillableFallbackGroupID(groupIn.FallbackGroupID).
 		SetNillableFallbackGroupIDOnInvalidRequest(groupIn.FallbackGroupIDOnInvalidRequest).
@@ -111,25 +78,13 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 		SetRpmLimit(groupIn.RPMLimit).
 		SetMaxReasoningEffort(groupIn.MaxReasoningEffort).
 		SetReasoningEffortMappings(groupIn.ReasoningEffortMappings).
-		SetPeakRateEnabled(groupIn.PeakRateEnabled).
-		SetPeakStart(groupIn.PeakStart).
-		SetPeakEnd(groupIn.PeakEnd).
-		SetPeakRateMultiplier(groupIn.PeakRateMultiplier).
-		SetProfitControlEnabled(groupIn.ProfitControlEnabled).
-		SetProfitMinMargin(groupIn.ProfitMinMargin).
-		SetProfitSafetyBuffer(groupIn.ProfitSafetyBuffer)
+		SetSupportedModelScopes(groupIn.SupportedModelScopes)
 	if groupIn.DuplicateOperationID != "" {
 		builder = builder.SetDuplicateOperationID(groupIn.DuplicateOperationID)
 	}
-
-	// 设置模型路由配置
 	if groupIn.ModelRouting != nil {
 		builder = builder.SetModelRouting(groupIn.ModelRouting)
 	}
-
-	// 设置支持的模型系列（始终设置，空数组表示不限制）
-	builder = builder.SetSupportedModelScopes(groupIn.SupportedModelScopes)
-
 	created, err := builder.Save(ctx)
 	if err != nil {
 		return translatePersistenceError(err, nil, service.ErrGroupExists)
@@ -241,39 +196,13 @@ func (r *groupRepository) GetByIDLite(ctx context.Context, id int64) (*service.G
 }
 
 func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) error {
-	modelPricing, err := json.Marshal(groupIn.ModelPricing)
-	if err != nil {
-		return fmt.Errorf("marshal group model pricing: %w", err)
-	}
 	builder := r.client.Group.UpdateOneID(groupIn.ID).
 		SetName(groupIn.Name).
 		SetDescription(groupIn.Description).
 		SetPlatform(groupIn.Platform).
-		SetRateMultiplier(groupIn.RateMultiplier).
+		SetSortOrder(groupIn.SortOrder).
 		SetIsExclusive(groupIn.IsExclusive).
 		SetStatus(groupIn.Status).
-		SetSubscriptionType(groupIn.SubscriptionType).
-		SetNillableDailyLimitUsd(groupIn.DailyLimitUSD).
-		SetNillableWeeklyLimitUsd(groupIn.WeeklyLimitUSD).
-		SetNillableMonthlyLimitUsd(groupIn.MonthlyLimitUSD).
-		SetAllowImageGeneration(groupIn.AllowImageGeneration).
-		SetAllowBatchImageGeneration(groupIn.AllowBatchImageGeneration).
-		SetImageRateIndependent(groupIn.ImageRateIndependent).
-		SetImageRateMultiplier(groupIn.ImageRateMultiplier).
-		SetNillableImagePrice1k(groupIn.ImagePrice1K).
-		SetNillableImagePrice2k(groupIn.ImagePrice2K).
-		SetNillableImagePrice4k(groupIn.ImagePrice4K).
-		SetBatchImageDiscountMultiplier(groupIn.BatchImageDiscountMultiplier).
-		SetBatchImageHoldMultiplier(groupIn.BatchImageHoldMultiplier).
-		SetVideoRateIndependent(groupIn.VideoRateIndependent).
-		SetVideoRateMultiplier(groupIn.VideoRateMultiplier).
-		SetNillableVideoPrice480p(groupIn.VideoPrice480P).
-		SetNillableVideoPrice720p(groupIn.VideoPrice720P).
-		SetNillableVideoPrice1080p(groupIn.VideoPrice1080P).
-		SetVideoModelPrices(service.NormalizeVideoModelPrices(groupIn.VideoModelPrices)).
-		SetLongContextPricingEnabled(groupIn.LongContextPricingEnabled).
-		SetModelPricing(modelPricing).
-		SetDefaultValidityDays(groupIn.DefaultValidityDays).
 		SetClaudeCodeOnly(groupIn.ClaudeCodeOnly).
 		SetModelRoutingEnabled(groupIn.ModelRoutingEnabled).
 		SetMcpXMLInject(groupIn.MCPXMLInject).
@@ -287,109 +216,22 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		SetRpmLimit(groupIn.RPMLimit).
 		SetMaxReasoningEffort(groupIn.MaxReasoningEffort).
 		SetReasoningEffortMappings(groupIn.ReasoningEffortMappings).
-		SetPeakRateEnabled(groupIn.PeakRateEnabled).
-		SetPeakStart(groupIn.PeakStart).
-		SetPeakEnd(groupIn.PeakEnd).
-		SetPeakRateMultiplier(groupIn.PeakRateMultiplier).
-		SetProfitControlEnabled(groupIn.ProfitControlEnabled).
-		SetProfitMinMargin(groupIn.ProfitMinMargin).
-		SetProfitSafetyBuffer(groupIn.ProfitSafetyBuffer)
-
-	// 显式处理可空字段：nil 需要 clear，非 nil 需要 set。
-	if groupIn.DailyLimitUSD != nil {
-		builder = builder.SetDailyLimitUsd(*groupIn.DailyLimitUSD)
-	} else {
-		builder = builder.ClearDailyLimitUsd()
-	}
-	if groupIn.WeeklyLimitUSD != nil {
-		builder = builder.SetWeeklyLimitUsd(*groupIn.WeeklyLimitUSD)
-	} else {
-		builder = builder.ClearWeeklyLimitUsd()
-	}
-	if groupIn.MonthlyLimitUSD != nil {
-		builder = builder.SetMonthlyLimitUsd(*groupIn.MonthlyLimitUSD)
-	} else {
-		builder = builder.ClearMonthlyLimitUsd()
-	}
-	if groupIn.ImagePrice1K != nil {
-		builder = builder.SetImagePrice1k(*groupIn.ImagePrice1K)
-	} else {
-		builder = builder.ClearImagePrice1k()
-	}
-	if groupIn.ImagePrice2K != nil {
-		builder = builder.SetImagePrice2k(*groupIn.ImagePrice2K)
-	} else {
-		builder = builder.ClearImagePrice2k()
-	}
-	if groupIn.ImagePrice4K != nil {
-		builder = builder.SetImagePrice4k(*groupIn.ImagePrice4K)
-	} else {
-		builder = builder.ClearImagePrice4k()
-	}
-	if groupIn.VideoPrice480P != nil {
-		builder = builder.SetVideoPrice480p(*groupIn.VideoPrice480P)
-	} else {
-		builder = builder.ClearVideoPrice480p()
-	}
-	if groupIn.VideoPrice720P != nil {
-		builder = builder.SetVideoPrice720p(*groupIn.VideoPrice720P)
-	} else {
-		builder = builder.ClearVideoPrice720p()
-	}
-	if groupIn.VideoPrice1080P != nil {
-		builder = builder.SetVideoPrice1080p(*groupIn.VideoPrice1080P)
-	} else {
-		builder = builder.ClearVideoPrice1080p()
-	}
-	if groupIn.WebSearchPricePerCall != nil {
-		builder = builder.SetWebSearchPricePerCall(*groupIn.WebSearchPricePerCall)
-	} else {
-		builder = builder.ClearWebSearchPricePerCall()
-	}
-	if groupIn.SearchPricePer1k != nil {
-		builder = builder.SetSearchPricePer1k(*groupIn.SearchPricePer1k)
-	} else {
-		builder = builder.ClearSearchPricePer1k()
-	}
-	if groupIn.AudioRealtimePricePerMin != nil {
-		builder = builder.SetAudioRealtimePricePerMin(*groupIn.AudioRealtimePricePerMin)
-	} else {
-		builder = builder.ClearAudioRealtimePricePerMin()
-	}
-	if groupIn.AudioTTSPricePerMillionChars != nil {
-		builder = builder.SetAudioTtsPricePerMillionChars(*groupIn.AudioTTSPricePerMillionChars)
-	} else {
-		builder = builder.ClearAudioTtsPricePerMillionChars()
-	}
-	if groupIn.AudioSTTPricePerHour != nil {
-		builder = builder.SetAudioSttPricePerHour(*groupIn.AudioSTTPricePerHour)
-	} else {
-		builder = builder.ClearAudioSttPricePerHour()
-	}
-
-	// 处理 FallbackGroupID：nil 时清除，否则设置
+		SetSupportedModelScopes(groupIn.SupportedModelScopes)
 	if groupIn.FallbackGroupID != nil {
 		builder = builder.SetFallbackGroupID(*groupIn.FallbackGroupID)
 	} else {
 		builder = builder.ClearFallbackGroupID()
 	}
-	// 处理 FallbackGroupIDOnInvalidRequest：nil 时清除，否则设置
 	if groupIn.FallbackGroupIDOnInvalidRequest != nil {
 		builder = builder.SetFallbackGroupIDOnInvalidRequest(*groupIn.FallbackGroupIDOnInvalidRequest)
 	} else {
 		builder = builder.ClearFallbackGroupIDOnInvalidRequest()
 	}
-
-	// 处理 ModelRouting：nil 时清除，否则设置
 	if groupIn.ModelRouting != nil {
 		builder = builder.SetModelRouting(groupIn.ModelRouting)
 	} else {
 		builder = builder.ClearModelRouting()
 	}
-
-	// 处理 SupportedModelScopes（始终设置，空数组表示不限制）
-	builder = builder.SetSupportedModelScopes(groupIn.SupportedModelScopes)
-
 	updated, err := builder.Save(ctx)
 	if err != nil {
 		return translatePersistenceError(err, service.ErrGroupNotFound, service.ErrGroupExists)
@@ -579,12 +421,6 @@ func groupListOrder(params pagination.PaginationParams) []func(*entsql.Selector)
 		defaultOrder = false
 	case "platform":
 		field = group.FieldPlatform
-		defaultOrder = false
-	case "billing_type", "subscription_type":
-		field = group.FieldSubscriptionType
-		defaultOrder = false
-	case "rate_multiplier":
-		field = group.FieldRateMultiplier
 		defaultOrder = false
 	case "is_exclusive":
 		field = group.FieldIsExclusive
@@ -799,11 +635,10 @@ func (r *groupRepository) DeleteAccountGroupsByGroupID(ctx context.Context, grou
 }
 
 func (r *groupRepository) DeleteCascade(ctx context.Context, id int64) ([]int64, error) {
-	g, err := r.client.Group.Query().Where(group.IDEQ(id)).Only(ctx)
+	_, err := r.client.Group.Query().Where(group.IDEQ(id)).Only(ctx)
 	if err != nil {
 		return nil, translatePersistenceError(err, service.ErrGroupNotFound, nil)
 	}
-	groupSvc := groupEntityToService(g)
 
 	// 使用 ent 事务统一包裹：避免手工基于 *sql.Tx 构造 ent client 带来的驱动断言问题，
 	// 同时保证级联删除的原子性。
@@ -843,51 +678,23 @@ func (r *groupRepository) DeleteCascade(ctx context.Context, id int64) ([]int64,
 		return nil, service.ErrGroupNotFound
 	}
 
-	var affectedUserIDs []int64
-	if groupSvc.IsSubscriptionType() {
-		// 只查询未软删除的订阅，避免通知已取消订阅的用户
-		rows, err := exec.QueryContext(ctx, "SELECT user_id FROM user_subscriptions WHERE group_id = $1 AND deleted_at IS NULL", id)
-		if err != nil {
-			return nil, err
-		}
-		for rows.Next() {
-			var userID int64
-			if scanErr := rows.Scan(&userID); scanErr != nil {
-				_ = rows.Close()
-				return nil, scanErr
-			}
-			affectedUserIDs = append(affectedUserIDs, userID)
-		}
-		if err := rows.Close(); err != nil {
-			return nil, err
-		}
-		if err := rows.Err(); err != nil {
-			return nil, err
-		}
-
-		// 软删除订阅：设置 deleted_at 而非硬删除
-		if _, err := exec.ExecContext(ctx, "UPDATE user_subscriptions SET deleted_at = NOW() WHERE group_id = $1 AND deleted_at IS NULL", id); err != nil {
-			return nil, err
-		}
-	}
-
-	// 2. Remove the group id from user_allowed_groups join table.
+	// Remove the group id from user_allowed_groups join table.
 	// Legacy users.allowed_groups 列已弃用，不再同步。
 	if _, err := exec.ExecContext(ctx, "DELETE FROM user_allowed_groups WHERE group_id = $1", id); err != nil {
 		return nil, err
 	}
 
-	// 3. Delete account_groups join rows.
+	// Delete account_groups join rows.
 	if _, err := exec.ExecContext(ctx, "DELETE FROM account_groups WHERE group_id = $1", id); err != nil {
 		return nil, err
 	}
 
-	// 4. Soft-delete composite model routes owned by this group.
+	// Soft-delete composite model routes owned by this group.
 	if _, err := exec.ExecContext(ctx, "UPDATE composite_model_routes SET deleted_at = NOW() WHERE group_id = $1 AND deleted_at IS NULL", id); err != nil {
 		return nil, err
 	}
 
-	// 5. Soft-delete group itself.
+	// Soft-delete group itself.
 	if _, err := txClient.Group.Delete().Where(group.IDEQ(id)).Exec(ctx); err != nil {
 		return nil, err
 	}
@@ -901,7 +708,7 @@ func (r *groupRepository) DeleteCascade(ctx context.Context, id int64) ([]int64,
 		logger.LegacyPrintf("repository.group", "[SchedulerOutbox] enqueue group cascade delete failed: group=%d err=%v", id, err)
 	}
 
-	return affectedUserIDs, nil
+	return nil, nil
 }
 
 type groupAccountCounts struct {

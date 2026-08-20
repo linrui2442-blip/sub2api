@@ -38,7 +38,6 @@ const (
 	openAIQuotaHeadroomNeutralFactor           = 0.5
 	openAIQuotaHeadroomSecondaryLowRemain      = 0.10
 	openAIQuotaHeadroomSnapshotStaleAfter      = 8 * time.Hour
-	openAIUpstreamCostNeutralFactor            = 0.5
 	defaultOpenAIOAuthSchedulingRateMultiplier = 1.0
 )
 
@@ -532,11 +531,11 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 	result, acquireErr := s.service.tryAcquireAccountSlot(ctx, accountID, account.Concurrency)
 	if acquireErr == nil && result != nil && result.Acquired {
 		_ = s.service.refreshStickySessionTTL(ctx, req.GroupID, sessionHash, s.service.openAIWSSessionStickyTTL())
-		return attachSelectionProfitGate(ctx, &AccountSelectionResult{
+		return &AccountSelectionResult{
 			Account:     account,
 			Acquired:    true,
 			ReleaseFunc: result.ReleaseFunc,
-		}), false, nil
+		}, false, nil
 	}
 
 	cfg := s.service.schedulingConfig()
@@ -552,7 +551,7 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 			)
 			return nil, true, nil
 		}
-		return attachSelectionProfitGate(ctx, &AccountSelectionResult{
+		return &AccountSelectionResult{
 			Account: account,
 			WaitPlan: &AccountWaitPlan{
 				AccountID:      accountID,
@@ -560,7 +559,7 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 				Timeout:        cfg.StickySessionWaitTimeout,
 				MaxWaiting:     cfg.StickySessionMaxWaiting,
 			},
-		}), false, nil
+		}, false, nil
 	}
 	return nil, false, nil
 }
@@ -899,21 +898,6 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 
 	weights := s.service.openAIWSSchedulerWeightsForRequest(ctx)
 	now := time.Now()
-	upstreamCostFactors := map[int64]float64(nil)
-	if req.UseUpstreamTokenCost && weights.UpstreamCost > 0 {
-		accounts := make([]*Account, 0, len(candidates))
-		for _, candidate := range candidates {
-			accounts = append(accounts, candidate.account)
-		}
-		upstreamCostFactors = openAIUpstreamCostFactors(accounts, now, s.service.openAIOAuthSchedulingRateMultiplier(ctx))
-		for _, factor := range upstreamCostFactors {
-			if factor != openAIUpstreamCostNeutralFactor {
-				plan.includeOverflowFallback = true
-				break
-			}
-		}
-	}
-
 	// Reset 因子（use-it-or-lose-it）：在拥有「未来会话窗口结束时间」的账号中，
 	// 剩余时间越短 → 因子越接近 1（越早重置越优先用尽）。无活跃窗口的账号因子为 0。
 	// 仅在 weights.Reset > 0 时计算，默认关闭不影响原有行为。
@@ -968,19 +952,13 @@ func (s *defaultOpenAIAccountScheduler) buildOpenAIAccountLoadPlan(
 		if weights.QuotaHeadroom > 0 {
 			quotaHeadroomFactor = openAIQuotaHeadroomFactor(item.account, now)
 		}
-		upstreamCostFactor := openAIUpstreamCostNeutralFactor
-		if factor, ok := upstreamCostFactors[item.account.ID]; ok {
-			upstreamCostFactor = factor
-		}
-
 		item.score = weights.Priority*priorityFactor +
 			weights.Load*loadFactor +
 			weights.Queue*queueFactor +
 			weights.ErrorRate*errorFactor +
 			weights.TTFT*ttftFactor +
 			weights.Reset*resetFactor +
-			weights.QuotaHeadroom*quotaHeadroomFactor +
-			weights.UpstreamCost*(upstreamCostFactor-openAIUpstreamCostNeutralFactor)
+			weights.QuotaHeadroom*quotaHeadroomFactor
 		if req.StickyWeighted {
 			if req.PreviousResponseCanMove && req.StickyPreviousAccountID > 0 && item.account.ID == req.StickyPreviousAccountID {
 				item.score += weights.Previous
@@ -1190,11 +1168,11 @@ func (s *defaultOpenAIAccountScheduler) tryAcquireOpenAISelectionOrderWithBudget
 		if req.SessionHash != "" && !req.PreserveStickyBinding {
 			_ = s.service.bindOpenAIStickySessionDuringSelection(ctx, req.GroupID, req.SessionHash, fresh.ID)
 		}
-		return attachSelectionProfitGate(ctx, &AccountSelectionResult{
+		return &AccountSelectionResult{
 			Account:     fresh,
 			Acquired:    true,
 			ReleaseFunc: result.ReleaseFunc,
-		}), compactBlocked, nil
+		}, compactBlocked, nil
 	}
 	return nil, compactBlocked, nil
 }
@@ -1281,15 +1259,15 @@ func (s *defaultOpenAIAccountScheduler) tryFallbackToWeightedSticky(
 			if req.SessionHash != "" && !req.PreserveStickyBinding {
 				_ = s.service.bindOpenAIStickySessionDuringSelection(ctx, req.GroupID, req.SessionHash, account.ID)
 			}
-			return attachSelectionProfitGate(ctx, &AccountSelectionResult{
+			return &AccountSelectionResult{
 				Account:     account,
 				Acquired:    true,
 				ReleaseFunc: result.ReleaseFunc,
-			}), nil
+			}, nil
 		}
 		if s.service.concurrencyService != nil {
 			cfg := s.service.schedulingConfig()
-			return attachSelectionProfitGate(ctx, &AccountSelectionResult{
+			return &AccountSelectionResult{
 				Account: account,
 				WaitPlan: &AccountWaitPlan{
 					AccountID:      account.ID,
@@ -1297,7 +1275,7 @@ func (s *defaultOpenAIAccountScheduler) tryFallbackToWeightedSticky(
 					Timeout:        cfg.StickySessionWaitTimeout,
 					MaxWaiting:     cfg.StickySessionMaxWaiting,
 				},
-			}), nil
+			}, nil
 		}
 	}
 	return nil, nil
@@ -1676,7 +1654,7 @@ func (s *defaultOpenAIAccountScheduler) finishLoadBalanceSelectionFallback(
 				compactBlocked = true
 				continue
 			}
-			return attachSelectionProfitGate(ctx, &AccountSelectionResult{
+			return &AccountSelectionResult{
 				Account: fresh,
 				WaitPlan: &AccountWaitPlan{
 					AccountID:      fresh.ID,
@@ -1684,7 +1662,7 @@ func (s *defaultOpenAIAccountScheduler) finishLoadBalanceSelectionFallback(
 					Timeout:        cfg.FallbackWaitTimeout,
 					MaxWaiting:     cfg.FallbackMaxWaiting,
 				},
-			}), candidateCount, topK, loadSkew, nil
+			}, candidateCount, topK, loadSkew, nil
 		}
 	}
 
@@ -1765,11 +1743,6 @@ func (s *defaultOpenAIAccountScheduler) isAccountRequestCompatibleReason(ctx con
 	}
 	if !accountSupportsOpenAICapabilities(account, req.RequiredCapability, req.RequiredImageCapability) {
 		return false, "capability_mismatch"
-	}
-	// 分组利润控制：不合格账号在候选过滤与抢槽后终检阶段即被排除，
-	// 排序/评分/粘性/熔断只在合格账号之间工作；named reason 进入 filter stats。
-	if vetoed, reason := openAIProfitControlVetoReason(ctx, account); vetoed {
-		return false, reason
 	}
 	return true, ""
 }
@@ -2152,15 +2125,6 @@ func (s *OpenAIGatewayService) selectAccountWithSchedulerOnce(
 	useUpstreamTokenCost bool,
 ) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
 	ctx = s.withOpenAIQuotaAutoPauseContext(ctx)
-	// 分组利润控制：唯一文本调度入口的防御性装门。handler 文本
-	// 入口已在请求开始经 WithOpenAIRequestPricingContext 装门并固定 pricingAt，
-	// 此处对同分组门直接复用（failover 重入阈值稳定），仅为不经 handler 装配的
-	// 内部调用兜底。图片/视频调度不在利润门范围：requiredImageCapability 非空的
-	// Images 调度不装门；其他使用 Responses 能力的文本请求（包括原生远程压缩）
-	// 仍须装门。其余媒体路径通过 WithOpenAIProfitControlSuppressed 显式跳过。
-	if requiredImageCapability == "" {
-		ctx = s.withOpenAIProfitControlGate(ctx, groupID)
-	}
 	platform = NormalizeOpenAICompatiblePlatform(platform)
 	decision := OpenAIAccountScheduleDecision{}
 	scheduler := s.getOpenAIAccountScheduler(ctx)
@@ -2571,14 +2535,6 @@ func buildOpenAIAccountSchedulerScoreSnapshot(
 	minResetRemaining, maxResetRemaining := 0.0, 0.0
 	hasResetSample := false
 	now := time.Now()
-	upstreamCostFactors := map[int64]float64(nil)
-	if weights.UpstreamCost > 0 {
-		accounts := make([]*Account, 0, len(candidates))
-		for _, candidate := range candidates {
-			accounts = append(accounts, candidate.account)
-		}
-		upstreamCostFactors = openAIUpstreamCostFactors(accounts, now, oauthSchedulingRateMultiplier)
-	}
 	if weights.Reset > 0 {
 		for _, candidate := range candidates {
 			end := candidate.account.SessionWindowEnd
@@ -2624,18 +2580,13 @@ func buildOpenAIAccountSchedulerScoreSnapshot(
 		if weights.QuotaHeadroom > 0 {
 			quotaHeadroomFactor = openAIQuotaHeadroomFactor(candidate.account, now)
 		}
-		upstreamCostFactor := openAIUpstreamCostNeutralFactor
-		if factor, ok := upstreamCostFactors[candidate.account.ID]; ok {
-			upstreamCostFactor = factor
-		}
 		baseScore := weights.Priority*priorityFactor +
 			weights.Load*loadFactor +
 			weights.Queue*queueFactor +
 			weights.ErrorRate*errorFactor +
 			weights.TTFT*ttftFactor +
 			weights.Reset*resetFactor +
-			weights.QuotaHeadroom*quotaHeadroomFactor +
-			weights.UpstreamCost*(upstreamCostFactor-openAIUpstreamCostNeutralFactor)
+			weights.QuotaHeadroom*quotaHeadroomFactor
 		score := OpenAIAccountSchedulerScoreSnapshot{
 			BaseScore:             baseScore,
 			StickyWeightedEnabled: stickyWeightedEnabled,
@@ -2647,154 +2598,6 @@ func buildOpenAIAccountSchedulerScoreSnapshot(
 		result[candidate.account.ID] = score
 	}
 	return result
-}
-
-func openAIUpstreamCostFactors(accounts []*Account, now time.Time, oauthSchedulingRateMultiplier float64) map[int64]float64 {
-	type rateSample struct {
-		accountID int64
-		rate      float64
-	}
-
-	factors := make(map[int64]float64, len(accounts))
-	samples := make([]rateSample, 0, len(accounts))
-	eligibleCount := 0
-	for _, account := range accounts {
-		if account == nil {
-			continue
-		}
-		factors[account.ID] = openAIUpstreamCostNeutralFactor
-		if !account.IsOpenAIApiKey() && !account.IsOpenAIOAuth() {
-			continue
-		}
-		eligibleCount++
-		if rate, ok := openAISchedulingRate(account, now, oauthSchedulingRateMultiplier); ok {
-			samples = append(samples, rateSample{accountID: account.ID, rate: rate})
-		}
-	}
-	if len(samples) < 2 || eligibleCount == 0 {
-		return factors
-	}
-
-	allEqual := true
-	positiveLogs := make([]float64, 0, len(samples))
-	for i, sample := range samples {
-		if i > 0 && sample.rate != samples[0].rate {
-			allEqual = false
-		}
-		if sample.rate > 0 {
-			positiveLogs = append(positiveLogs, math.Log(sample.rate))
-		}
-	}
-	if allEqual || len(positiveLogs) == 0 {
-		return factors
-	}
-
-	sort.Float64s(positiveLogs)
-	middle := len(positiveLogs) / 2
-	medianLog := positiveLogs[middle]
-	if len(positiveLogs)%2 == 0 {
-		medianLog = (positiveLogs[middle-1] + positiveLogs[middle]) / 2
-	}
-	center := math.Exp(medianLog)
-	if center <= 0 || math.IsNaN(center) || math.IsInf(center, 0) {
-		return factors
-	}
-
-	coverage := float64(len(samples)) / float64(eligibleCount)
-	for _, sample := range samples {
-		rawFactor := 1.0
-		if sample.rate > 0 {
-			rawFactor = 1 / (1 + sample.rate/center)
-		}
-		factors[sample.accountID] = clamp01(openAIUpstreamCostNeutralFactor + coverage*(rawFactor-openAIUpstreamCostNeutralFactor))
-	}
-	return factors
-}
-
-type openAILegacyUpstreamRateOrder struct {
-	enabled bool
-	rates   map[int64]float64
-}
-
-func newOpenAILegacyUpstreamRateOrder(accounts []*Account, now time.Time, oauthSchedulingRateMultiplier float64) openAILegacyUpstreamRateOrder {
-	rates := make(map[int64]float64, len(accounts))
-	var first float64
-	distinct := false
-	for _, account := range accounts {
-		if account == nil {
-			continue
-		}
-		// 与 openAIUpstreamCostFactors 使用同一道平台门控：只有 OpenAI 平台账号
-		// 的倍率参与 legacy 低倍率优先排序。上游自报倍率来自中转方，不能让它对
-		// 其他平台的调度产生影响——否则自报低价即可吸走流量，而实际结算走本地倍率。
-		if !account.IsOpenAIApiKey() && !account.IsOpenAIOAuth() {
-			continue
-		}
-		rate, ok := openAISchedulingRate(account, now, oauthSchedulingRateMultiplier)
-		if !ok {
-			continue
-		}
-		if len(rates) == 0 {
-			first = rate
-		} else if rate != first {
-			distinct = true
-		}
-		rates[account.ID] = rate
-	}
-	return openAILegacyUpstreamRateOrder{enabled: len(rates) >= 2 && distinct, rates: rates}
-}
-
-func openAISchedulingRate(account *Account, now time.Time, oauthSchedulingRateMultiplier float64) (float64, bool) {
-	if account != nil && account.IsOpenAIOAuth() {
-		return oauthSchedulingRateMultiplier, true
-	}
-	return openAIFreshUpstreamBillingRate(account, now)
-}
-
-// compare returns -1 when a should be selected before b, 1 when b should be
-// selected first, and 0 when the rate signal does not distinguish them.
-func (o openAILegacyUpstreamRateOrder) compare(a, b *Account) int {
-	if !o.enabled || a == nil || b == nil {
-		return 0
-	}
-	aRate, aKnown := o.rates[a.ID]
-	bRate, bKnown := o.rates[b.ID]
-	if aKnown != bKnown {
-		if aKnown {
-			return -1
-		}
-		return 1
-	}
-	if !aKnown || aRate == bRate {
-		return 0
-	}
-	if aRate < bRate {
-		return -1
-	}
-	return 1
-}
-
-func openAIFreshUpstreamBillingRate(account *Account, now time.Time) (float64, bool) {
-	if !isUpstreamBillingProbeAccount(account) {
-		return 0, false
-	}
-	snapshot := decodeUpstreamBillingProbeSnapshot(account.Extra)
-	if snapshot == nil || (snapshot.Status != UpstreamBillingProbeStatusOK && snapshot.Status != UpstreamBillingProbeStatusFailed) ||
-		snapshot.ReceivedAt == nil || snapshot.ReceivedAt.IsZero() {
-		return 0, false
-	}
-	receivedAt := *snapshot.ReceivedAt
-	freshUntil := snapshot.FreshUntil
-	if freshUntil == nil && snapshot.Status == UpstreamBillingProbeStatusOK {
-		interval := snapshot.NextProbeAt.Sub(receivedAt)
-		if interval > 0 {
-			freshUntil = probeTimePtr(receivedAt.Add(2 * interval))
-		}
-	}
-	if freshUntil == nil || !freshUntil.After(receivedAt) || now.Before(receivedAt) || now.After(*freshUntil) {
-		return 0, false
-	}
-	return upstreamBillingRateAt(snapshot.Data, now)
 }
 
 func openAIQuotaHeadroomFactor(account *Account, now time.Time) float64 {

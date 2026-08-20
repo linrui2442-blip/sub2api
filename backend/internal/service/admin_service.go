@@ -18,16 +18,11 @@ type AdminService interface {
 	CreateUser(ctx context.Context, input *CreateUserInput) (*User, error)
 	UpdateUser(ctx context.Context, id int64, input *UpdateUserInput) (*User, error)
 	DeleteUser(ctx context.Context, id int64) error
-	UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string) (*User, error)
 	BatchUpdateConcurrency(ctx context.Context, userIDs []int64, value int, mode string) (int, error)
 	BatchUpdateLimits(ctx context.Context, userIDs []int64, concurrency, rpmLimit *int) (int, error)
 	GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int, sortBy, sortOrder string) ([]APIKey, int64, error)
 	GetUserUsageStats(ctx context.Context, userID int64, period string) (any, error)
 	GetUserRPMStatus(ctx context.Context, userID int64) (*UserRPMStatus, error)
-	// GetUserBalanceHistory returns paginated balance/concurrency change records for a user.
-	// codeType is optional - pass empty string to return all types.
-	// Also returns totalRecharged (sum of all positive balance top-ups).
-	GetUserBalanceHistory(ctx context.Context, userID int64, page, pageSize int, codeType string) ([]RedeemCode, int64, float64, error)
 	BindUserAuthIdentity(ctx context.Context, userID int64, input AdminBindAuthIdentityInput) (*AdminBoundAuthIdentity, error)
 
 	// Group management
@@ -127,13 +122,6 @@ type AdminService interface {
 	TestProxy(ctx context.Context, id int64) (*ProxyTestResult, error)
 	CheckProxyQuality(ctx context.Context, id int64) (*ProxyQualityCheckResult, error)
 
-	// Redeem code management
-	ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, search string, sortBy, sortOrder string) ([]RedeemCode, int64, error)
-	GetRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
-	GenerateRedeemCodes(ctx context.Context, input *GenerateRedeemCodesInput) ([]RedeemCode, error)
-	DeleteRedeemCode(ctx context.Context, id int64) error
-	BatchDeleteRedeemCodes(ctx context.Context, ids []int64) (int64, error)
-	ExpireRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
 	ResetAccountQuota(ctx context.Context, id int64) error
 }
 
@@ -144,7 +132,6 @@ type CreateUserInput struct {
 	Username      string
 	Notes         string
 	Role          string // 空字符串表示使用默认角色(user);合法值 admin/user
-	Balance       *float64
 	Concurrency   int
 	RPMLimit      int
 	AllowedGroups []int64
@@ -157,10 +144,9 @@ type UpdateUserInput struct {
 	Password      string
 	Username      *string
 	Notes         *string
-	Role          string   // 空字符串表示"未提供"(不修改);合法值 admin/user
-	Balance       *float64 // 使用指针区分"未提供"和"设置为0"
-	Concurrency   *int     // 使用指针区分"未提供"和"设置为0"
-	RPMLimit      *int     // 使用指针区分"未提供"和"设置为0"
+	Role          string // 空字符串表示"未提供"(不修改);合法值 admin/user
+	Concurrency   *int   // 使用指针区分"未提供"和"设置为0"
+	RPMLimit      *int   // 使用指针区分"未提供"和"设置为0"
 	Status        string
 	AllowedGroups *[]int64 // 使用指针区分"未提供"和"设置为空数组"
 	// GroupRates 用户专属分组倍率配置
@@ -274,10 +260,6 @@ type CreateGroupInput struct {
 	MaxReasoningEffort string
 	// ReasoningEffortMappings OpenAI/Codex 推理强度精确映射。
 	ReasoningEffortMappings []ReasoningEffortMapping
-	// 分组利润控制（五个 token 平台分组可启用；margin/buffer 为小数，nil 按 0 处理）
-	ProfitControlEnabled bool
-	ProfitMinMargin      *float64
-	ProfitSafetyBuffer   *float64
 	// 从指定分组复制账号（创建分组后在同一事务内绑定）
 	CopyAccountsFromGroupIDs []int64
 }
@@ -349,10 +331,6 @@ type UpdateGroupInput struct {
 	MaxReasoningEffort *string
 	// ReasoningEffortMappings nil 表示不修改，空数组表示清空，非空数组表示替换。
 	ReasoningEffortMappings *[]ReasoningEffortMapping
-	// 分组利润控制（nil 表示不修改；margin/buffer 为小数）
-	ProfitControlEnabled *bool
-	ProfitMinMargin      *float64
-	ProfitSafetyBuffer   *float64
 	// 从指定分组复制账号（同步操作：先清空当前分组的账号绑定，再绑定源分组的账号）
 	CopyAccountsFromGroupIDs []int64
 }
@@ -367,12 +345,10 @@ type CreateAccountInput struct {
 	ProxyID            *int64
 	Concurrency        int
 	Priority           int
-	RateMultiplier     *float64 // 账号计费倍率（>=0，允许 0）
 	LoadFactor         *int
 	GroupIDs           []int64
 	ExpiresAt          *int64
 	AutoPauseOnExpired *bool
-	ProbeEnabled       *bool
 	// SkipDefaultGroupBind prevents auto-binding to platform default group when GroupIDs is empty.
 	SkipDefaultGroupBind bool
 	// SkipMixedChannelCheck skips the mixed channel risk check when binding groups.
@@ -398,14 +374,11 @@ type UpdateAccountInput struct {
 	ProxyID               *int64
 	Concurrency           *int     // 使用指针区分"未提供"和"设置为0"
 	Priority              *int     // 使用指针区分"未提供"和"设置为0"
-	RateMultiplier        *float64 // 账号计费倍率（>=0，允许 0）
 	LoadFactor            *int
 	Status                string
 	GroupIDs              *[]int64
 	ExpiresAt             *int64
 	AutoPauseOnExpired    *bool
-	ProbeEnabled          *bool
-	RateSyncEnabled       *bool
 	SkipMixedChannelCheck bool // 跳过混合渠道检查（用户已确认风险）
 }
 
@@ -417,14 +390,12 @@ type BulkUpdateAccountsInput struct {
 	ProxyID        *int64
 	Concurrency    *int
 	Priority       *int
-	RateMultiplier *float64 // 账号计费倍率（>=0，允许 0）
 	LoadFactor     *int
 	Status         string
 	Schedulable    *bool
 	GroupIDs       *[]int64
 	Credentials    map[string]any
 	Extra          map[string]any
-	ProbeEnabled   *bool
 	// SkipMixedChannelCheck skips the mixed channel risk check when binding groups.
 	// This should only be set when the caller has explicitly confirmed the risk.
 	SkipMixedChannelCheck bool
@@ -510,15 +481,6 @@ type UpdateProxyInput struct {
 	FallbackMode   string
 	BackupProxyID  *int64
 	ExpiryWarnDays int
-}
-
-type GenerateRedeemCodesInput struct {
-	Count        int
-	Type         string
-	Value        float64
-	GroupID      *int64 // 订阅类型专用：关联的分组ID
-	ValidityDays int    // 订阅类型专用：有效天数
-	ExpiresAt    *time.Time
 }
 
 type ProxyBatchDeleteResult struct {
@@ -648,23 +610,17 @@ type adminServiceImpl struct {
 	groupDuplicateRepo   GroupDuplicateRepository
 	accountRepo          AccountRepository
 	accountDuplicateRepo AccountDuplicateRepository
-	accountBillingRepo   AccountBillingSettingsRepository
 	proxyRepo            ProxyRepository
 	apiKeyRepo           APIKeyRepository
-	redeemCodeRepo       RedeemCodeRepository
 	userGroupRateRepo    UserGroupRateRepository
 	userRPMCache         UserRPMCache
-	billingCacheService  *BillingCacheService
 	proxyProber          ProxyExitInfoProber
 	proxyLatencyCache    ProxyLatencyCache
 	authCacheInvalidator APIKeyAuthCacheInvalidator
 	entClient            *dbent.Client // 用于开启数据库事务
 	settingService       *SettingService
-	defaultSubAssigner   DefaultSubscriptionAssigner
-	userSubRepo          UserSubscriptionRepository
 	privacyClientFactory PrivacyClientFactory
 	runtimeBlocker       AccountRuntimeBlocker
-	affiliateService     adminRechargeAffiliateAccruer
 	compositeRouteRepo   CompositeModelRouteRepository
 	compositeResolver    *CompositeRouteResolver
 	// 分组平台变更后用来失效渠道缓存；可为 nil（缓存会在 TTL 到期后自然重建）
@@ -677,67 +633,8 @@ type ChannelCacheInvalidator interface {
 	InvalidateCache()
 }
 
-type adminRechargeAffiliateAccruer interface {
-	AccrueInviteRebate(ctx context.Context, inviteeUserID int64, baseRechargeAmount float64) (float64, error)
-}
-
 type userGroupRateBatchReader interface {
 	GetByUserIDs(ctx context.Context, userIDs []int64) (map[int64]map[int64]float64, error)
-}
-
-// NewAdminService creates a new AdminService
-func NewAdminService(
-	userRepo UserRepository,
-	groupRepo AdminGroupRepository,
-	accountRepo AdminAccountRepository,
-	proxyRepo ProxyRepository,
-	apiKeyRepo APIKeyRepository,
-	redeemCodeRepo RedeemCodeRepository,
-	userGroupRateRepo UserGroupRateRepository,
-	userRPMCache UserRPMCache,
-	billingCacheService *BillingCacheService,
-	proxyProber ProxyExitInfoProber,
-	proxyLatencyCache ProxyLatencyCache,
-	authCacheInvalidator APIKeyAuthCacheInvalidator,
-	entClient *dbent.Client,
-	settingService *SettingService,
-	defaultSubAssigner DefaultSubscriptionAssigner,
-	userSubRepo UserSubscriptionRepository,
-	privacyClientFactory PrivacyClientFactory,
-	runtimeBlocker AccountRuntimeBlocker,
-	affiliateService *AffiliateService,
-	compositeRouteRepo CompositeModelRouteRepository,
-	compositeResolver *CompositeRouteResolver,
-	channelCacheInvalidator ChannelCacheInvalidator,
-) AdminService {
-	return &adminServiceImpl{
-		userRepo:             userRepo,
-		groupRepo:            groupRepo,
-		groupDuplicateRepo:   groupRepo,
-		accountRepo:          accountRepo,
-		accountDuplicateRepo: accountRepo,
-		accountBillingRepo:   accountRepo,
-		proxyRepo:            proxyRepo,
-		apiKeyRepo:           apiKeyRepo,
-		redeemCodeRepo:       redeemCodeRepo,
-		userGroupRateRepo:    userGroupRateRepo,
-		userRPMCache:         userRPMCache,
-		billingCacheService:  billingCacheService,
-		proxyProber:          proxyProber,
-		proxyLatencyCache:    proxyLatencyCache,
-		authCacheInvalidator: authCacheInvalidator,
-		entClient:            entClient,
-		settingService:       settingService,
-		defaultSubAssigner:   defaultSubAssigner,
-		userSubRepo:          userSubRepo,
-		privacyClientFactory: privacyClientFactory,
-		runtimeBlocker:       runtimeBlocker,
-		affiliateService:     affiliateService,
-		compositeRouteRepo:   compositeRouteRepo,
-		compositeResolver:    compositeResolver,
-
-		channelCacheInvalidator: channelCacheInvalidator,
-	}
 }
 
 // NewPersonalAdminService builds the private control-plane service without
@@ -769,7 +666,6 @@ func NewPersonalAdminService(
 		groupDuplicateRepo:      groupRepo,
 		accountRepo:             accountRepo,
 		accountDuplicateRepo:    accountRepo,
-		accountBillingRepo:      accountRepo,
 		proxyRepo:               proxyRepo,
 		apiKeyRepo:              apiKeyRepo,
 		userGroupRateRepo:       userGroupRateRepo,

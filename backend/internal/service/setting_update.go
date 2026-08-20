@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -99,9 +98,6 @@ func (s *SettingService) refreshCachedSettingsAfterWrite(ctx context.Context, se
 }
 
 func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, settings *SystemSettings) (map[string]string, error) {
-	if err := s.validateDefaultSubscriptionGroups(ctx, settings.DefaultSubscriptions); err != nil {
-		return nil, err
-	}
 	normalizedWhitelist, err := NormalizeRegistrationEmailSuffixWhitelist(settings.RegistrationEmailSuffixWhitelist)
 	if err != nil {
 		return nil, infraerrors.BadRequest("INVALID_REGISTRATION_EMAIL_SUFFIX_WHITELIST", err.Error())
@@ -115,19 +111,9 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 		return nil, infraerrors.BadRequest("INVALID_FORWARDED_CLIENT_IP_HEADERS", err.Error())
 	}
 	settings.ForwardedClientIPHeaders = normalizedForwardedClientIPHeaders
-	alipaySource, err := normalizeVisibleMethodSettingSource("alipay", settings.PaymentVisibleMethodAlipaySource, settings.PaymentVisibleMethodAlipayEnabled)
-	if err != nil {
-		return nil, err
-	}
-	wxpaySource, err := normalizeVisibleMethodSettingSource("wxpay", settings.PaymentVisibleMethodWxpaySource, settings.PaymentVisibleMethodWxpayEnabled)
-	if err != nil {
-		return nil, err
-	}
 	if err := s.normalizeOpenAIAdvancedSchedulerOverrides(settings); err != nil {
 		return nil, err
 	}
-	settings.PaymentVisibleMethodAlipaySource = alipaySource
-	settings.PaymentVisibleMethodWxpaySource = wxpaySource
 	settings.WeChatConnectAppID = strings.TrimSpace(settings.WeChatConnectAppID)
 	settings.WeChatConnectAppSecret = strings.TrimSpace(settings.WeChatConnectAppSecret)
 	settings.WeChatConnectOpenAppID = strings.TrimSpace(firstNonEmpty(settings.WeChatConnectOpenAppID, settings.WeChatConnectAppID))
@@ -484,10 +470,6 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyCodexCLIOnlyWhitelist] = strings.TrimSpace(settings.CodexCLIOnlyWhitelist)
 	updates[SettingKeyCodexCLIOnlyAllowAppServerClients] = strconv.FormatBool(settings.CodexCLIOnlyAllowAppServerClients)
 	updates[SettingKeyCodexCLIOnlyEngineFingerprintSignals] = strings.TrimSpace(settings.CodexCLIOnlyEngineFingerprintSignals)
-	updates[SettingPaymentVisibleMethodAlipaySource] = settings.PaymentVisibleMethodAlipaySource
-	updates[SettingPaymentVisibleMethodWxpaySource] = settings.PaymentVisibleMethodWxpaySource
-	updates[SettingPaymentVisibleMethodAlipayEnabled] = strconv.FormatBool(settings.PaymentVisibleMethodAlipayEnabled)
-	updates[SettingPaymentVisibleMethodWxpayEnabled] = strconv.FormatBool(settings.PaymentVisibleMethodWxpayEnabled)
 	updates[SettingKeyOpenAILowUpstreamRatePriorityEnabled] = strconv.FormatBool(settings.OpenAILowUpstreamRatePriorityEnabled)
 	updates[SettingKeyOpenAIOAuthSchedulingRateMultiplier] = strconv.FormatFloat(settings.OpenAIOAuthSchedulingRateMultiplier, 'f', -1, 64)
 	updates[openAIAdvancedSchedulerSettingKey] = strconv.FormatBool(settings.OpenAIAdvancedSchedulerEnabled)
@@ -629,20 +611,6 @@ func validateDefaultPlatformQuotaMap(m map[string]*DefaultPlatformQuotaSetting) 
 func (s *SettingService) buildAuthSourceDefaultUpdates(ctx context.Context, settings *AuthSourceDefaultSettings) (map[string]string, error) {
 	if settings == nil {
 		return nil, nil
-	}
-
-	for _, subscriptions := range [][]DefaultSubscriptionSetting{
-		settings.Email.Subscriptions,
-		settings.LinuxDo.Subscriptions,
-		settings.OIDC.Subscriptions,
-		settings.WeChat.Subscriptions,
-		settings.GitHub.Subscriptions,
-		settings.Google.Subscriptions,
-		settings.DingTalk.Subscriptions,
-	} {
-		if err := s.validateDefaultSubscriptionGroups(ctx, subscriptions); err != nil {
-			return nil, err
-		}
 	}
 
 	// 校验各 auth source 的 platform quota map（改动 C：对等系统层校验）
@@ -789,43 +757,4 @@ func (s *SettingService) refreshCachedSettings(settings *SystemSettings) {
 
 func (s *SettingService) defaultRewriteMessageCacheControl() bool {
 	return false
-}
-
-func (s *SettingService) validateDefaultSubscriptionGroups(ctx context.Context, items []DefaultSubscriptionSetting) error {
-	if len(items) == 0 {
-		return nil
-	}
-
-	checked := make(map[int64]struct{}, len(items))
-	for _, item := range items {
-		if item.GroupID <= 0 {
-			continue
-		}
-		if _, ok := checked[item.GroupID]; ok {
-			return ErrDefaultSubGroupDuplicate.WithMetadata(map[string]string{
-				"group_id": strconv.FormatInt(item.GroupID, 10),
-			})
-		}
-		checked[item.GroupID] = struct{}{}
-		if s.defaultSubGroupReader == nil {
-			continue
-		}
-
-		group, err := s.defaultSubGroupReader.GetByID(ctx, item.GroupID)
-		if err != nil {
-			if errors.Is(err, ErrGroupNotFound) {
-				return ErrDefaultSubGroupInvalid.WithMetadata(map[string]string{
-					"group_id": strconv.FormatInt(item.GroupID, 10),
-				})
-			}
-			return fmt.Errorf("get default subscription group %d: %w", item.GroupID, err)
-		}
-		if !group.IsSubscriptionType() {
-			return ErrDefaultSubGroupInvalid.WithMetadata(map[string]string{
-				"group_id": strconv.FormatInt(item.GroupID, 10),
-			})
-		}
-	}
-
-	return nil
 }

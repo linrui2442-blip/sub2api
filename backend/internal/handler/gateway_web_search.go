@@ -79,7 +79,7 @@ func (h *GatewayHandler) WebSearch(c *gin.Context) {
 
 	// Billing eligibility (same as other requests)
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)
-	if err := h.eligibilityChecker().CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.eligibilityChecker().CheckRequestEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
@@ -220,14 +220,6 @@ func (h *GatewayHandler) WebSearch(c *gin.Context) {
 	// Request IDs are billing idempotency keys, so they must be unique per invocation.
 	// Query/IP/UA hashes would collapse repeated identical searches into one charge.
 	searchRequestID := searchLabel + ":" + uuid.NewString()
-	if apiKey.Group != nil {
-		if p := apiKey.Group.GetSearchPricePer1k(); p != nil && *p == 0 {
-			logger.L().With(
-				zap.String("component", "handler.gateway.web_search"),
-				zap.Int64("group_id", apiKey.Group.ID),
-			).Info("gateway.web_search.search_price_per_1k_explicit_free")
-		}
-	}
 	h.submitMandatoryUsageRecordTask(c.Request.Context(), func(ctx context.Context) {
 		if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
 			Result: &service.ForwardResult{

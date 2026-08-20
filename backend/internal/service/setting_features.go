@@ -433,6 +433,30 @@ func (s *SettingService) ResolveAuthSourceGrantSettings(ctx context.Context, sig
 	return mergeProviderDefaultGrantSettings(result, providerDefaults), true, nil
 }
 
+func authSourceSignupSettings(defaults *AuthSourceDefaultSettings, signupSource string) (ProviderDefaultGrantSettings, bool) {
+	if defaults == nil {
+		return ProviderDefaultGrantSettings{}, false
+	}
+	switch strings.ToLower(strings.TrimSpace(signupSource)) {
+	case "email":
+		return defaults.Email, true
+	case "linuxdo":
+		return defaults.LinuxDo, true
+	case "oidc":
+		return defaults.OIDC, true
+	case "wechat":
+		return defaults.WeChat, true
+	case "github":
+		return defaults.GitHub, true
+	case "google":
+		return defaults.Google, true
+	case "dingtalk":
+		return defaults.DingTalk, true
+	default:
+		return ProviderDefaultGrantSettings{}, false
+	}
+}
+
 func (s *SettingService) UpdateAuthSourceDefaultSettings(ctx context.Context, settings *AuthSourceDefaultSettings) error {
 	updates, err := s.buildAuthSourceDefaultUpdates(ctx, settings)
 	if err != nil {

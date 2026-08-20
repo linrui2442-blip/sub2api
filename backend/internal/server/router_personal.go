@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"sync/atomic"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
@@ -14,6 +15,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 )
+
+const frameSrcRefreshTimeout = 5 * time.Second
 
 // SetupPersonalRouter is the Personal Edition HTTP boundary. It intentionally
 // avoids the standard user/admin route registrars so commercial handlers can be
@@ -87,9 +90,7 @@ func SetupPersonalRouter(
 	routes.RegisterPersonalUserRoutes(v1, handlers, jwtAuth, auditLog, settingService, panelRateLimiter)
 	routes.RegisterPersonalAdminRoutes(v1, handlers, adminAuth, auditLog, stepUpAuth, settingService, panelRateLimiter)
 
-	// SubscriptionService is intentionally nil here. RegisterGatewayRoutes keeps
-	// the legacy parameter for standard-build compatibility but does not use it.
-	routes.RegisterGatewayRoutes(r, handlers, apiKeyAuth, apiKeyService, nil, opsService, settingService, compositeResolver, cfg)
+	routes.RegisterGatewayRoutes(r, handlers, apiKeyAuth, apiKeyService, opsService, settingService, compositeResolver, cfg)
 
 	return r
 }

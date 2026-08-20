@@ -37,16 +37,6 @@ const (
 	TencentCaptchaRceDomain = "https://rce.tencentrio.com"
 	// TencentCaptchaWorkerSource 是天御国际站创建验证码 Web Worker 时使用的来源。
 	TencentCaptchaWorkerSource = "blob:"
-	// StripeDomain is the domain for Stripe.js SDK
-	StripeDomain = "https://*.stripe.com"
-	// AirwallexStaticDomain 是 Airwallex 生产环境 SDK 脚本域名。
-	AirwallexStaticDomain = "https://static.airwallex.com"
-	// AirwallexCheckoutDomain 是 Airwallex 生产环境收银台元素和 iframe 域名。
-	AirwallexCheckoutDomain = "https://checkout.airwallex.com"
-	// AirwallexDemoStaticDomain 是 Airwallex 沙箱环境 SDK 脚本域名。
-	AirwallexDemoStaticDomain = "https://static-demo.airwallex.com"
-	// AirwallexDemoCheckoutDomain 是 Airwallex 沙箱环境收银台元素和 iframe 域名。
-	AirwallexDemoCheckoutDomain = "https://checkout-demo.airwallex.com"
 )
 
 var requiredCSPDirectiveValues = []struct {
@@ -68,18 +58,6 @@ var requiredCSPDirectiveValues = []struct {
 	{"frame-src", TencentCaptchaGlobalDomain},
 	{"frame-src", TencentCaptchaPrehandleDomain},
 	{"worker-src", TencentCaptchaWorkerSource},
-	{"script-src", StripeDomain},
-	{"frame-src", StripeDomain},
-	{"script-src", AirwallexStaticDomain},
-	{"script-src", AirwallexCheckoutDomain},
-	{"style-src", AirwallexStaticDomain},
-	{"style-src", AirwallexCheckoutDomain},
-	{"frame-src", AirwallexCheckoutDomain},
-	{"script-src", AirwallexDemoStaticDomain},
-	{"script-src", AirwallexDemoCheckoutDomain},
-	{"style-src", AirwallexDemoStaticDomain},
-	{"style-src", AirwallexDemoCheckoutDomain},
-	{"frame-src", AirwallexDemoCheckoutDomain},
 }
 
 // GenerateNonce generates a cryptographically secure random nonce.
@@ -161,7 +139,7 @@ func isAPIRoutePath(c *gin.Context) bool {
 }
 
 // enhanceCSPPolicy 确保 CSP 策略包含 nonce 支持和运行时组件必需域名。
-// 这样旧配置文件没有及时补域名时，验证码和支付组件仍能正常加载。
+// 这样旧配置文件没有及时补域名时，验证码组件仍能正常加载。
 func enhanceCSPPolicy(policy string) string {
 	// Add nonce placeholder to script-src if not present
 	if !strings.Contains(policy, NonceTemplate) && !strings.Contains(policy, "'nonce-") {

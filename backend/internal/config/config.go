@@ -32,7 +32,7 @@ const (
 
 // DefaultCSPPolicy is the default Content-Security-Policy with nonce support
 // __CSP_NONCE__ will be replaced with actual nonce at request time by the SecurityHeaders middleware
-const DefaultCSPPolicy = "default-src 'self'; worker-src 'self' blob:; script-src 'self' __CSP_NONCE__ https://challenges.cloudflare.com https://*.alicdn.com https://static.cloudflareinsights.com https://turing.captcha.qcloud.com https://turing.captcha.gtimg.com https://ca.turing.captcha.qcloud.com https://global.turing.captcha.gtimg.com https://www.tycaptcha.com https://cloudcache.tencentcs.com https://*.stripe.com https://static.airwallex.com https://checkout.airwallex.com https://static-demo.airwallex.com https://checkout-demo.airwallex.com; style-src 'self' 'unsafe-inline' https://*.captcha.gtimg.com https://fonts.googleapis.com https://*.alicdn.com https://static.airwallex.com https://checkout.airwallex.com https://static-demo.airwallex.com https://checkout-demo.airwallex.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://turing.captcha.qcloud.com https://www.tycaptcha.com https://rce.tencentrio.com https:; frame-src https://challenges.cloudflare.com https://turing.captcha.qcloud.com https://ca.turing.captcha.qcloud.com https://www.tycaptcha.com https://*.stripe.com https://checkout.airwallex.com https://checkout-demo.airwallex.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+const DefaultCSPPolicy = "default-src 'self'; worker-src 'self' blob:; script-src 'self' __CSP_NONCE__ https://challenges.cloudflare.com https://*.alicdn.com https://static.cloudflareinsights.com https://turing.captcha.qcloud.com https://turing.captcha.gtimg.com https://ca.turing.captcha.qcloud.com https://global.turing.captcha.gtimg.com https://www.tycaptcha.com https://cloudcache.tencentcs.com; style-src 'self' 'unsafe-inline' https://*.captcha.gtimg.com https://fonts.googleapis.com https://*.alicdn.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://turing.captcha.qcloud.com https://www.tycaptcha.com https://rce.tencentrio.com https:; frame-src https://challenges.cloudflare.com https://turing.captcha.qcloud.com https://ca.turing.captcha.qcloud.com https://www.tycaptcha.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 
 // UMQ（用户消息队列）模式常量
 const (
@@ -62,43 +62,39 @@ const (
 const DefaultUpstreamResponseReadMaxBytes int64 = 128 * 1024 * 1024
 
 type Config struct {
-	Server                  ServerConfig                  `mapstructure:"server"`
-	Log                     LogConfig                     `mapstructure:"log"`
-	CORS                    CORSConfig                    `mapstructure:"cors"`
-	Security                SecurityConfig                `mapstructure:"security"`
-	Billing                 BillingConfig                 `mapstructure:"billing"`
-	Turnstile               TurnstileConfig               `mapstructure:"turnstile"`
-	Database                DatabaseConfig                `mapstructure:"database"`
-	Redis                   RedisConfig                   `mapstructure:"redis"`
-	Ops                     OpsConfig                     `mapstructure:"ops"`
-	JWT                     JWTConfig                     `mapstructure:"jwt"`
-	Totp                    TotpConfig                    `mapstructure:"totp"`
-	WebAuthn                WebAuthnConfig                `mapstructure:"webauthn"`
-	LinuxDo                 LinuxDoConnectConfig          `mapstructure:"linuxdo_connect"`
-	WeChat                  WeChatConnectConfig           `mapstructure:"wechat_connect"`
-	OIDC                    OIDCConnectConfig             `mapstructure:"oidc_connect"`
-	DingTalk                DingTalkConnectConfig         `mapstructure:"dingtalk_connect"`
-	GitHubOAuth             EmailOAuthProviderConfig      `mapstructure:"github_oauth"`
-	GoogleOAuth             EmailOAuthProviderConfig      `mapstructure:"google_oauth"`
-	Default                 DefaultConfig                 `mapstructure:"default"`
-	RateLimit               RateLimitConfig               `mapstructure:"rate_limit"`
-	Pricing                 PricingConfig                 `mapstructure:"pricing"`
-	Gateway                 GatewayConfig                 `mapstructure:"gateway"`
-	APIKeyAuth              APIKeyAuthCacheConfig         `mapstructure:"api_key_auth_cache"`
-	SubscriptionCache       SubscriptionCacheConfig       `mapstructure:"subscription_cache"`
-	SubscriptionMaintenance SubscriptionMaintenanceConfig `mapstructure:"subscription_maintenance"`
-	Dashboard               DashboardCacheConfig          `mapstructure:"dashboard_cache"`
-	DashboardAgg            DashboardAggregationConfig    `mapstructure:"dashboard_aggregation"`
-	UsageCleanup            UsageCleanupConfig            `mapstructure:"usage_cleanup"`
-	Concurrency             ConcurrencyConfig             `mapstructure:"concurrency"`
-	TokenRefresh            TokenRefreshConfig            `mapstructure:"token_refresh"`
-	RunMode                 string                        `mapstructure:"run_mode" yaml:"run_mode"`
-	Timezone                string                        `mapstructure:"timezone"` // e.g. "Asia/Shanghai", "UTC"
-	Gemini                  GeminiConfig                  `mapstructure:"gemini"`
-	Update                  UpdateConfig                  `mapstructure:"update"`
-	Idempotency             IdempotencyConfig             `mapstructure:"idempotency"`
-	BatchImage              BatchImageConfig              `mapstructure:"batch_image"`
-	ImageStorage            ImageStorageConfig            `mapstructure:"image_storage"`
+	Server       ServerConfig               `mapstructure:"server"`
+	Log          LogConfig                  `mapstructure:"log"`
+	CORS         CORSConfig                 `mapstructure:"cors"`
+	Security     SecurityConfig             `mapstructure:"security"`
+	Turnstile    TurnstileConfig            `mapstructure:"turnstile"`
+	Database     DatabaseConfig             `mapstructure:"database"`
+	Redis        RedisConfig                `mapstructure:"redis"`
+	Ops          OpsConfig                  `mapstructure:"ops"`
+	JWT          JWTConfig                  `mapstructure:"jwt"`
+	Totp         TotpConfig                 `mapstructure:"totp"`
+	WebAuthn     WebAuthnConfig             `mapstructure:"webauthn"`
+	LinuxDo      LinuxDoConnectConfig       `mapstructure:"linuxdo_connect"`
+	WeChat       WeChatConnectConfig        `mapstructure:"wechat_connect"`
+	OIDC         OIDCConnectConfig          `mapstructure:"oidc_connect"`
+	DingTalk     DingTalkConnectConfig      `mapstructure:"dingtalk_connect"`
+	GitHubOAuth  EmailOAuthProviderConfig   `mapstructure:"github_oauth"`
+	GoogleOAuth  EmailOAuthProviderConfig   `mapstructure:"google_oauth"`
+	Default      DefaultConfig              `mapstructure:"default"`
+	RateLimit    RateLimitConfig            `mapstructure:"rate_limit"`
+	Gateway      GatewayConfig              `mapstructure:"gateway"`
+	APIKeyAuth   APIKeyAuthCacheConfig      `mapstructure:"api_key_auth_cache"`
+	Dashboard    DashboardCacheConfig       `mapstructure:"dashboard_cache"`
+	DashboardAgg DashboardAggregationConfig `mapstructure:"dashboard_aggregation"`
+	UsageCleanup UsageCleanupConfig         `mapstructure:"usage_cleanup"`
+	Concurrency  ConcurrencyConfig          `mapstructure:"concurrency"`
+	TokenRefresh TokenRefreshConfig         `mapstructure:"token_refresh"`
+	RunMode      string                     `mapstructure:"run_mode" yaml:"run_mode"`
+	Timezone     string                     `mapstructure:"timezone"` // e.g. "Asia/Shanghai", "UTC"
+	Gemini       GeminiConfig               `mapstructure:"gemini"`
+	Update       UpdateConfig               `mapstructure:"update"`
+	Idempotency  IdempotencyConfig          `mapstructure:"idempotency"`
+	BatchImage   BatchImageConfig           `mapstructure:"batch_image"`
+	ImageStorage ImageStorageConfig         `mapstructure:"image_storage"`
 }
 
 type LogConfig struct {
@@ -642,21 +638,6 @@ type TokenRefreshConfig struct {
 	CycleTimeoutSeconds int `mapstructure:"cycle_timeout_seconds"`
 }
 
-type PricingConfig struct {
-	// 价格数据远程URL（默认使用LiteLLM镜像）
-	RemoteURL string `mapstructure:"remote_url"`
-	// 哈希校验文件URL
-	HashURL string `mapstructure:"hash_url"`
-	// 本地数据目录
-	DataDir string `mapstructure:"data_dir"`
-	// 回退文件路径
-	FallbackFile string `mapstructure:"fallback_file"`
-	// 更新间隔（小时）
-	UpdateIntervalHours int `mapstructure:"update_interval_hours"`
-	// 哈希校验间隔（分钟）
-	HashCheckIntervalMinutes int `mapstructure:"hash_check_interval_minutes"`
-}
-
 type ServerConfig struct {
 	Host                     string    `mapstructure:"host"`
 	Port                     int       `mapstructure:"port"`
@@ -799,7 +780,6 @@ func (c *Config) SetTrustForwardedIPForAPIKeyACL(enabled bool) {
 type URLAllowlistConfig struct {
 	Enabled           bool     `mapstructure:"enabled"`
 	UpstreamHosts     []string `mapstructure:"upstream_hosts"`
-	PricingHosts      []string `mapstructure:"pricing_hosts"`
 	CRSHosts          []string `mapstructure:"crs_hosts"`
 	AllowPrivateHosts bool     `mapstructure:"allow_private_hosts"`
 	// 关闭 URL 白名单校验时，是否允许 http URL（默认只允许 https）
@@ -821,7 +801,6 @@ type ProxyFallbackConfig struct {
 	// AllowDirectOnError 当辅助服务的代理初始化失败时是否允许回退直连。
 	// 仅影响以下非 AI 账号连接的辅助服务：
 	//   - GitHub Release 更新检查
-	//   - 定价数据拉取
 	// 不影响 AI 账号网关连接（Claude/OpenAI/Gemini/Antigravity），
 	// 这些关键路径的代理失败始终返回错误，不会回退直连。
 	// 默认 false：避免因代理配置错误导致服务器真实 IP 泄露。
@@ -830,30 +809,6 @@ type ProxyFallbackConfig struct {
 
 type ProxyProbeConfig struct {
 	InsecureSkipVerify bool `mapstructure:"insecure_skip_verify"` // 已禁用：禁止跳过 TLS 证书验证
-}
-
-type BillingConfig struct {
-	CircuitBreaker CircuitBreakerConfig `mapstructure:"circuit_breaker"`
-	// MinimumBalanceReserve is the conservative preflight floor for balance billing.
-	// Requests in balance mode are rejected when the cached balance is below this
-	// amount, even if it is still positive. Set to 0 to keep the legacy balance > 0 gate.
-	MinimumBalanceReserve float64 `mapstructure:"minimum_balance_reserve"`
-	// UserPlatformQuotaCacheTTLSeconds 用户 × 平台 quota 缓存 TTL（秒），默认 86400=1天，覆盖典型 daily 窗口。
-	// 消费点：
-	//   - billing_cache_service.cacheWriteWorker 异步累加
-	//   - billing_cache_service.checkUserPlatformQuotaEligibility 首次缓存装载
-	// 读写两端必须共用同一 TTL，避免缓存生命周期不一致导致 quota 计数漂移。
-	UserPlatformQuotaCacheTTLSeconds int `mapstructure:"user_platform_quota_cache_ttl_seconds"`
-	// UserPlatformQuotaSentinelTTLSeconds sentinel(无 limit 占位)entry 的 TTL,
-	// 显著短于 quota cache 默认 86400s 以控 Redis 内存;默认 3600=1h。
-	UserPlatformQuotaSentinelTTLSeconds int `mapstructure:"user_platform_quota_sentinel_ttl_seconds"`
-}
-
-type CircuitBreakerConfig struct {
-	Enabled             bool `mapstructure:"enabled"`
-	FailureThreshold    int  `mapstructure:"failure_threshold"`
-	ResetTimeoutSeconds int  `mapstructure:"reset_timeout_seconds"`
-	HalfOpenRequests    int  `mapstructure:"half_open_requests"`
 }
 
 type ConcurrencyConfig struct {
@@ -1621,20 +1576,6 @@ type InvalidAuthAbuseConfig struct {
 	Capacity      int  `mapstructure:"capacity"`
 }
 
-// SubscriptionCacheConfig 订阅认证 L1 缓存配置
-type SubscriptionCacheConfig struct {
-	L1Size        int `mapstructure:"l1_size"`
-	L1TTLSeconds  int `mapstructure:"l1_ttl_seconds"`
-	JitterPercent int `mapstructure:"jitter_percent"`
-}
-
-// SubscriptionMaintenanceConfig 订阅窗口维护后台任务配置。
-// 用于将“请求路径触发的维护动作”有界化，避免高并发下 goroutine 膨胀。
-type SubscriptionMaintenanceConfig struct {
-	WorkerCount int `mapstructure:"worker_count"`
-	QueueSize   int `mapstructure:"queue_size"`
-}
-
 // DashboardCacheConfig 仪表盘统计缓存配置
 type DashboardCacheConfig struct {
 	// Enabled: 是否启用仪表盘缓存
@@ -1998,15 +1939,6 @@ func setDefaults() {
 	// Security - disable direct fallback on proxy error
 	viper.SetDefault("security.proxy_fallback.allow_direct_on_error", false)
 
-	// Billing
-	viper.SetDefault("billing.circuit_breaker.enabled", true)
-	viper.SetDefault("billing.circuit_breaker.failure_threshold", 5)
-	viper.SetDefault("billing.circuit_breaker.reset_timeout_seconds", 30)
-	viper.SetDefault("billing.circuit_breaker.half_open_requests", 3)
-	viper.SetDefault("billing.minimum_balance_reserve", 0.000001)
-	viper.SetDefault("billing.user_platform_quota_cache_ttl_seconds", 86400)
-	viper.SetDefault("billing.user_platform_quota_sentinel_ttl_seconds", 3600)
-
 	// Turnstile
 	viper.SetDefault("turnstile.required", false)
 
@@ -2211,14 +2143,6 @@ func setDefaults() {
 	viper.SetDefault("rate_limit.overload_cooldown_minutes", 10)
 	viper.SetDefault("rate_limit.oauth_401_cooldown_minutes", 10)
 
-	// Pricing - 从 model-price-repo 同步模型定价和上下文窗口数据（固定到 commit，避免分支漂移）
-	viper.SetDefault("pricing.remote_url", "https://raw.githubusercontent.com/Wei-Shaw/model-price-repo/main/model_prices_and_context_window.json")
-	viper.SetDefault("pricing.hash_url", "https://raw.githubusercontent.com/Wei-Shaw/model-price-repo/main/model_prices_and_context_window.sha256")
-	viper.SetDefault("pricing.data_dir", "./data")
-	viper.SetDefault("pricing.fallback_file", "./resources/model-pricing/model_prices_and_context_window.json")
-	viper.SetDefault("pricing.update_interval_hours", 24)
-	viper.SetDefault("pricing.hash_check_interval_minutes", 10)
-
 	// Timezone (default to Asia/Shanghai for Chinese users)
 	viper.SetDefault("timezone", "Asia/Shanghai")
 
@@ -2235,11 +2159,6 @@ func setDefaults() {
 	viper.SetDefault("api_key_auth_cache.invalid_abuse.window_seconds", 60)
 	viper.SetDefault("api_key_auth_cache.invalid_abuse.block_seconds", 60)
 	viper.SetDefault("api_key_auth_cache.invalid_abuse.capacity", 16384)
-
-	// Subscription auth L1 cache
-	viper.SetDefault("subscription_cache.l1_size", 16384)
-	viper.SetDefault("subscription_cache.l1_ttl_seconds", 10)
-	viper.SetDefault("subscription_cache.jitter_percent", 10)
 
 	// Dashboard cache
 	viper.SetDefault("dashboard_cache.enabled", true)
@@ -2474,10 +2393,6 @@ func setDefaults() {
 	viper.SetDefault("gemini.oauth.scopes", "")
 	viper.SetDefault("gemini.quota.policy", "")
 
-	// Subscription Maintenance (bounded queue + worker pool)
-	viper.SetDefault("subscription_maintenance.worker_count", 2)
-	viper.SetDefault("subscription_maintenance.queue_size", 1024)
-
 	setEnvReachableDefaults()
 }
 
@@ -2668,13 +2583,6 @@ func (c *Config) Validate() error {
 		if c.Log.Sampling.Thereafter < 0 {
 			return fmt.Errorf("log.sampling.thereafter must be non-negative")
 		}
-	}
-
-	if c.SubscriptionMaintenance.WorkerCount < 0 {
-		return fmt.Errorf("subscription_maintenance.worker_count must be non-negative")
-	}
-	if c.SubscriptionMaintenance.QueueSize < 0 {
-		return fmt.Errorf("subscription_maintenance.queue_size must be non-negative")
 	}
 
 	// Gemini OAuth 配置校验：client_id 与 client_secret 必须同时设置或同时留空。
@@ -2934,20 +2842,6 @@ func (c *Config) Validate() error {
 		warnIfInsecureURL("oidc_connect.jwks_url", c.OIDC.JWKSURL)
 		warnIfInsecureURL("oidc_connect.redirect_url", c.OIDC.RedirectURL)
 		warnIfInsecureURL("oidc_connect.frontend_redirect_url", c.OIDC.FrontendRedirectURL)
-	}
-	if c.Billing.CircuitBreaker.Enabled {
-		if c.Billing.CircuitBreaker.FailureThreshold <= 0 {
-			return fmt.Errorf("billing.circuit_breaker.failure_threshold must be positive")
-		}
-		if c.Billing.CircuitBreaker.ResetTimeoutSeconds <= 0 {
-			return fmt.Errorf("billing.circuit_breaker.reset_timeout_seconds must be positive")
-		}
-		if c.Billing.CircuitBreaker.HalfOpenRequests <= 0 {
-			return fmt.Errorf("billing.circuit_breaker.half_open_requests must be positive")
-		}
-	}
-	if c.Billing.MinimumBalanceReserve < 0 {
-		return fmt.Errorf("billing.minimum_balance_reserve must be non-negative")
 	}
 	if c.Database.MaxOpenConns <= 0 {
 		return fmt.Errorf("database.max_open_conns must be positive")

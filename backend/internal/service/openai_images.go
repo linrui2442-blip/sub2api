@@ -545,7 +545,7 @@ func isOpenAINativeImageOption(name string) bool {
 }
 
 func normalizeOpenAIImageSizeTier(size string) string {
-	return NormalizeImageBillingTierOrDefault(size)
+	return NormalizeImageSizeTier(size)
 }
 
 func (s *OpenAIGatewayService) ForwardImages(

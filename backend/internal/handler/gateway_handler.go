@@ -45,27 +45,25 @@ type GatewayHandler struct {
 	antigravityGatewayService *service.AntigravityGatewayService
 	userService               *service.UserService
 	requestEligibility        service.RequestEligibilityChecker
-	// Deprecated test compatibility; removed with the SaaS billing module.
-	billingCacheService      *service.BillingCacheService
-	usageService             *service.UsageService
-	apiKeyService            *service.APIKeyService
-	usageRecordWorkerPool    *service.UsageRecordWorkerPool
-	errorPassthroughService  *service.ErrorPassthroughService
-	contentModerationService *service.ContentModerationService
-	securityAuditCoordinator *securityaudit.Coordinator
-	concurrencyHelper        *ConcurrencyHelper
-	userMsgQueueHelper       *UserMsgQueueHelper
-	maxAccountSwitches       int
-	maxAccountSwitchesGemini int
-	cfg                      *config.Config
-	settingService           *service.SettingService
+	usageService              *service.UsageService
+	apiKeyService             *service.APIKeyService
+	usageRecordWorkerPool     *service.UsageRecordWorkerPool
+	errorPassthroughService   *service.ErrorPassthroughService
+	contentModerationService  *service.ContentModerationService
+	securityAuditCoordinator  *securityaudit.Coordinator
+	concurrencyHelper         *ConcurrencyHelper
+	userMsgQueueHelper        *UserMsgQueueHelper
+	maxAccountSwitches        int
+	maxAccountSwitchesGemini  int
+	cfg                       *config.Config
+	settingService            *service.SettingService
 }
 
 func (h *GatewayHandler) eligibilityChecker() service.RequestEligibilityChecker {
 	if h.requestEligibility != nil {
 		return h.requestEligibility
 	}
-	return h.billingCacheService
+	return service.PersonalRequestEligibilityChecker{}
 }
 
 // NewGatewayHandler creates a new GatewayHandler
@@ -248,7 +246,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	}
 
 	// 2. 【新增】Wait后二次检查余额/订阅
-	if err := h.eligibilityChecker().CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.eligibilityChecker().CheckRequestEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("gateway.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
@@ -433,29 +431,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				// Slot acquired: no longer waiting in queue.
 				releaseWait()
 			}
-			// 终检与准入后绑定使用选号结果携带的门（见 responses 同名注释）。
-			admissionCtx := service.ContextWithSelectionProfitGate(c.Request.Context(), selection)
-			latest, vetoed, reason := h.gatewayService.GatewayProfitControlVetoLatest(admissionCtx, account)
-			if vetoed {
-				if accountReleaseFunc != nil {
-					accountReleaseFunc()
-				}
-				reqLog.Debug("gateway.account_slot_profit_vetoed", zap.Int64("account_id", account.ID), zap.String("reason", reason))
-				if fs.RecordProfitVeto(account.ID) == FailoverExhausted {
-					reqLog.Warn("gateway.profit_veto_attempts_exhausted", zap.Int("profit_veto_count", fs.ProfitVetoCount()))
-					markOpsRoutingCapacityLimited(c)
-					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", profitVetoExhaustedMessage, streamStarted)
-					return
-				}
-				continue
-			}
-			account = latest
-			selection.Account = latest
-			// 等待路径保持既有 eager 绑定（无门时 helper 直接绑定）；调度器已
-			// 抢槽的直达路径无门时由选号内部绑定，这里只在门下补准入后绑定。
-			if selection.ProfitGateActive() || !selection.Acquired {
-				if err := h.gatewayService.BindStickySessionAfterProfitAdmission(admissionCtx, apiKey.GroupID, sessionKey, account.ID); err != nil {
-					reqLog.Warn("gateway.bind_sticky_session_after_profit_admission_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+			if !selection.Acquired {
+				if err := h.gatewayService.BindStickySession(c.Request.Context(), apiKey.GroupID, sessionKey, account.ID); err != nil {
+					reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				}
 			}
 			// 账号槽位/等待计数需要在超时或断开时安全回收
@@ -756,29 +734,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				// Slot acquired: no longer waiting in queue.
 				releaseWait()
 			}
-			// 终检与准入后绑定使用选号结果携带的门（见 responses 同名注释）。
-			admissionCtx := service.ContextWithSelectionProfitGate(c.Request.Context(), selection)
-			latest, vetoed, reason := h.gatewayService.GatewayProfitControlVetoLatest(admissionCtx, account)
-			if vetoed {
-				if accountReleaseFunc != nil {
-					accountReleaseFunc()
-				}
-				reqLog.Debug("gateway.account_slot_profit_vetoed", zap.Int64("account_id", account.ID), zap.String("reason", reason))
-				if fs.RecordProfitVeto(account.ID) == FailoverExhausted {
-					reqLog.Warn("gateway.profit_veto_attempts_exhausted", zap.Int("profit_veto_count", fs.ProfitVetoCount()))
-					markOpsRoutingCapacityLimited(c)
-					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", profitVetoExhaustedMessage, streamStarted)
-					return
-				}
-				continue
-			}
-			account = latest
-			selection.Account = latest
-			// 等待路径保持既有 eager 绑定（无门时 helper 直接绑定）；调度器已
-			// 抢槽的直达路径无门时由选号内部绑定，这里只在门下补准入后绑定。
-			if selection.ProfitGateActive() || !selection.Acquired {
-				if err := h.gatewayService.BindStickySessionAfterProfitAdmission(admissionCtx, currentAPIKey.GroupID, sessionKey, account.ID); err != nil {
-					reqLog.Warn("gateway.bind_sticky_session_after_profit_admission_failed", zap.Int64("account_id", account.ID), zap.Error(err))
+			if !selection.Acquired {
+				if err := h.gatewayService.BindStickySession(c.Request.Context(), currentAPIKey.GroupID, sessionKey, account.ID); err != nil {
+					reqLog.Warn("gateway.bind_sticky_session_failed", zap.Int64("account_id", account.ID), zap.Error(err))
 				}
 			}
 			// 账号槽位/等待计数需要在超时或断开时安全回收
@@ -963,25 +921,15 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 							return
 						}
 						if fallbackGroup.Platform != service.PlatformAnthropic ||
-							fallbackGroup.SubscriptionType == service.SubscriptionTypeSubscription ||
 							fallbackGroup.FallbackGroupIDOnInvalidRequest != nil {
 							reqLog.Warn("gateway.fallback_group_invalid",
 								zap.Int64("fallback_group_id", fallbackGroup.ID),
 								zap.String("fallback_platform", fallbackGroup.Platform),
-								zap.String("fallback_subscription_type", fallbackGroup.SubscriptionType),
 							)
 							_ = h.antigravityGatewayService.WriteMappedClaudeError(c, account, promptTooLongErr.StatusCode, promptTooLongErr.RequestID, promptTooLongErr.Body)
 							return
 						}
 						fallbackAPIKey := cloneAPIKeyWithGroup(apiKey, fallbackGroup)
-						if err := h.eligibilityChecker().CheckBillingEligibility(c.Request.Context(), fallbackAPIKey.User, fallbackAPIKey, fallbackGroup, nil, service.PlatformFromAPIKey(fallbackAPIKey)); err != nil {
-							status, code, message, retryAfter := billingErrorDetails(err)
-							if retryAfter > 0 {
-								c.Header("Retry-After", strconv.Itoa(retryAfter))
-							}
-							h.handleStreamingAwareError(c, status, code, message, streamStarted)
-							return
-						}
 						// 兜底重试按"直接请求兜底分组"处理：清除强制平台，允许按分组平台调度
 						ctx := context.WithValue(c.Request.Context(), ctxkey.ForcePlatform, "")
 						c.Request = c.Request.WithContext(ctx)
@@ -1654,60 +1602,14 @@ func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, 
 }
 
 // usageUnrestricted 处理 unrestricted 模式的响应（向后兼容）
-func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, apiKey *service.APIKey, subject middleware2.AuthSubject, usageData gin.H, dailyUsage any, modelStats any) {
-	// 订阅模式
-	if apiKey.Group != nil && apiKey.Group.IsSubscriptionType() {
-		resp := gin.H{
-			"mode":     "unrestricted",
-			"isValid":  true,
-			"planName": apiKey.Group.Name,
-			"unit":     "USD",
-		}
-
-		// 订阅信息可能不在 context 中（/v1/usage 路径跳过了中间件的计费检查）
-		subscription, ok := middleware2.GetSubscriptionFromContext(c)
-		if ok {
-			remaining := h.calculateSubscriptionRemaining(apiKey.Group, subscription)
-			resp["remaining"] = remaining
-			resp["subscription"] = gin.H{
-				"daily_usage_usd":     subscription.DailyUsageUSD,
-				"weekly_usage_usd":    subscription.WeeklyUsageUSD,
-				"monthly_usage_usd":   subscription.MonthlyUsageUSD,
-				"daily_limit_usd":     apiKey.Group.DailyLimitUSD,
-				"weekly_limit_usd":    apiKey.Group.WeeklyLimitUSD,
-				"monthly_limit_usd":   apiKey.Group.MonthlyLimitUSD,
-				"weekly_window_start": subscription.WeeklyWindowStart,
-				"expires_at":          subscription.ExpiresAt,
-			}
-		}
-
-		if usageData != nil {
-			resp["usage"] = usageData
-		}
-		if dailyUsage != nil {
-			resp["daily_usage"] = dailyUsage
-		}
-		if modelStats != nil {
-			resp["model_stats"] = modelStats
-		}
-		c.JSON(http.StatusOK, resp)
-		return
-	}
-
-	// 余额模式
-	latestUser, err := h.userService.GetByID(ctx, subject.UserID)
-	if err != nil {
-		h.errorResponse(c, http.StatusInternalServerError, "api_error", "Failed to get user info")
-		return
-	}
-
+func (h *GatewayHandler) usageUnrestricted(c *gin.Context, _ context.Context, apiKey *service.APIKey, _ middleware2.AuthSubject, usageData gin.H, dailyUsage any, modelStats any) {
 	resp := gin.H{
-		"mode":      "unrestricted",
-		"isValid":   true,
-		"planName":  "钱包余额",
-		"remaining": latestUser.Balance,
-		"unit":      "USD",
-		"balance":   latestUser.Balance,
+		"mode":     "personal",
+		"isValid":  true,
+		"planName": "Personal Private Edition",
+	}
+	if apiKey != nil && apiKey.Group != nil {
+		resp["group"] = apiKey.Group.Name
 	}
 	if usageData != nil {
 		resp["usage"] = usageData
@@ -1719,55 +1621,6 @@ func (h *GatewayHandler) usageUnrestricted(c *gin.Context, ctx context.Context, 
 		resp["model_stats"] = modelStats
 	}
 	c.JSON(http.StatusOK, resp)
-}
-
-// calculateSubscriptionRemaining 计算订阅剩余可用额度
-// 逻辑：
-// 1. 如果日/周/月任一限额达到100%，返回0
-// 2. 否则返回所有已配置周期中剩余额度的最小值
-func (h *GatewayHandler) calculateSubscriptionRemaining(group *service.Group, sub *service.UserSubscription) float64 {
-	var remainingValues []float64
-
-	// 检查日限额
-	if group.HasDailyLimit() {
-		remaining := *group.DailyLimitUSD - sub.DailyUsageUSD
-		if remaining <= 0 {
-			return 0
-		}
-		remainingValues = append(remainingValues, remaining)
-	}
-
-	// 检查周限额
-	if group.HasWeeklyLimit() {
-		remaining := *group.WeeklyLimitUSD - sub.WeeklyUsageUSD
-		if remaining <= 0 {
-			return 0
-		}
-		remainingValues = append(remainingValues, remaining)
-	}
-
-	// 检查月限额
-	if group.HasMonthlyLimit() {
-		remaining := *group.MonthlyLimitUSD - sub.MonthlyUsageUSD
-		if remaining <= 0 {
-			return 0
-		}
-		remainingValues = append(remainingValues, remaining)
-	}
-
-	// 如果没有配置任何限额，返回-1表示无限制
-	if len(remainingValues) == 0 {
-		return -1
-	}
-
-	// 返回最小值
-	min := remainingValues[0]
-	for _, v := range remainingValues[1:] {
-		if v < min {
-			min = v
-		}
-	}
-	return min
 }
 
 // handleConcurrencyError handles concurrency-related acquire errors.
@@ -2048,7 +1901,7 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 
 	// 校验 billing eligibility（订阅/余额）
 	// 【注意】不计算并发，但需要校验订阅/余额
-	if err := h.eligibilityChecker().CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.eligibilityChecker().CheckRequestEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))
@@ -2329,13 +2182,6 @@ func extractQuotaResetSeconds(err error) int {
 }
 
 func billingErrorDetails(err error) (status int, code, message string, retryAfter int) {
-	if errors.Is(err, service.ErrBillingServiceUnavailable) {
-		msg := pkgerrors.Message(err)
-		if msg == "" {
-			msg = "Billing service temporarily unavailable. Please retry later."
-		}
-		return http.StatusServiceUnavailable, "billing_service_error", msg, 0
-	}
 	if errors.Is(err, service.ErrAPIKeyRateLimit5hExceeded) {
 		msg := pkgerrors.Message(err)
 		return http.StatusTooManyRequests, "rate_limit_exceeded", msg, 0
@@ -2355,23 +2201,15 @@ func billingErrorDetails(err error) (status int, code, message string, retryAfte
 		retrySeconds := 60 - int(time.Now().Unix()%60)
 		return http.StatusTooManyRequests, "rate_limit_exceeded", msg, retrySeconds
 	}
-	if errors.Is(err, service.ErrUserPlatformDailyQuotaExhausted) ||
-		errors.Is(err, service.ErrUserPlatformWeeklyQuotaExhausted) ||
-		errors.Is(err, service.ErrUserPlatformMonthlyQuotaExhausted) {
-		// 与 RPM 超限一致映射 429 + Retry-After，让 SDK 自动退避（而非 403 直接失败）。
-		// 错误码用 rate_limit_exceeded 与 OpenAI 兼容客户端一致；细分类型由 ErrCode + window_resets_at metadata 区分。
-		msg := pkgerrors.Message(err)
-		return http.StatusTooManyRequests, "rate_limit_exceeded", msg, extractQuotaResetSeconds(err)
-	}
 	msg := pkgerrors.Message(err)
 	if msg == "" {
 		logger.L().With(
 			zap.String("component", "handler.gateway.billing"),
 			zap.Error(err),
 		).Warn("gateway.billing_error_missing_message")
-		msg = "Billing error"
+		msg = "Request is not eligible"
 	}
-	return http.StatusForbidden, "billing_error", msg, 0
+	return http.StatusForbidden, "request_not_eligible", msg, 0
 }
 
 func (h *GatewayHandler) metadataBridgeEnabled() bool {
