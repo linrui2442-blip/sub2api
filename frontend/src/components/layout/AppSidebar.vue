@@ -130,7 +130,7 @@ function isActive(path: string) {
 }
 
 function closeMobile() {
-  appStore.closeMobileSidebar()
+  appStore.setMobileOpen(false)
 }
 
 function toggleTheme() {
