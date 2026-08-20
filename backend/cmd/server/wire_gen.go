@@ -50,7 +50,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	}
 	userRepository := repository.NewUserRepository(client, db)
 	redisClient := repository.ProvideRedis(configConfig)
-	refreshTokenCache := repository.NewRefreshTokenCache(redisClient)
+	refreshTokenCache := repository.ProvideRefreshTokenCache(redisClient, db)
 	settingRepository := repository.NewSettingRepository(client)
 	settingService := service.ProvideSettingService(settingRepository, configConfig)
 	turnstileVerifier := repository.NewTurnstileVerifier()

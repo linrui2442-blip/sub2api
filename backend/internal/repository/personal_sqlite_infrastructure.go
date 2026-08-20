@@ -38,6 +38,21 @@ func ensurePersonalSQLiteInfrastructure(ctx context.Context, db *sql.DB) error {
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_scheduler_outbox_pending_dedup_key
 			ON scheduler_outbox (dedup_key)
 			WHERE dedup_key IS NOT NULL`,
+
+		// Browser refresh sessions must survive a local restart. The token itself
+		// is never stored: token_hash is the SHA-256 digest used by the existing
+		// rotation/replay-defense flow.
+		`CREATE TABLE IF NOT EXISTS personal_refresh_tokens (
+			token_hash TEXT PRIMARY KEY,
+			user_id INTEGER NOT NULL,
+			family_id TEXT NOT NULL,
+			payload TEXT NOT NULL,
+			expires_at DATETIME NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_personal_refresh_tokens_user
+			ON personal_refresh_tokens (user_id, expires_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_personal_refresh_tokens_family
+			ON personal_refresh_tokens (family_id, expires_at)`,
 	}
 
 	for _, statement := range statements {

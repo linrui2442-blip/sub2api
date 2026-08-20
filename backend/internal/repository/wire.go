@@ -8,6 +8,7 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/google/wire"
 	"github.com/redis/go-redis/v9"
@@ -106,7 +107,7 @@ var ProviderSet = wire.NewSet(
 	NewAuthCacheInvalidationOutboxRepository,
 	NewProxyLatencyCache,
 	NewTotpCache,
-	NewRefreshTokenCache,
+	ProvideRefreshTokenCache,
 	NewErrorPassthroughCache,
 	NewTLSFingerprintProfileCache,
 
@@ -198,4 +199,13 @@ func ProvideSQLDB(client *ent.Client) (*sql.DB, error) {
 // 提供：*redis.Client
 func ProvideRedis(cfg *config.Config) *redis.Client {
 	return InitRedis(cfg)
+}
+
+// ProvideRefreshTokenCache keeps Personal browser sessions durable in SQLite,
+// while the upstream compatibility runtime retains its Redis implementation.
+func ProvideRefreshTokenCache(rdb *redis.Client, db *sql.DB) service.RefreshTokenCache {
+	if personal.Enabled() {
+		return newPersonalRefreshTokenCache(db)
+	}
+	return NewRefreshTokenCache(rdb)
 }
