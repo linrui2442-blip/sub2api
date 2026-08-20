@@ -252,3 +252,97 @@ func (c *personalTempUnschedCache) DeleteTempUnsched(ctx context.Context, accoun
 }
 
 func fmtInt64(id int64) string { return strconv.FormatInt(id, 10) }
+
+// personalAccountCounterCache keeps short-lived account penalties local to one
+// Personal process. All operations are mutex-protected so failure thresholds
+// remain atomic under concurrent gateway requests.
+type personalAccountCounterCache struct {
+	mu      sync.Mutex
+	entries map[string]personalCounterEntry
+}
+
+type personalCounterEntry struct {
+	count     int64
+	expiresAt time.Time
+}
+
+func newPersonalAccountCounterCache() *personalAccountCounterCache {
+	return &personalAccountCounterCache{entries: make(map[string]personalCounterEntry)}
+}
+
+func (c *personalAccountCounterCache) increment(ctx context.Context, key string, ttl time.Duration) (int64, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
+	now := time.Now()
+	c.mu.Lock()
+	entry := c.entries[key]
+	if entry.expiresAt.IsZero() || !now.Before(entry.expiresAt) {
+		entry = personalCounterEntry{expiresAt: now.Add(ttl)}
+	}
+	entry.count++
+	c.entries[key] = entry
+	c.mu.Unlock()
+	return entry.count, nil
+}
+
+func (c *personalAccountCounterCache) get(ctx context.Context, key string) (int64, time.Duration, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, 0, err
+	}
+	now := time.Now()
+	c.mu.Lock()
+	entry, ok := c.entries[key]
+	if ok && !entry.expiresAt.IsZero() && !now.Before(entry.expiresAt) {
+		delete(c.entries, key)
+		ok = false
+	}
+	c.mu.Unlock()
+	if !ok {
+		return 0, 0, nil
+	}
+	return entry.count, time.Until(entry.expiresAt), nil
+}
+
+func (c *personalAccountCounterCache) reset(ctx context.Context, key string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	c.mu.Lock()
+	delete(c.entries, key)
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *personalAccountCounterCache) IncrementTimeoutCount(ctx context.Context, accountID int64, windowMinutes int) (int64, error) {
+	if windowMinutes < 1 {
+		windowMinutes = 1
+	}
+	return c.increment(ctx, timeoutCounterPrefix+fmtInt64(accountID), time.Duration(windowMinutes)*time.Minute)
+}
+func (c *personalAccountCounterCache) GetTimeoutCount(ctx context.Context, accountID int64) (int64, error) {
+	count, _, err := c.get(ctx, timeoutCounterPrefix+fmtInt64(accountID))
+	return count, err
+}
+func (c *personalAccountCounterCache) ResetTimeoutCount(ctx context.Context, accountID int64) error {
+	return c.reset(ctx, timeoutCounterPrefix+fmtInt64(accountID))
+}
+func (c *personalAccountCounterCache) GetTimeoutCountTTL(ctx context.Context, accountID int64) (time.Duration, error) {
+	_, ttl, err := c.get(ctx, timeoutCounterPrefix+fmtInt64(accountID))
+	return ttl, err
+}
+func (c *personalAccountCounterCache) IncrementOpenAI403Count(ctx context.Context, accountID int64, windowMinutes int) (int64, error) {
+	if windowMinutes < 1 {
+		windowMinutes = 1
+	}
+	return c.increment(ctx, openAI403CounterPrefix+fmtInt64(accountID), time.Duration(windowMinutes)*time.Minute)
+}
+func (c *personalAccountCounterCache) ResetOpenAI403Count(ctx context.Context, accountID int64) error {
+	return c.reset(ctx, openAI403CounterPrefix+fmtInt64(accountID))
+}
+func (c *personalAccountCounterCache) IncrementInternal500Count(ctx context.Context, accountID int64) (int64, error) {
+	return c.increment(ctx, internal500CounterPrefix+fmtInt64(accountID), time.Duration(internal500CounterTTLSeconds)*time.Second)
+}
+func (c *personalAccountCounterCache) ResetInternal500Count(ctx context.Context, accountID int64) error {
+	return c.reset(ctx, internal500CounterPrefix+fmtInt64(accountID))
+}

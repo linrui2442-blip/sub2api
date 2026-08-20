@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/redis/go-redis/v9"
 )
@@ -31,6 +32,9 @@ type timeoutCounterCache struct {
 
 // NewTimeoutCounterCache 创建超时计数器缓存实例
 func NewTimeoutCounterCache(rdb *redis.Client) service.TimeoutCounterCache {
+	if personal.Enabled() {
+		return newPersonalAccountCounterCache()
+	}
 	return &timeoutCounterCache{rdb: rdb}
 }
 
