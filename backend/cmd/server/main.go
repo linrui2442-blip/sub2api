@@ -212,7 +212,12 @@ func runMainServer(openBrowser bool) {
 		BuildType: BuildType,
 	}
 
-	app, err := initializeApplication(buildInfo)
+	var app *Application
+	if personal.Enabled() {
+		app, err = initializePersonalApplication(buildInfo)
+	} else {
+		app, err = initializeApplication(buildInfo)
+	}
 	if err != nil {
 		log.Fatalf("Failed to initialize application: %v", err)
 	}
