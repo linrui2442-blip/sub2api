@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/google/wire"
 )
@@ -27,13 +28,25 @@ func ProvidePersonalAdminAuthMiddleware(
 	return AdminAuthMiddleware(adminAuth(personalAuth.AuthService, userService, settingService, auditService))
 }
 
+// ProvidePersonalAPIKeyAuthMiddleware deliberately omits SubscriptionService.
+// Personal Edition forces SIMPLE gateway semantics, and apiKeyAuthWithSubscription
+// exits through its authentication-only SIMPLE branch before commercial
+// subscription/balance enforcement is reached. Private-member limits are handled
+// by the Personal API-key/member policy instead of SaaS subscription plans.
+func ProvidePersonalAPIKeyAuthMiddleware(
+	apiKeyService *service.APIKeyService,
+	cfg *config.Config,
+) APIKeyAuthMiddleware {
+	return APIKeyAuthMiddleware(apiKeyAuthWithSubscription(apiKeyService, nil, cfg))
+}
+
 // PersonalProviderSet excludes OptionalJWT/public-route middleware and, more
-// importantly, prevents JWT/admin authentication from selecting the standard
-// AuthService provider with its registration/commercial dependencies.
+// importantly, prevents JWT/admin/API-key authentication from selecting the
+// standard SaaS auth/subscription providers.
 var PersonalProviderSet = wire.NewSet(
 	ProvidePersonalJWTAuthMiddleware,
 	ProvidePersonalAdminAuthMiddleware,
-	NewAPIKeyAuthMiddleware,
+	ProvidePersonalAPIKeyAuthMiddleware,
 	NewAuditLogMiddleware,
 	NewStepUpAuthMiddleware,
 )
