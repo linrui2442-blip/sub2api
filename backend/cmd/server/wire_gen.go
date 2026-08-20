@@ -548,7 +548,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	handlers := handler.ProvidePersonalHandlers(authHandler, userHandler, apiKeyHandler, usageHandler, adminHandlers, gatewayHandler, openAIGatewayHandler, settingHandler, totpHandler, passkeyHandler)
 	jwtAuthMiddleware := middleware.ProvidePersonalJWTAuthMiddleware(personalAuthService, userService, settingService, auditLogService)
 	adminAuthMiddleware := middleware.ProvidePersonalAdminAuthMiddleware(personalAuthService, userService, settingService, auditLogService)
-	apiKeyAuthMiddleware := middleware.NewAPIKeyAuthMiddleware(apiKeyService, subscriptionService, configConfig)
+	apiKeyAuthMiddleware := middleware.ProvidePersonalAPIKeyAuthMiddleware(apiKeyService, configConfig)
 	auditLogMiddleware := middleware.NewAuditLogMiddleware(auditLogService)
 	stepUpAuthMiddleware := middleware.NewStepUpAuthMiddleware(totpService, userService, settingService)
 	engine := server.ProvidePersonalRouter(configConfig, handlers, jwtAuthMiddleware, adminAuthMiddleware, apiKeyAuthMiddleware, auditLogMiddleware, stepUpAuthMiddleware, apiKeyService, opsService, settingService, compositeRouteResolver, redisClient)
