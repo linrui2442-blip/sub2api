@@ -22,12 +22,12 @@ func TestPersonalApplicationBootSmoke(t *testing.T) {
 	repository.ClosePersonalEmbeddedRedis()
 	defer repository.ClosePersonalEmbeddedRedis()
 
-	app, err := initializeApplication(handler.BuildInfo{
+	app, err := initializePersonalApplication(handler.BuildInfo{
 		Version:   "personal-smoke",
 		BuildType: "personal",
 	})
 	if err != nil {
-		t.Fatalf("initialize Personal Edition without external PostgreSQL/Redis: %v", err)
+		t.Fatalf("initialize dedicated Personal Edition without external PostgreSQL/Redis: %v", err)
 	}
 	if app == nil || app.Server == nil {
 		t.Fatal("Personal Edition application/server must be initialized")
