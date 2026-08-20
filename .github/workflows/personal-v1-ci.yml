@@ -71,6 +71,13 @@ jobs:
       - name: Regenerate Wire graph
         working-directory: backend
         run: go generate ./cmd/server
+      - name: Upload generated Wire graph
+        uses: actions/upload-artifact@v7
+        with:
+          name: personal-wire-gen
+          path: backend/cmd/server/wire_gen.go
+          if-no-files-found: error
+          retention-days: 2
       - name: Boot full Personal Edition application
         working-directory: backend
         run: go test ./cmd/server -run '^TestPersonalApplicationBootSmoke$' -count=1 -timeout=5m
