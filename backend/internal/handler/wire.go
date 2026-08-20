@@ -97,7 +97,7 @@ func ProvideGatewayHandler(
 	antigravityGatewayService *service.AntigravityGatewayService,
 	userService *service.UserService,
 	concurrencyService *service.ConcurrencyService,
-	billingCacheService *service.BillingCacheService,
+	requestEligibility service.RequestEligibilityChecker,
 	usageService *service.UsageService,
 	apiKeyService *service.APIKeyService,
 	usageRecordWorkerPool *service.UsageRecordWorkerPool,
@@ -109,7 +109,7 @@ func ProvideGatewayHandler(
 	coordinator *securityaudit.Coordinator,
 ) *GatewayHandler {
 	h := NewGatewayHandler(gatewayService, openAIGatewayService, geminiCompatService, antigravityGatewayService,
-		userService, concurrencyService, billingCacheService, usageService, apiKeyService, usageRecordWorkerPool,
+		userService, concurrencyService, requestEligibility, usageService, apiKeyService, usageRecordWorkerPool,
 		errorPassthroughService, contentModerationService, userMsgQueueService, cfg, settingService)
 	h.securityAuditCoordinator = coordinator
 	return h
@@ -118,7 +118,7 @@ func ProvideGatewayHandler(
 func ProvideOpenAIGatewayHandler(
 	gatewayService *service.OpenAIGatewayService,
 	concurrencyService *service.ConcurrencyService,
-	billingCacheService *service.BillingCacheService,
+	requestEligibility service.RequestEligibilityChecker,
 	apiKeyService *service.APIKeyService,
 	usageRecordWorkerPool *service.UsageRecordWorkerPool,
 	errorPassthroughService *service.ErrorPassthroughService,
@@ -128,7 +128,7 @@ func ProvideOpenAIGatewayHandler(
 	cfg *config.Config,
 	coordinator *securityaudit.Coordinator,
 ) *OpenAIGatewayHandler {
-	h := NewOpenAIGatewayHandler(gatewayService, concurrencyService, billingCacheService, apiKeyService,
+	h := NewOpenAIGatewayHandler(gatewayService, concurrencyService, requestEligibility, apiKeyService,
 		usageRecordWorkerPool, errorPassthroughService, contentModerationService, opsService, cfg)
 	h.securityAuditCoordinator = coordinator
 	h.grokMediaEligibilityProber = grokQuotaService
@@ -220,6 +220,7 @@ func ProvideHandlers(
 
 // ProviderSet is the Wire provider set for all handlers
 var ProviderSet = wire.NewSet(
+	service.ProvideBillingRequestEligibilityChecker,
 	// Top-level handlers
 	NewAuthHandler,
 	NewUserHandler,

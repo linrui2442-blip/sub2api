@@ -739,3 +739,50 @@ func NewAdminService(
 		channelCacheInvalidator: channelCacheInvalidator,
 	}
 }
+
+// NewPersonalAdminService builds the private control-plane service without
+// SaaS commercial dependencies. Personal keeps member, group, account, proxy,
+// API-key and audit administration; subscriptions, redeem codes, affiliate
+// accrual and billing-cache invalidation are deliberately absent.
+func NewPersonalAdminService(
+	userRepo UserRepository,
+	groupRepo AdminGroupRepository,
+	accountRepo AdminAccountRepository,
+	proxyRepo ProxyRepository,
+	apiKeyRepo APIKeyRepository,
+	userGroupRateRepo UserGroupRateRepository,
+	userRPMCache UserRPMCache,
+	proxyProber ProxyExitInfoProber,
+	proxyLatencyCache ProxyLatencyCache,
+	authCacheInvalidator APIKeyAuthCacheInvalidator,
+	entClient *dbent.Client,
+	settingService *SettingService,
+	privacyClientFactory PrivacyClientFactory,
+	runtimeBlocker AccountRuntimeBlocker,
+	compositeRouteRepo CompositeModelRouteRepository,
+	compositeResolver *CompositeRouteResolver,
+	channelCacheInvalidator ChannelCacheInvalidator,
+) AdminService {
+	return &adminServiceImpl{
+		userRepo:                userRepo,
+		groupRepo:               groupRepo,
+		groupDuplicateRepo:      groupRepo,
+		accountRepo:             accountRepo,
+		accountDuplicateRepo:    accountRepo,
+		accountBillingRepo:      accountRepo,
+		proxyRepo:               proxyRepo,
+		apiKeyRepo:              apiKeyRepo,
+		userGroupRateRepo:       userGroupRateRepo,
+		userRPMCache:            userRPMCache,
+		proxyProber:             proxyProber,
+		proxyLatencyCache:       proxyLatencyCache,
+		authCacheInvalidator:    authCacheInvalidator,
+		entClient:               entClient,
+		settingService:          settingService,
+		privacyClientFactory:    privacyClientFactory,
+		runtimeBlocker:          runtimeBlocker,
+		compositeRouteRepo:      compositeRouteRepo,
+		compositeResolver:       compositeResolver,
+		channelCacheInvalidator: channelCacheInvalidator,
+	}
+}

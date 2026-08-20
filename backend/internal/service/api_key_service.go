@@ -359,6 +359,20 @@ func NewAPIKeyService(
 	return svc
 }
 
+// NewPersonalAPIKeyService builds the Personal Edition API-key service without
+// the SaaS subscription repository. Group access is determined exclusively by
+// local user permissions and allowed-group membership.
+func NewPersonalAPIKeyService(
+	apiKeyRepo APIKeyRepository,
+	userRepo UserRepository,
+	groupRepo GroupRepository,
+	userGroupRateRepo UserGroupRateRepository,
+	cache APIKeyCache,
+	cfg *config.Config,
+) *APIKeyService {
+	return NewAPIKeyService(apiKeyRepo, userRepo, groupRepo, nil, userGroupRateRepo, cache, cfg)
+}
+
 // SetRateLimitCacheInvalidator sets the optional rate limit cache invalidator.
 // Called after construction (e.g. in wire) to avoid circular dependencies.
 func (s *APIKeyService) SetRateLimitCacheInvalidator(inv RateLimitCacheInvalidator) {
@@ -444,16 +458,15 @@ func (s *APIKeyService) incrementAPIKeyErrorCount(ctx context.Context, userID in
 	_ = s.cache.IncrementCreateAttemptCount(ctx, userID)
 }
 
-// canUserBindGroup 检查用户是否可以绑定指定分组
-// 对于订阅类型分组：检查用户是否有有效订阅
-// 对于标准类型分组：使用原有的 AllowedGroups 和 IsExclusive 逻辑
+// canUserBindGroup checks whether the local user may bind the group. Personal
+// Edition never has a subscription repository, so local allowed-group rules
+// are authoritative there. The legacy subscription branch remains reachable
+// only from the standard constructor until the SaaS modules are removed.
 func (s *APIKeyService) canUserBindGroup(ctx context.Context, user *User, group *Group) bool {
-	// 订阅类型分组：需要有效订阅
-	if group.IsSubscriptionType() {
+	if group.IsSubscriptionType() && s.userSubRepo != nil {
 		_, err := s.userSubRepo.GetActiveByUserIDAndGroupID(ctx, user.ID, group.ID)
-		return err == nil // 有有效订阅则允许
+		return err == nil
 	}
-	// 标准类型分组：使用原有逻辑
 	return user.CanBindGroup(group.ID, group.IsExclusive)
 }
 
@@ -1030,16 +1043,15 @@ func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([
 		return nil, fmt.Errorf("list active groups: %w", err)
 	}
 
-	// 获取用户的所有有效订阅
-	activeSubscriptions, err := s.userSubRepo.ListActiveByUserID(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("list active subscriptions: %w", err)
-	}
-
-	// 构建订阅分组 ID 集合
 	subscribedGroupIDs := make(map[int64]bool)
-	for _, sub := range activeSubscriptions {
-		subscribedGroupIDs[sub.GroupID] = true
+	if s.userSubRepo != nil {
+		activeSubscriptions, err := s.userSubRepo.ListActiveByUserID(ctx, userID)
+		if err != nil {
+			return nil, fmt.Errorf("list active subscriptions: %w", err)
+		}
+		for _, sub := range activeSubscriptions {
+			subscribedGroupIDs[sub.GroupID] = true
+		}
 	}
 
 	// 过滤出用户有权限的分组
@@ -1055,11 +1067,9 @@ func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([
 
 // canUserBindGroupInternal 内部方法，检查用户是否可以绑定分组（使用预加载的订阅数据）
 func (s *APIKeyService) canUserBindGroupInternal(user *User, group *Group, subscribedGroupIDs map[int64]bool) bool {
-	// 订阅类型分组：需要有效订阅
-	if group.IsSubscriptionType() {
+	if group.IsSubscriptionType() && s.userSubRepo != nil {
 		return subscribedGroupIDs[group.ID]
 	}
-	// 标准类型分组：使用原有逻辑
 	return user.CanBindGroup(group.ID, group.IsExclusive)
 }
 

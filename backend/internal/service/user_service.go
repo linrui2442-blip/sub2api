@@ -307,6 +307,14 @@ func NewUserService(userRepo UserRepository, settingRepo SettingRepository, auth
 	}
 }
 
+func NewPersonalUserService(
+	userRepo UserRepository,
+	settingRepo SettingRepository,
+	authCacheInvalidator APIKeyAuthCacheInvalidator,
+) *UserService {
+	return NewUserService(userRepo, settingRepo, authCacheInvalidator, nil)
+}
+
 // GetFirstAdmin 获取首个管理员用户（用于 Admin API Key 认证）
 func (s *UserService) GetFirstAdmin(ctx context.Context) (*User, error) {
 	admin, err := s.userRepo.GetFirstAdmin(ctx)

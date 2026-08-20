@@ -173,6 +173,13 @@ func NewChannelService(repo ChannelRepository, groupRepo GroupRepository, authCa
 	return s
 }
 
+// NewPersonalChannelService keeps model routing/mapping independent from the
+// commercial pricing catalogue. Personal channels use only explicitly stored
+// routing metadata and never fall back to SaaS price data.
+func NewPersonalChannelService(repo ChannelRepository, groupRepo GroupRepository, authCacheInvalidator APIKeyAuthCacheInvalidator) *ChannelService {
+	return NewChannelService(repo, groupRepo, authCacheInvalidator, nil)
+}
+
 // loadCache 加载或返回缓存的渠道数据
 func (s *ChannelService) loadCache(ctx context.Context) (*channelCache, error) {
 	if cached, ok := s.cache.Load().(*channelCache); ok && cached != nil {

@@ -44,19 +44,28 @@ type GatewayHandler struct {
 	geminiCompatService       *service.GeminiMessagesCompatService
 	antigravityGatewayService *service.AntigravityGatewayService
 	userService               *service.UserService
-	billingCacheService       *service.BillingCacheService
-	usageService              *service.UsageService
-	apiKeyService             *service.APIKeyService
-	usageRecordWorkerPool     *service.UsageRecordWorkerPool
-	errorPassthroughService   *service.ErrorPassthroughService
-	contentModerationService  *service.ContentModerationService
-	securityAuditCoordinator  *securityaudit.Coordinator
-	concurrencyHelper         *ConcurrencyHelper
-	userMsgQueueHelper        *UserMsgQueueHelper
-	maxAccountSwitches        int
-	maxAccountSwitchesGemini  int
-	cfg                       *config.Config
-	settingService            *service.SettingService
+	requestEligibility        service.RequestEligibilityChecker
+	// Deprecated test compatibility; removed with the SaaS billing module.
+	billingCacheService      *service.BillingCacheService
+	usageService             *service.UsageService
+	apiKeyService            *service.APIKeyService
+	usageRecordWorkerPool    *service.UsageRecordWorkerPool
+	errorPassthroughService  *service.ErrorPassthroughService
+	contentModerationService *service.ContentModerationService
+	securityAuditCoordinator *securityaudit.Coordinator
+	concurrencyHelper        *ConcurrencyHelper
+	userMsgQueueHelper       *UserMsgQueueHelper
+	maxAccountSwitches       int
+	maxAccountSwitchesGemini int
+	cfg                      *config.Config
+	settingService           *service.SettingService
+}
+
+func (h *GatewayHandler) eligibilityChecker() service.RequestEligibilityChecker {
+	if h.requestEligibility != nil {
+		return h.requestEligibility
+	}
+	return h.billingCacheService
 }
 
 // NewGatewayHandler creates a new GatewayHandler
@@ -67,7 +76,7 @@ func NewGatewayHandler(
 	antigravityGatewayService *service.AntigravityGatewayService,
 	userService *service.UserService,
 	concurrencyService *service.ConcurrencyService,
-	billingCacheService *service.BillingCacheService,
+	requestEligibility service.RequestEligibilityChecker,
 	usageService *service.UsageService,
 	apiKeyService *service.APIKeyService,
 	usageRecordWorkerPool *service.UsageRecordWorkerPool,
@@ -102,7 +111,7 @@ func NewGatewayHandler(
 		geminiCompatService:       geminiCompatService,
 		antigravityGatewayService: antigravityGatewayService,
 		userService:               userService,
-		billingCacheService:       billingCacheService,
+		requestEligibility:        requestEligibility,
 		usageService:              usageService,
 		apiKeyService:             apiKeyService,
 		usageRecordWorkerPool:     usageRecordWorkerPool,
@@ -239,7 +248,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	}
 
 	// 2. 【新增】Wait后二次检查余额/订阅
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.eligibilityChecker().CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("gateway.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
@@ -965,7 +974,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 							return
 						}
 						fallbackAPIKey := cloneAPIKeyWithGroup(apiKey, fallbackGroup)
-						if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), fallbackAPIKey.User, fallbackAPIKey, fallbackGroup, nil, service.PlatformFromAPIKey(fallbackAPIKey)); err != nil {
+						if err := h.eligibilityChecker().CheckBillingEligibility(c.Request.Context(), fallbackAPIKey.User, fallbackAPIKey, fallbackGroup, nil, service.PlatformFromAPIKey(fallbackAPIKey)); err != nil {
 							status, code, message, retryAfter := billingErrorDetails(err)
 							if retryAfter > 0 {
 								c.Header("Retry-After", strconv.Itoa(retryAfter))
@@ -2039,7 +2048,7 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 
 	// 校验 billing eligibility（订阅/余额）
 	// 【注意】不计算并发，但需要校验订阅/余额
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.eligibilityChecker().CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
 			c.Header("Retry-After", strconv.Itoa(retryAfter))

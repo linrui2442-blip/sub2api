@@ -31,6 +31,14 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 		config.ProviderSet,
 		repository.ProviderSet,
 		service.ProviderSet,
+		service.ProvidePersonalAPIKeyService,
+		service.NewPersonalUserService,
+		service.NewPersonalGatewayService,
+		service.NewPersonalOpenAIGatewayService,
+		service.NewPersonalAdminService,
+		service.NewPersonalChannelService,
+		wire.Bind(new(service.ChannelCacheInvalidator), new(*service.ChannelService)),
+		wire.Bind(new(service.AccountRuntimeBlocker), new(*service.OpenAIGatewayService)),
 		service.ProvidePersonalAuthService,
 		securityaudit.ProviderSet,
 		middleware.PersonalProviderSet,
@@ -51,7 +59,6 @@ func providePersonalCleanup(
 	entClient *ent.Client,
 	rdb *redis.Client,
 	apiKeyService *service.APIKeyService,
-	billingCache *service.BillingCacheService,
 	opsService *service.OpsService,
 	schedulerSnapshot *service.SchedulerSnapshotService,
 	tokenRefresh *service.TokenRefreshService,
@@ -76,12 +83,6 @@ func providePersonalCleanup(
 			{"AuthCacheInvalidationSubscriber", func() error {
 				if apiKeyService != nil {
 					apiKeyService.StopAuthCacheInvalidationSubscriber()
-				}
-				return nil
-			}},
-			{"BillingCacheService", func() error {
-				if billingCache != nil {
-					billingCache.Stop()
 				}
 				return nil
 			}},

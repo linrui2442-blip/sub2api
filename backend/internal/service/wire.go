@@ -786,13 +786,27 @@ func ProvideAPIKeyService(
 	return svc
 }
 
+// ProvidePersonalAPIKeyService keeps Personal API-key authorization independent
+// from subscriptions and billing while preserving local group permissions.
+func ProvidePersonalAPIKeyService(
+	apiKeyRepo APIKeyRepository,
+	userRepo UserRepository,
+	groupRepo GroupRepository,
+	userGroupRateRepo UserGroupRateRepository,
+	cache APIKeyCache,
+	cfg *config.Config,
+	concurrencyService *ConcurrencyService,
+) *APIKeyService {
+	svc := NewPersonalAPIKeyService(apiKeyRepo, userRepo, groupRepo, userGroupRateRepo, cache, cfg)
+	svc.SetConcurrencyService(concurrencyService)
+	return svc
+}
+
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
 	ProvideAuthService,
 	NewPasskeyService,
-	NewUserService,
-	ProvideAPIKeyService,
 	ProvideAPIKeyAuthCacheInvalidator,
 	ProvideAuthCacheInvalidationWorker,
 	NewGroupService,
@@ -807,9 +821,6 @@ var ProviderSet = wire.NewSet(
 	NewBillingService,
 	ProvideBillingCacheService,
 	NewAnnouncementService,
-	NewAdminService,
-	NewGatewayService,
-	NewOpenAIGatewayService,
 	ProvideImageStorageSettingService,
 	ProvideImageTaskService,
 	ProvideBatchImageModelPricingResolver,
@@ -817,7 +828,6 @@ var ProviderSet = wire.NewSet(
 	NewBatchImageDownloadService,
 	ProvideBatchImageCleanupService,
 	ProvideBatchImageWorkerRuntime,
-	wire.Bind(new(AccountRuntimeBlocker), new(*OpenAIGatewayService)),
 	NewOAuthService,
 	ProvideOpenAIOAuthService,
 	ProvideGrokOAuthService,
@@ -896,9 +906,6 @@ var ProviderSet = wire.NewSet(
 	ProvideScheduledTestService,
 	ProvideScheduledTestRunnerService,
 	NewGroupCapacityService,
-	NewChannelService,
-	wire.Bind(new(ChannelCacheInvalidator), new(*ChannelService)),
-	NewModelPricingResolver,
 	NewContentModerationService,
 	NewAffiliateService,
 	ProvidePaymentConfigService,

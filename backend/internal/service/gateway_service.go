@@ -862,6 +862,39 @@ func NewGatewayService(
 	return svc
 }
 
+// NewPersonalGatewayService builds the Anthropic/Gemini gateway core without
+// SaaS billing, subscriptions, user pricing overrides, or commercial quotas.
+func NewPersonalGatewayService(
+	accountRepo AccountRepository,
+	groupRepo GroupRepository,
+	usageLogRepo UsageLogRepository,
+	userRepo UserRepository,
+	cache GatewayCache,
+	cfg *config.Config,
+	schedulerSnapshot *SchedulerSnapshotService,
+	concurrencyService *ConcurrencyService,
+	rateLimitService *RateLimitService,
+	identityService *IdentityService,
+	httpUpstream HTTPUpstream,
+	deferredService *DeferredService,
+	claudeTokenProvider *ClaudeTokenProvider,
+	sessionLimitCache SessionLimitCache,
+	rpmCache RPMCache,
+	digestStore *DigestSessionStore,
+	settingService *SettingService,
+	tlsFPProfileService *TLSFingerprintProfileService,
+	channelService *ChannelService,
+	compositeResolver *CompositeRouteResolver,
+) *GatewayService {
+	return NewGatewayService(
+		accountRepo, groupRepo, usageLogRepo, nil, userRepo, nil, nil,
+		cache, cfg, schedulerSnapshot, concurrencyService, nil, rateLimitService,
+		nil, identityService, httpUpstream, deferredService, claudeTokenProvider,
+		sessionLimitCache, rpmCache, digestStore, settingService, tlsFPProfileService,
+		channelService, nil, compositeResolver, nil, nil,
+	)
+}
+
 // GenerateSessionHash 从预解析请求计算粘性会话 hash
 func (s *GatewayService) GenerateSessionHash(parsed *ParsedRequest) string {
 	if parsed == nil {

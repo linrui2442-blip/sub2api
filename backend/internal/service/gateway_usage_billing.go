@@ -793,6 +793,21 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 		applyCacheTTLOverride(&result.Usage, overrideTarget)
 		cacheTTLOverridden = (result.Usage.CacheCreation5mTokens + result.Usage.CacheCreation1hTokens) > 0
 	}
+	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
+		requestedModel := result.Model
+		if input.OriginalModel != "" {
+			requestedModel = input.OriginalModel
+		}
+		usageLog := s.buildRecordUsageLog(
+			ctx, input, result, apiKey, user, account, nil, requestedModel,
+			1, 1, 1, 0, cacheTTLOverridden, nil, opts,
+		)
+		writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.gateway")
+		if s.deferredService != nil {
+			s.deferredService.ScheduleLastUsedUpdate(account.ID)
+		}
+		return nil
+	}
 
 	// 获取费率倍数（优先级：用户专属 > 分组默认 > 系统默认）
 	multiplier := 1.0
@@ -888,13 +903,6 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 			},
 			cost.TotalCost,
 		)
-	}
-
-	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
-		writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.gateway")
-		logger.LegacyPrintf("service.gateway", "[SIMPLE MODE] Usage recorded (not billed): user=%d, tokens=%d", usageLog.UserID, usageLog.TotalTokens())
-		s.deferredService.ScheduleLastUsedUpdate(account.ID)
-		return nil
 	}
 
 	// 配额平台由 handler 在请求 ctx 内经 QuotaPlatform() 算定并通过 input 传入；

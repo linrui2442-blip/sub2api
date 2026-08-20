@@ -38,6 +38,15 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 		// Business layer ProviderSets
 		repository.ProviderSet,
 		service.ProviderSet,
+		service.ProvideAPIKeyService,
+		service.NewUserService,
+		service.NewGatewayService,
+		service.NewOpenAIGatewayService,
+		service.NewAdminService,
+		service.NewChannelService,
+		service.NewModelPricingResolver,
+		wire.Bind(new(service.ChannelCacheInvalidator), new(*service.ChannelService)),
+		wire.Bind(new(service.AccountRuntimeBlocker), new(*service.OpenAIGatewayService)),
 		securityaudit.ProviderSet,
 		payment.ProviderSet,
 		middleware.ProviderSet,
@@ -328,12 +337,12 @@ func provideCleanup(
 				return nil
 			}},
 			{"ChannelMonitorV2Aggregator", func() error {
-			if channelMonitorV2Aggregator != nil {
-				channelMonitorV2Aggregator.Stop()
-			}
-			return nil
-		}},
-		{"ChannelMonitorRunner", func() error {
+				if channelMonitorV2Aggregator != nil {
+					channelMonitorV2Aggregator.Stop()
+				}
+				return nil
+			}},
+			{"ChannelMonitorRunner", func() error {
 				if channelMonitorRunner != nil {
 					channelMonitorRunner.Stop()
 				}

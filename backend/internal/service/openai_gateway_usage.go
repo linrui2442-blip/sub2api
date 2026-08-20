@@ -163,6 +163,9 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		CacheReadTokens:     result.Usage.CacheReadInputTokens,
 		ImageOutputTokens:   result.Usage.ImageOutputTokens,
 	}
+	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
+		return s.recordPersonalUsage(ctx, input, tokens)
+	}
 
 	// Get rate multiplier
 	multiplier := 1.0
@@ -426,13 +429,6 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 		)
 	}
 
-	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
-		writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.openai_gateway")
-		logger.LegacyPrintf("service.openai_gateway", "[SIMPLE MODE] Usage recorded (not billed): user=%d, tokens=%d", usageLog.UserID, usageLog.TotalTokens())
-		s.deferredService.ScheduleLastUsedUpdate(account.ID)
-		return nil
-	}
-
 	// Async usage billing runs outside the original request context, so it
 	// cannot recover ForcePlatform there. Fall back for internal/test callers.
 	quotaPlatform := input.QuotaPlatform
@@ -463,6 +459,63 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	}
 	writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.openai_gateway")
 
+	return nil
+}
+
+// recordPersonalUsage records operational telemetry without calculating or
+// persisting money, cost, profit, balance, or subscription state.
+func (s *OpenAIGatewayService) recordPersonalUsage(ctx context.Context, input *OpenAIRecordUsageInput, tokens UsageTokens) error {
+	result := input.Result
+	apiKey := input.APIKey
+	user := input.User
+	account := input.Account
+	requestID := resolveUsageBillingRequestID(ctx, result.RequestID)
+	if result.OpenAIWSMode && strings.TrimSpace(result.RequestID) != "" {
+		requestID = strings.TrimSpace(result.RequestID)
+	}
+	requestedModel := result.Model
+	if input.OriginalModel != "" {
+		requestedModel = input.OriginalModel
+	}
+	sentModel := upstreamSentModel(result.Model, result.UpstreamModel)
+	durationMs := int(result.Duration.Milliseconds())
+	usageLog := &UsageLog{
+		UserID:                user.ID,
+		APIKeyID:              apiKey.ID,
+		AccountID:             account.ID,
+		RequestID:             requestID,
+		Model:                 result.Model,
+		RequestedModel:        requestedModel,
+		UpstreamModel:         optionalTrimmedStringPtr(result.UpstreamModel),
+		UpstreamResponseModel: optionalTrimmedStringPtr(result.UpstreamResponseModel),
+		UpstreamModelMismatch: upstreamModelMismatch(sentModel, result.UpstreamResponseModel),
+		ServiceTier:           result.ServiceTier,
+		ReasoningEffort:       result.ReasoningEffort,
+		InboundEndpoint:       optionalTrimmedStringPtr(input.InboundEndpoint),
+		UpstreamEndpoint:      optionalTrimmedStringPtr(input.UpstreamEndpoint),
+		InputTokens:           tokens.InputTokens,
+		ImageInputTokens:      tokens.ImageInputTokens,
+		OutputTokens:          tokens.OutputTokens,
+		CacheCreationTokens:   tokens.CacheCreationTokens,
+		CacheReadTokens:       tokens.CacheReadTokens,
+		ImageOutputTokens:     tokens.ImageOutputTokens,
+		ImageCount:            result.ImageCount,
+		Stream:                result.Stream,
+		OpenAIWSMode:          result.OpenAIWSMode,
+		DurationMs:            &durationMs,
+		FirstTokenMs:          result.FirstTokenMs,
+		GroupID:               apiKey.GroupID,
+		ChannelID:             optionalInt64Ptr(input.ChannelID),
+		ModelMappingChain:     optionalTrimmedStringPtr(input.ModelMappingChain),
+		UserAgent:             optionalTrimmedStringPtr(input.UserAgent),
+		IPAddress:             optionalTrimmedStringPtr(input.IPAddress),
+		SessionID:             optionalTrimmedStringPtr(input.SessionID),
+		CreatedAt:             time.Now(),
+	}
+	writeUsageLogBestEffort(ctx, s.usageLogRepo, usageLog, "service.openai_gateway")
+	if s.deferredService != nil {
+		s.deferredService.ScheduleLastUsedUpdate(account.ID)
+	}
 	return nil
 }
 

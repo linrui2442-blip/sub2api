@@ -30,7 +30,9 @@ import (
 
 // OpenAIGatewayHandler handles OpenAI API gateway requests
 type OpenAIGatewayHandler struct {
-	gatewayService             *service.OpenAIGatewayService
+	gatewayService     *service.OpenAIGatewayService
+	requestEligibility service.RequestEligibilityChecker
+	// Deprecated test compatibility; removed with the SaaS billing module.
 	billingCacheService        *service.BillingCacheService
 	apiKeyService              *service.APIKeyService
 	usageRecordWorkerPool      *service.UsageRecordWorkerPool
@@ -43,6 +45,13 @@ type OpenAIGatewayHandler struct {
 	imageLimiter               *imageConcurrencyLimiter
 	maxAccountSwitches         int
 	cfg                        *config.Config
+}
+
+func (h *OpenAIGatewayHandler) eligibilityChecker() service.RequestEligibilityChecker {
+	if h.requestEligibility != nil {
+		return h.requestEligibility
+	}
+	return h.billingCacheService
 }
 
 type openAIWSTurnChannelMappingSnapshot struct {
@@ -247,7 +256,7 @@ func isResponsesWebSocketCompositePlatform(platform string) bool {
 func NewOpenAIGatewayHandler(
 	gatewayService *service.OpenAIGatewayService,
 	concurrencyService *service.ConcurrencyService,
-	billingCacheService *service.BillingCacheService,
+	requestEligibility service.RequestEligibilityChecker,
 	apiKeyService *service.APIKeyService,
 	usageRecordWorkerPool *service.UsageRecordWorkerPool,
 	errorPassthroughService *service.ErrorPassthroughService,
@@ -265,7 +274,7 @@ func NewOpenAIGatewayHandler(
 	}
 	return &OpenAIGatewayHandler{
 		gatewayService:           gatewayService,
-		billingCacheService:      billingCacheService,
+		requestEligibility:       requestEligibility,
 		apiKeyService:            apiKeyService,
 		usageRecordWorkerPool:    usageRecordWorkerPool,
 		errorPassthroughService:  errorPassthroughService,
@@ -468,7 +477,7 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 	}
 
 	// 2. Re-check billing eligibility after wait
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.eligibilityChecker().CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("openai.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
@@ -1053,7 +1062,7 @@ func (h *OpenAIGatewayHandler) Messages(c *gin.Context) {
 		defer userReleaseFunc()
 	}
 
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.eligibilityChecker().CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("openai_messages.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
@@ -1881,7 +1890,7 @@ func (h *OpenAIGatewayHandler) ResponsesWebSocket(c *gin.Context) {
 	if requestPlatform == service.PlatformGrok {
 		requiredTransport = service.OpenAIUpstreamTransportHTTPSSE
 	}
-	if err := h.billingCacheService.CheckBillingEligibility(ctx, apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.eligibilityChecker().CheckBillingEligibility(ctx, apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("openai.websocket_billing_eligibility_check_failed", zap.Error(err))
 		closeOpenAIClientWS(wsConn, coderws.StatusPolicyViolation, "billing check failed")
 		return
@@ -2469,8 +2478,8 @@ func (h *OpenAIGatewayHandler) missingResponsesDependencies() []string {
 	if h.gatewayService == nil {
 		missing = append(missing, "gatewayService")
 	}
-	if h.billingCacheService == nil {
-		missing = append(missing, "billingCacheService")
+	if h.eligibilityChecker() == nil {
+		missing = append(missing, "requestEligibility")
 	}
 	if h.apiKeyService == nil {
 		missing = append(missing, "apiKeyService")

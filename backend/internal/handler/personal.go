@@ -45,11 +45,9 @@ func ProvidePersonalPasskeyHandler(
 // identity-binding dependencies that belong to the public SaaS user surface.
 func ProvidePersonalUserHandler(
 	userService *service.UserService,
-	userPlatformQuotaRepo service.UserPlatformQuotaRepository,
 ) *UserHandler {
 	return &UserHandler{
-		userService:           userService,
-		userPlatformQuotaRepo: userPlatformQuotaRepo,
+		userService: userService,
 	}
 }
 
@@ -120,6 +118,7 @@ func ProvidePersonalHandlers(
 // list intentionally small; adding a constructor here means its dependency
 // graph becomes part of every Personal startup.
 var PersonalProviderSet = wire.NewSet(
+	service.ProvidePersonalRequestEligibilityChecker,
 	ProvidePersonalAuthHandler,
 	ProvidePersonalUserHandler,
 	NewAPIKeyHandler,

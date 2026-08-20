@@ -548,6 +548,33 @@ func NewOpenAIGatewayService(
 	return svc
 }
 
+// NewPersonalOpenAIGatewayService builds the OpenAI gateway without billing,
+// subscriptions, user price overrides, balance notifications, or commercial
+// user quotas. Provider rate limits and account health remain intact.
+func NewPersonalOpenAIGatewayService(
+	accountRepo AccountRepository,
+	usageLogRepo UsageLogRepository,
+	userRepo UserRepository,
+	cache GatewayCache,
+	cfg *config.Config,
+	schedulerSnapshot *SchedulerSnapshotService,
+	concurrencyService *ConcurrencyService,
+	rateLimitService *RateLimitService,
+	httpUpstream HTTPUpstream,
+	deferredService *DeferredService,
+	openAITokenProvider *OpenAITokenProvider,
+	grokTokenProvider *GrokTokenProvider,
+	channelService *ChannelService,
+	settingService *SettingService,
+) *OpenAIGatewayService {
+	return NewOpenAIGatewayService(
+		accountRepo, usageLogRepo, nil, userRepo, nil, nil, cache, cfg,
+		schedulerSnapshot, concurrencyService, nil, rateLimitService, nil,
+		httpUpstream, deferredService, openAITokenProvider, grokTokenProvider,
+		nil, channelService, nil, settingService, nil,
+	)
+}
+
 // ResolveChannelMapping 解析渠道级模型映射（代理到 ChannelService）
 func (s *OpenAIGatewayService) ResolveChannelMapping(ctx context.Context, groupID int64, model string) ChannelMappingResult {
 	if s.channelService == nil {

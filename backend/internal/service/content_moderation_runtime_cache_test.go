@@ -265,12 +265,21 @@ func TestContentModerationRuntimeSnapshotRefreshFailureKeepsStaleConfig(t *testi
 		SettingKeyRiskControlEnabled:      "true",
 		SettingKeyContentModerationConfig: runtimeCacheTestConfig(t, "blocked"),
 	}}
-	svc := runtimeCacheTestService(repo, time.Nanosecond)
+	svc := runtimeCacheTestService(repo, time.Minute)
 	input := runtimeCacheTestInput("blocked")
 
 	decision, err := svc.Check(context.Background(), input)
 	require.NoError(t, err)
 	require.True(t, decision.Blocked)
+
+	// Expire the snapshot explicitly. A nanosecond TTL is not deterministic on
+	// Windows because wall-clock resolution can make two adjacent time.Now
+	// calls equal, preventing the stale-while-revalidate branch from running.
+	current := svc.runtimeSnapshot.Load()
+	require.NotNil(t, current)
+	expired := *current
+	expired.loadedAt = time.Now().Add(-2 * time.Minute)
+	svc.runtimeSnapshot.Store(&expired)
 
 	repo.failMultiple(errors.New("database unavailable"))
 	decision, err = svc.Check(context.Background(), input)
