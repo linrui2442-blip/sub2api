@@ -1,9 +1,51 @@
 package handler
 
 import (
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler/admin"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/google/wire"
 )
+
+// ProvidePersonalAuthHandler keeps only dependencies exercised by Personal
+// login/session routes. Public registration promo/redeem/user-attribute flows
+// are not registered, so they must not become startup dependencies here.
+func ProvidePersonalAuthHandler(
+	cfg *config.Config,
+	authService *service.AuthService,
+	userService *service.UserService,
+	settingService *service.SettingService,
+	totpService *service.TotpService,
+) *AuthHandler {
+	return &AuthHandler{
+		cfg:         cfg,
+		authService: authService,
+		userService: userService,
+		settingSvc:  settingService,
+		totpService: totpService,
+	}
+}
+
+// ProvidePersonalUserHandler omits the notification-email, affiliate and
+// identity-binding dependencies that belong to the public SaaS user surface.
+func ProvidePersonalUserHandler(
+	userService *service.UserService,
+	userPlatformQuotaRepo service.UserPlatformQuotaRepository,
+) *UserHandler {
+	return &UserHandler{
+		userService:           userService,
+		userPlatformQuotaRepo: userPlatformQuotaRepo,
+	}
+}
+
+// ProvidePersonalSettingHandler serves only /settings/public. The notification
+// email unsubscribe service is intentionally not attached in Personal Edition.
+func ProvidePersonalSettingHandler(
+	settingService *service.SettingService,
+	buildInfo BuildInfo,
+) *SettingHandler {
+	return NewSettingHandler(settingService, buildInfo.Version)
+}
 
 // ProvidePersonalAdminHandlers builds the admin handler subset used by the
 // private Personal Edition control plane. Commercial SaaS handlers are
@@ -65,15 +107,15 @@ func ProvidePersonalHandlers(
 // list intentionally small; adding a constructor here means its dependency
 // graph becomes part of every Personal startup.
 var PersonalProviderSet = wire.NewSet(
-	NewAuthHandler,
-	NewUserHandler,
+	ProvidePersonalAuthHandler,
+	ProvidePersonalUserHandler,
 	NewAPIKeyHandler,
 	NewUsageHandler,
 	ProvideGatewayHandler,
 	ProvideOpenAIGatewayHandler,
 	NewTotpHandler,
 	NewPasskeyHandler,
-	ProvideSettingHandler,
+	ProvidePersonalSettingHandler,
 
 	admin.NewUserHandler,
 	admin.NewGroupHandler,
