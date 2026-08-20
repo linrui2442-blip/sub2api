@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/redis/go-redis/v9"
 )
@@ -38,6 +39,9 @@ type tempUnschedCache struct {
 }
 
 func NewTempUnschedCache(rdb *redis.Client) service.TempUnschedCache {
+	if personal.Enabled() {
+		return newPersonalTempUnschedCache()
+	}
 	return &tempUnschedCache{rdb: rdb}
 }
 

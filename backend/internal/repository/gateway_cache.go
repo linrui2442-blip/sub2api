@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/redis/go-redis/v9"
 )
@@ -18,6 +19,9 @@ type gatewayCache struct {
 }
 
 func NewGatewayCache(rdb *redis.Client) service.GatewayCache {
+	if personal.Enabled() {
+		return newPersonalGatewayCache()
+	}
 	return &gatewayCache{rdb: rdb}
 }
 

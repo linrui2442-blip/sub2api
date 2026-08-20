@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/redis/go-redis/v9"
 )
@@ -15,6 +16,9 @@ type updateCache struct {
 }
 
 func NewUpdateCache(rdb *redis.Client) service.UpdateCache {
+	if personal.Enabled() {
+		return newPersonalUpdateCache()
+	}
 	return &updateCache{rdb: rdb}
 }
 
