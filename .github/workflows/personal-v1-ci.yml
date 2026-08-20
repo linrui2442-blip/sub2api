@@ -71,13 +71,9 @@ jobs:
       - name: Regenerate Wire graph
         working-directory: backend
         run: go generate ./cmd/server
-      - name: Upload generated Wire graph
-        uses: actions/upload-artifact@v7
-        with:
-          name: personal-wire-gen
-          path: backend/cmd/server/wire_gen.go
-          if-no-files-found: error
-          retention-days: 2
+      - name: Verify generated Wire graph is committed
+        working-directory: backend
+        run: git diff --exit-code -- cmd/server/wire_gen.go
       - name: Boot full Personal Edition application
         working-directory: backend
         run: go test ./cmd/server -run '^TestPersonalApplicationBootSmoke$' -count=1 -timeout=5m
@@ -120,6 +116,9 @@ jobs:
       - name: Regenerate Wire graph
         working-directory: backend
         run: go generate ./cmd/server
+      - name: Verify generated Wire graph is committed
+        working-directory: backend
+        run: git diff --exit-code -- cmd/server/wire_gen.go
       - name: Verify Windows Personal Edition compilation
         working-directory: backend
         env:
@@ -134,34 +133,3 @@ jobs:
           path: sub2api-personal.exe
           if-no-files-found: error
           retention-days: 7
-
-  sync-wire-generated:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/personal-v1'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: personal-v1
-          fetch-depth: 0
-      - uses: actions/setup-go@v6
-        with:
-          go-version-file: backend/go.mod
-          check-latest: false
-          cache: true
-          cache-dependency-path: backend/go.sum
-      - name: Regenerate Wire graph
-        working-directory: backend
-        run: go generate ./cmd/server
-      - name: Commit generated Wire graph when changed
-        run: |
-          if git diff --quiet -- backend/cmd/server/wire_gen.go; then
-            echo 'wire_gen.go already matches the Personal injector graph.'
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add backend/cmd/server/wire_gen.go
-          git commit -m 'chore(personal): sync generated Wire graph'
-          git push origin HEAD:personal-v1
