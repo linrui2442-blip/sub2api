@@ -52,9 +52,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	redisClient := repository.ProvideRedis(configConfig)
 	refreshTokenCache := repository.NewRefreshTokenCache(redisClient)
 	settingRepository := repository.NewSettingRepository(client)
-	groupRepository := repository.NewGroupRepository(client, db)
-	proxyRepository := repository.NewProxyRepository(client, db)
-	settingService := service.ProvideSettingService(settingRepository, groupRepository, proxyRepository, configConfig)
+	settingService := service.ProvideSettingService(settingRepository, configConfig)
 	turnstileVerifier := repository.NewTurnstileVerifier()
 	turnstileService := service.NewTurnstileService(settingService, turnstileVerifier)
 	tencentCaptchaVerifier := repository.NewTencentCaptchaVerifier()
@@ -63,6 +61,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	aliyunCaptchaService := service.NewAliyunCaptchaService(settingService, aliyunCaptchaVerifier)
 	personalAuthService := service.ProvidePersonalAuthService(client, userRepository, refreshTokenCache, configConfig, settingService, turnstileService, tencentCaptchaService, aliyunCaptchaService)
 	apiKeyRepository := repository.NewAPIKeyRepository(client, db)
+	groupRepository := repository.NewGroupRepository(client, db)
 	userGroupRateRepository := repository.NewUserGroupRateRepository(db)
 	apiKeyCache := repository.NewAPIKeyCache(redisClient)
 	concurrencyCache := repository.ProvideConcurrencyCache(redisClient, configConfig)
@@ -105,6 +104,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 		return nil, err
 	}
 	deferredService := service.ProvideDeferredService(accountRepository, timingWheelService)
+	proxyRepository := repository.NewProxyRepository(client, db)
 	claudeOAuthClient := repository.NewClaudeOAuthClient()
 	oAuthService := service.NewOAuthService(proxyRepository, claudeOAuthClient)
 	oAuthRefreshAPI := service.ProvideOAuthRefreshAPI(accountRepository, geminiTokenCache)

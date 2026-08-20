@@ -110,19 +110,13 @@ type DefaultSubscriptionGroupReader interface {
 	GetByID(ctx context.Context, id int64) (*Group, error)
 }
 
-// WebSearchManagerBuilder creates a websearch.Manager from config (injected by infra layer).
-// proxyURLs maps proxy ID to resolved URL for provider-level proxy support.
-type WebSearchManagerBuilder func(cfg *WebSearchEmulationConfig, proxyURLs map[int64]string)
-
 // SettingService 系统设置服务
 type SettingService struct {
 	settingRepo                 SettingRepository
 	defaultSubGroupReader       DefaultSubscriptionGroupReader
-	proxyRepo                   ProxyRepository // for resolving websearch provider proxy URLs
 	cfg                         *config.Config
-	onUpdate                    func() // Callback when settings are updated (for cache invalidation)
-	version                     string // Application version
-	webSearchManagerBuilder     WebSearchManagerBuilder
+	onUpdate                    func()       // Callback when settings are updated (for cache invalidation)
+	version                     string       // Application version
 	antigravityUAVersionCache   atomic.Value // *cachedAntigravityUserAgentVersion
 	antigravityUAVersionSF      singleflight.Group
 	openAICodexUACache          atomic.Value // *cachedOpenAICodexUserAgent
@@ -287,11 +281,6 @@ func NewSettingService(settingRepo SettingRepository, cfg *config.Config) *Setti
 // SetDefaultSubscriptionGroupReader injects an optional group reader for default subscription validation.
 func (s *SettingService) SetDefaultSubscriptionGroupReader(reader DefaultSubscriptionGroupReader) {
 	s.defaultSubGroupReader = reader
-}
-
-// SetProxyRepository injects a proxy repo for resolving websearch provider proxy URLs.
-func (s *SettingService) SetProxyRepository(repo ProxyRepository) {
-	s.proxyRepo = repo
 }
 
 func (s *SettingService) LoadForwardedClientIPSettings(ctx context.Context) error {

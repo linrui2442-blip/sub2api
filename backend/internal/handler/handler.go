@@ -45,7 +45,6 @@ type Handlers struct {
 	Totp             *TotpHandler
 	Passkey          *PasskeyHandler
 	AvailableChannel *AvailableChannelHandler
-	AsyncImage       *AsyncImageHandler
 }
 
 // BuildInfo contains build-time information

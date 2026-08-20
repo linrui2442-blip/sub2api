@@ -222,7 +222,6 @@ type SystemSettings struct {
 	CodexCLIOnlyEngineFingerprintSignals string `json:"codex_cli_only_engine_fingerprint_signals"`
 
 	// Web Search Emulation
-	WebSearchEmulationEnabled bool `json:"web_search_emulation_enabled"`
 
 	// Payment visible method routing
 

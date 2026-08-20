@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"hash/fnv"
-	"log/slog"
 	"net/url"
 	"reflect"
 	"sort"
@@ -2082,41 +2081,6 @@ func (a *Account) IsAnthropicAPIKeyPassthroughEnabled() bool {
 	}
 	enabled, ok := a.Extra["anthropic_passthrough"].(bool)
 	return ok && enabled
-}
-
-// WebSearch 模拟三态常量
-const (
-	WebSearchModeDefault  = "default"  // 跟随渠道配置
-	WebSearchModeEnabled  = "enabled"  // 强制开启
-	WebSearchModeDisabled = "disabled" // 强制关闭
-)
-
-// GetWebSearchEmulationMode 返回账号的 WebSearch 模拟模式。
-// 三态：default（跟随渠道）/ enabled（强制开启）/ disabled（强制关闭）。
-// 兼容旧 bool 值：true→enabled, false→default（并记录 debug 日志）。
-func (a *Account) GetWebSearchEmulationMode() string {
-	if a == nil || a.Platform != PlatformAnthropic || a.Type != AccountTypeAPIKey || a.Extra == nil {
-		return WebSearchModeDefault
-	}
-	raw := a.Extra[featureKeyWebSearchEmulation]
-	// Tolerant: legacy bool values (pre-migration or stale writes)
-	if b, ok := raw.(bool); ok {
-		slog.Debug("legacy bool web_search_emulation value", "account_id", a.ID, "value", b)
-		if b {
-			return WebSearchModeEnabled
-		}
-		return WebSearchModeDefault
-	}
-	mode, ok := raw.(string)
-	if !ok {
-		return WebSearchModeDefault
-	}
-	switch mode {
-	case WebSearchModeEnabled, WebSearchModeDisabled:
-		return mode
-	default:
-		return WebSearchModeDefault
-	}
 }
 
 // IsCodexCLIOnlyEnabled 返回 OpenAI OAuth 账号是否启用"仅允许 Codex 官方客户端"。

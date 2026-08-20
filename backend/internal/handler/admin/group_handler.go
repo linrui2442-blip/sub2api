@@ -13,7 +13,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
-	"github.com/Wei-Shaw/sub2api/internal/platform/liveattestation"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -31,16 +30,6 @@ func float64ValueOrDefault(value *float64, fallback float64) float64 {
 		return fallback
 	}
 	return *value
-}
-
-// GetLiveCapability 返回当前服务端是否具备生成 Live attestation 的运行环境。
-func (h *GroupHandler) GetLiveCapability(c *gin.Context) {
-	err := liveattestation.NewProvider().Check(c.Request.Context())
-	result := gin.H{"supported": err == nil}
-	if err != nil {
-		result["reason"] = err.Error()
-	}
-	response.Success(c, result)
 }
 
 type optionalLimitField struct {

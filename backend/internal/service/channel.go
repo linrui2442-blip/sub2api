@@ -270,19 +270,6 @@ func (c *Channel) Clone() *Channel {
 	return &cp
 }
 
-// IsWebSearchEmulationEnabled 返回该渠道是否为指定平台启用了 web search 模拟。
-func (c *Channel) IsWebSearchEmulationEnabled(platform string) bool {
-	if c == nil || c.FeaturesConfig == nil {
-		return false
-	}
-	wse, ok := c.FeaturesConfig[featureKeyWebSearchEmulation].(map[string]any)
-	if !ok {
-		return false
-	}
-	enabled, ok := wse[platform].(bool)
-	return ok && enabled
-}
-
 // IsBedrockCCCompatEnabled 返回该渠道是否启用了 Bedrock CC 兼容模式。
 // 一旦启用，该渠道下所有请求都会应用 CC 兼容转换，不区分账号 platform。
 func (c *Channel) IsBedrockCCCompatEnabled(platform string) bool {

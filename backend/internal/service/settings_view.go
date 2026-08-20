@@ -239,7 +239,6 @@ type SystemSettings struct {
 	CodexCLIOnlyEngineFingerprintSignals   string // codex_cli_only 引擎指纹门信号列表 JSON（[]EngineFingerprintSignal）
 
 	// Web Search Emulation
-	WebSearchEmulationEnabled bool // 是否启用 web search 模拟
 
 	// Payment visible method routing
 

@@ -520,15 +520,6 @@ func ProvideImageStorageSettingService(
 	return NewImageStorageSettingService(settingRepo, encryptor, backup, factory, cfg.ImageStorage)
 }
 
-// ProvideImageTaskService 构造异步图片任务服务。
-//
-// 对象存储是异步图片任务的启用前提：仅当开关打开且凭证齐全时功能才可用，否则整体禁用
-// （handler 返回 404，不创建任务、不写 Redis），从而避免大 base64 结果撑爆 Redis。
-// 启用状态由 settings 服务在运行时解析，因此后台改开关后无需重启即可生效。
-func ProvideImageTaskService(store ImageTaskStore, settings *ImageStorageSettingService) *ImageTaskService {
-	return NewImageTaskServiceWithResolver(store, settings.Resolver(), defaultImageTaskTTL, defaultImageTaskExecutionTimeout)
-}
-
 // ProvideBackupService creates and starts BackupService
 func ProvideBackupService(
 	settingRepo SettingRepository,
@@ -603,10 +594,9 @@ func ProvideOpsIngressRejectAggregator(opsRepo OpsRepository, opsService *OpsSer
 	return aggregator
 }
 
-// ProvideSettingService wires SettingService with group reader and proxy repo.
-func ProvideSettingService(settingRepo SettingRepository, groupRepo GroupRepository, proxyRepo ProxyRepository, cfg *config.Config) *SettingService {
+// ProvideSettingService wires the Personal runtime settings service.
+func ProvideSettingService(settingRepo SettingRepository, cfg *config.Config) *SettingService {
 	svc := NewSettingService(settingRepo, cfg)
-	svc.SetProxyRepository(proxyRepo)
 	if err := svc.LoadForwardedClientIPSettings(context.Background()); err != nil {
 		logger.LegacyPrintf("service.setting", "Warning: load forwarded client IP settings failed: %v", err)
 	}
@@ -654,7 +644,6 @@ var ProviderSet = wire.NewSet(
 	NewUsageService,
 	NewDashboardService,
 	ProvideImageStorageSettingService,
-	ProvideImageTaskService,
 	NewOAuthService,
 	ProvideOpenAIOAuthService,
 	ProvideGrokOAuthService,

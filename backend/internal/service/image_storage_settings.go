@@ -80,13 +80,6 @@ func NewImageStorageSettingService(
 	}
 }
 
-// Resolver 返回可注入 ImageTaskService 的解析函数。
-func (s *ImageStorageSettingService) Resolver() ImageStorageResolver {
-	return func() (*ImageResultUploader, bool) {
-		return s.resolve()
-	}
-}
-
 func (s *ImageStorageSettingService) resolve() (*ImageResultUploader, bool) {
 	if s == nil {
 		return nil, false
