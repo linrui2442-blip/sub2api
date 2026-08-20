@@ -62,6 +62,14 @@ func ProvidePersonalSettingHandler(
 	return NewSettingHandler(settingService, buildInfo.Version)
 }
 
+// providePersonalUnusedUserAttributeHandler is a dependency-free compatibility
+// placeholder for a previously generated wire_gen.go. Personal routes never
+// expose user-attribute APIs. A fresh Wire generation can remove this slot
+// without pulling the SaaS attribute repository/service graph back in.
+func providePersonalUnusedUserAttributeHandler() *admin.UserAttributeHandler {
+	return nil
+}
+
 // ProvidePersonalAdminHandlers builds the admin handler subset used by the
 // private Personal Edition control plane. Commercial SaaS handlers are
 // intentionally absent so Wire does not construct their service graphs.
@@ -73,6 +81,7 @@ func ProvidePersonalAdminHandlers(
 	openaiOAuthHandler *admin.OpenAIOAuthHandler,
 	geminiOAuthHandler *admin.GeminiOAuthHandler,
 	proxyHandler *admin.ProxyHandler,
+	_ *admin.UserAttributeHandler,
 	auditLogHandler *admin.AuditLogHandler,
 ) *AdminHandlers {
 	return &AdminHandlers{
@@ -138,6 +147,7 @@ var PersonalProviderSet = wire.NewSet(
 	admin.NewGeminiOAuthHandler,
 	admin.NewProxyHandler,
 	admin.NewAuditLogHandler,
+	providePersonalUnusedUserAttributeHandler,
 
 	ProvidePersonalAdminHandlers,
 	ProvidePersonalHandlers,
