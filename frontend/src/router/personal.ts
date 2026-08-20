@@ -82,7 +82,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/admin/settings',
     name: 'PersonalAdminSettings',
-    component: () => import('@/views/admin/SettingsView.vue'),
+    component: () => import('@/views/admin/PersonalSettingsView.vue'),
     meta: { requiresAuth: true, requiresAdmin: true, title: 'Settings' }
   },
   {
