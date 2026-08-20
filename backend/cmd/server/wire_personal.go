@@ -36,7 +36,6 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 		handler.PersonalProviderSet,
 		server.PersonalProviderSet,
 		providePrivacyClientFactory,
-		provideServiceBuildInfo,
 		providePersonalCleanup,
 		wire.Struct(new(Application), "Server", "PromptAudit", "Cleanup"),
 	)
