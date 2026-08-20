@@ -12,17 +12,32 @@ import (
 // are not registered, so they must not become startup dependencies here.
 func ProvidePersonalAuthHandler(
 	cfg *config.Config,
-	authService *service.AuthService,
+	personalAuth *service.PersonalAuthService,
 	userService *service.UserService,
 	settingService *service.SettingService,
 	totpService *service.TotpService,
 ) *AuthHandler {
 	return &AuthHandler{
 		cfg:         cfg,
-		authService: authService,
+		authService: personalAuth.AuthService,
 		userService: userService,
 		settingSvc:  settingService,
 		totpService: totpService,
+	}
+}
+
+// ProvidePersonalPasskeyHandler shares the same private auth runtime used by
+// password login/JWT middleware; it does not request the standard SaaS auth
+// provider solely for action-captcha and token-session helpers.
+func ProvidePersonalPasskeyHandler(
+	passkeys *service.PasskeyService,
+	personalAuth *service.PersonalAuthService,
+	settingService *service.SettingService,
+) *PasskeyHandler {
+	return &PasskeyHandler{
+		passkeys:    passkeys,
+		authService: personalAuth.AuthService,
+		settingSvc:  settingService,
 	}
 }
 
@@ -114,7 +129,7 @@ var PersonalProviderSet = wire.NewSet(
 	ProvideGatewayHandler,
 	ProvideOpenAIGatewayHandler,
 	NewTotpHandler,
-	NewPasskeyHandler,
+	ProvidePersonalPasskeyHandler,
 	ProvidePersonalSettingHandler,
 
 	admin.NewUserHandler,
