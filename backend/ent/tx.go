@@ -22,8 +22,6 @@ type Tx struct {
 	AccountGroup *AccountGroupClient
 	// AuthIdentity is the client for interacting with the AuthIdentity builders.
 	AuthIdentity *AuthIdentityClient
-	// AuthIdentityChannel is the client for interacting with the AuthIdentityChannel builders.
-	AuthIdentityChannel *AuthIdentityChannelClient
 	// CompositeModelRoute is the client for interacting with the CompositeModelRoute builders.
 	CompositeModelRoute *CompositeModelRouteClient
 	// ErrorPassthroughRule is the client for interacting with the ErrorPassthroughRule builders.
@@ -32,10 +30,6 @@ type Tx struct {
 	Group *GroupClient
 	// IdempotencyRecord is the client for interacting with the IdempotencyRecord builders.
 	IdempotencyRecord *IdempotencyRecordClient
-	// IdentityAdoptionDecision is the client for interacting with the IdentityAdoptionDecision builders.
-	IdentityAdoptionDecision *IdentityAdoptionDecisionClient
-	// PendingAuthSession is the client for interacting with the PendingAuthSession builders.
-	PendingAuthSession *PendingAuthSessionClient
 	// Proxy is the client for interacting with the Proxy builders.
 	Proxy *ProxyClient
 	// SecuritySecret is the client for interacting with the SecuritySecret builders.
@@ -187,13 +181,10 @@ func (tx *Tx) init() {
 	tx.Account = NewAccountClient(tx.config)
 	tx.AccountGroup = NewAccountGroupClient(tx.config)
 	tx.AuthIdentity = NewAuthIdentityClient(tx.config)
-	tx.AuthIdentityChannel = NewAuthIdentityChannelClient(tx.config)
 	tx.CompositeModelRoute = NewCompositeModelRouteClient(tx.config)
 	tx.ErrorPassthroughRule = NewErrorPassthroughRuleClient(tx.config)
 	tx.Group = NewGroupClient(tx.config)
 	tx.IdempotencyRecord = NewIdempotencyRecordClient(tx.config)
-	tx.IdentityAdoptionDecision = NewIdentityAdoptionDecisionClient(tx.config)
-	tx.PendingAuthSession = NewPendingAuthSessionClient(tx.config)
 	tx.Proxy = NewProxyClient(tx.config)
 	tx.SecuritySecret = NewSecuritySecretClient(tx.config)
 	tx.Setting = NewSettingClient(tx.config)

@@ -1139,106 +1139,9 @@ func windowCostFromPrefetchContext(ctx context.Context, accountID int64) (float6
 }
 
 func (s *GatewayService) withWindowCostPrefetch(ctx context.Context, accounts []Account) context.Context {
-	if ctx == nil || len(accounts) == 0 || s.sessionLimitCache == nil || s.usageLogRepo == nil {
-		return ctx
-	}
-
-	accountByID := make(map[int64]*Account)
-	accountIDs := make([]int64, 0, len(accounts))
-	for i := range accounts {
-		account := &accounts[i]
-		if account == nil || !account.IsAnthropicOAuthOrSetupToken() {
-			continue
-		}
-		if account.GetWindowCostLimit() <= 0 {
-			continue
-		}
-		accountByID[account.ID] = account
-		accountIDs = append(accountIDs, account.ID)
-	}
-	if len(accountIDs) == 0 {
-		return ctx
-	}
-
-	costs := make(map[int64]float64, len(accountIDs))
-	cacheValues, err := s.sessionLimitCache.GetWindowCostBatch(ctx, accountIDs)
-	if err == nil {
-		for accountID, cost := range cacheValues {
-			costs[accountID] = cost
-		}
-		windowCostPrefetchCacheHitTotal.Add(int64(len(cacheValues)))
-	} else {
-		windowCostPrefetchErrorTotal.Add(1)
-		logger.LegacyPrintf("service.gateway", "window_cost batch cache read failed: %v", err)
-	}
-	cacheMissCount := len(accountIDs) - len(costs)
-	if cacheMissCount < 0 {
-		cacheMissCount = 0
-	}
-	windowCostPrefetchCacheMissTotal.Add(int64(cacheMissCount))
-
-	missingByStart := make(map[int64][]int64)
-	startTimes := make(map[int64]time.Time)
-	for _, accountID := range accountIDs {
-		if _, ok := costs[accountID]; ok {
-			continue
-		}
-		account := accountByID[accountID]
-		if account == nil {
-			continue
-		}
-		startTime := account.GetCurrentWindowStartTime()
-		startKey := startTime.Unix()
-		missingByStart[startKey] = append(missingByStart[startKey], accountID)
-		startTimes[startKey] = startTime
-	}
-	if len(missingByStart) == 0 {
-		return context.WithValue(ctx, windowCostPrefetchContextKey, costs)
-	}
-
-	batchReader, hasBatch := s.usageLogRepo.(usageLogWindowStatsBatchProvider)
-	for startKey, ids := range missingByStart {
-		startTime := startTimes[startKey]
-
-		if hasBatch {
-			windowCostPrefetchBatchSQLTotal.Add(1)
-			queryStart := time.Now()
-			statsByAccount, err := batchReader.GetAccountWindowStatsBatch(ctx, ids, startTime)
-			if err == nil {
-				slog.Debug("window_cost_batch_query_ok",
-					"accounts", len(ids),
-					"window_start", startTime.Format(time.RFC3339),
-					"duration_ms", time.Since(queryStart).Milliseconds())
-				for _, accountID := range ids {
-					stats := statsByAccount[accountID]
-					cost := 0.0
-					if stats != nil {
-						cost = stats.StandardCost
-					}
-					costs[accountID] = cost
-					_ = s.sessionLimitCache.SetWindowCost(ctx, accountID, cost)
-				}
-				continue
-			}
-			windowCostPrefetchErrorTotal.Add(1)
-			logger.LegacyPrintf("service.gateway", "window_cost batch db query failed: start=%s err=%v", startTime.Format(time.RFC3339), err)
-		}
-
-		// 回退路径：缺少批量仓储能力或批量查询失败时，按账号单查（失败开放）。
-		windowCostPrefetchFallbackTotal.Add(int64(len(ids)))
-		for _, accountID := range ids {
-			stats, err := s.usageLogRepo.GetAccountWindowStats(ctx, accountID, startTime)
-			if err != nil {
-				windowCostPrefetchErrorTotal.Add(1)
-				continue
-			}
-			cost := stats.StandardCost
-			costs[accountID] = cost
-			_ = s.sessionLimitCache.SetWindowCost(ctx, accountID, cost)
-		}
-	}
-
-	return context.WithValue(ctx, windowCostPrefetchContextKey, costs)
+	// Personal Edition does not derive monetary scheduling limits from usage
+	// logs. Provider quota, RPM and health-based scheduling remain active.
+	return ctx
 }
 
 // isAccountSchedulableForQuota 检查账号是否在配额限制内
@@ -1254,60 +1157,8 @@ func (s *GatewayService) isAccountSchedulableForQuota(account *Account) bool {
 // 仅适用于 Anthropic OAuth/SetupToken 账号
 // 返回 true 表示可调度，false 表示不可调度
 func (s *GatewayService) isAccountSchedulableForWindowCost(ctx context.Context, account *Account, isSticky bool) bool {
-	// 只检查 Anthropic OAuth/SetupToken 账号
-	if !account.IsAnthropicOAuthOrSetupToken() {
-		return true
-	}
-
-	limit := account.GetWindowCostLimit()
-	if limit <= 0 {
-		return true // 未启用窗口费用限制
-	}
-
-	// 尝试从缓存获取窗口费用
-	var currentCost float64
-	if cost, ok := windowCostFromPrefetchContext(ctx, account.ID); ok {
-		currentCost = cost
-		goto checkSchedulability
-	}
-	if s.sessionLimitCache != nil {
-		if cost, hit, err := s.sessionLimitCache.GetWindowCost(ctx, account.ID); err == nil && hit {
-			currentCost = cost
-			goto checkSchedulability
-		}
-	}
-
-	// 缓存未命中，从数据库查询
-	{
-		// 使用统一的窗口开始时间计算逻辑（考虑窗口过期情况）
-		startTime := account.GetCurrentWindowStartTime()
-
-		stats, err := s.usageLogRepo.GetAccountWindowStats(ctx, account.ID, startTime)
-		if err != nil {
-			// 失败开放：查询失败时允许调度
-			return true
-		}
-
-		// 使用标准费用（不含账号倍率）
-		currentCost = stats.StandardCost
-
-		// 设置缓存（忽略错误）
-		if s.sessionLimitCache != nil {
-			_ = s.sessionLimitCache.SetWindowCost(ctx, account.ID, currentCost)
-		}
-	}
-
-checkSchedulability:
-	schedulability := account.CheckWindowCostSchedulability(currentCost)
-
-	switch schedulability {
-	case WindowCostSchedulable:
-		return true
-	case WindowCostStickyOnly:
-		return isSticky
-	case WindowCostNotSchedulable:
-		return false
-	}
+	// Monetary window limits belonged to the removed commercial usage model.
+	// Core quota, cooldown, failover and RPM checks are evaluated separately.
 	return true
 }
 

@@ -373,7 +373,7 @@ type UsageLog struct {
 	AccountID int64  `json:"account_id"`
 	RequestID string `json:"request_id"`
 	Model     string `json:"model"`
-	// ServiceTier records the OpenAI service tier used for billing, e.g. "priority" / "flex".
+	// ServiceTier records the OpenAI service tier reported for the request, e.g. "priority" / "flex".
 	ServiceTier *string `json:"service_tier,omitempty"`
 	// ReasoningEffort is the request's reasoning effort level.
 	// OpenAI: "low"/"medium"/"high"/"xhigh"; Claude: "low"/"medium"/"high"/"max".
@@ -393,16 +393,6 @@ type UsageLog struct {
 	CacheCreation5mTokens int `json:"cache_creation_5m_tokens"`
 	CacheCreation1hTokens int `json:"cache_creation_1h_tokens"`
 
-	InputCost                 float64 `json:"input_cost"`
-	OutputCost                float64 `json:"output_cost"`
-	CacheCreationCost         float64 `json:"cache_creation_cost"`
-	CacheReadCost             float64 `json:"cache_read_cost"`
-	TotalCost                 float64 `json:"total_cost"`
-	ActualCost                float64 `json:"actual_cost"`
-	RateMultiplier            float64 `json:"rate_multiplier"`
-	LongContextBillingApplied bool    `json:"long_context_billing_applied"`
-
-	BillingType  int8   `json:"billing_type"`
 	RequestType  string `json:"request_type"`
 	Stream       bool   `json:"stream"`
 	OpenAIWSMode bool   `json:"openai_ws_mode"`
@@ -415,9 +405,7 @@ type UsageLog struct {
 	ImageInputSize     *string        `json:"image_input_size"`
 	ImageOutputSize    *string        `json:"image_output_size"`
 	ImageInputTokens   int            `json:"image_input_tokens"`
-	ImageInputCost     float64        `json:"image_input_cost"`
 	ImageOutputTokens  int            `json:"image_output_tokens"`
-	ImageOutputCost    float64        `json:"image_output_cost"`
 	ImageSizeSource    *string        `json:"image_size_source"`
 	ImageSizeBreakdown map[string]int `json:"image_size_breakdown"`
 	MediaType          *string        `json:"media_type"`
@@ -429,12 +417,6 @@ type UsageLog struct {
 	// SessionID is the explicit client-provided request correlation identifier
 	// (e.g. the session_id / X-Session-Id headers). Omitted when absent.
 	SessionID *string `json:"session_id,omitempty"`
-
-	// Cache TTL Override 标记
-	CacheTTLOverridden bool `json:"cache_ttl_overridden"`
-
-	// BillingMode 计费模式：token/image
-	BillingMode *string `json:"billing_mode,omitempty"`
 
 	CreatedAt time.Time `json:"created_at"`
 
@@ -459,14 +441,6 @@ type AdminUsageLog struct {
 	ChannelID *int64 `json:"channel_id,omitempty"`
 	// ModelMappingChain 模型映射链，如 "a→b→c"
 	ModelMappingChain *string `json:"model_mapping_chain,omitempty"`
-	// BillingTier 计费层级标签（per_request/image 模式）
-	BillingTier *string `json:"billing_tier,omitempty"`
-
-	// AccountRateMultiplier 账号计费倍率快照（nil 表示按 1.0 处理）
-	AccountRateMultiplier *float64 `json:"account_rate_multiplier"`
-	// AccountStatsCost 自定义定价规则计算的账号统计费用（nil 表示使用默认公式）
-	AccountStatsCost *float64 `json:"account_stats_cost,omitempty"`
-
 	// IPAddress 用户请求 IP
 	IPAddress *string `json:"ip_address,omitempty"`
 
@@ -484,7 +458,6 @@ type UsageCleanupFilters struct {
 	Model       *string   `json:"model,omitempty"`
 	RequestType *string   `json:"request_type,omitempty"`
 	Stream      *bool     `json:"stream,omitempty"`
-	BillingType *int8     `json:"billing_type,omitempty"`
 }
 
 type UsageCleanupTask struct {

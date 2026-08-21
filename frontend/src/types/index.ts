@@ -66,8 +66,6 @@ export interface LoginRequest {
 
 export interface SendVerifyCodeRequest {
   email: string
-  pending_auth_token?: string
-  pending_oauth_token?: string
 }
 
 export interface SendVerifyCodeResponse {
@@ -1237,7 +1235,6 @@ export interface UsageLog {
   upstream_endpoint?: string | null
 
   group_id: number | null
-  subscription_id: number | null
 
   input_tokens: number
   output_tokens: number
@@ -1246,15 +1243,6 @@ export interface UsageLog {
   cache_creation_5m_tokens: number
   cache_creation_1h_tokens: number
 
-  input_cost: number
-  output_cost: number
-  cache_creation_cost: number
-  cache_read_cost: number
-  total_cost: number
-  actual_cost: number
-  rate_multiplier: number
-  long_context_billing_applied: boolean
-  billing_type: number
 
   request_type?: UsageRequestType
   stream: boolean
@@ -1270,26 +1258,19 @@ export interface UsageLog {
   image_size_source: ImageSizeSource | null
   image_size_breakdown: ImageSizeBreakdown | null
   image_input_tokens: number
-  image_input_cost: number
-  image_output_tokens: number
-  image_output_cost: number
+	image_output_tokens: number
 
   // User-Agent
   user_agent: string | null
   ip_address?: string | null
 
   // Cache TTL Override
-  cache_ttl_overridden: boolean
-
-  // 计费模式
-  billing_mode?: string | null
 
   created_at: string
 
   user?: User
   api_key?: ApiKey
   group?: Group
-  subscription?: UserSubscription
 }
 
 export interface UsageLogAccountSummary {
@@ -1303,14 +1284,8 @@ export interface AdminUsageLog extends UsageLog {
   upstream_model_mismatch?: boolean | null
   model_mapping_chain?: string | null
 
-  // 账号计费倍率（仅管理员可见）
-  account_rate_multiplier?: number | null
-  // 自定义定价规则计算的账号统计费用（nil 时使用 total_cost * multiplier）
-  account_stats_cost?: number | null
-
-  // 渠道 ID 和计费等级（仅管理员可见）
-  channel_id?: number | null
-  billing_tier?: string | null
+	// 渠道 ID（仅管理员可见）
+	channel_id?: number | null
 
   // 最小账号信息（仅管理员接口返回）
   account?: UsageLogAccountSummary
@@ -1373,10 +1348,6 @@ export interface DashboardStats {
   total_cache_creation_tokens: number
   total_cache_read_tokens: number
   total_tokens: number
-  total_cost: number // 累计标准计费
-  total_actual_cost: number // 累计实际扣除
-  total_account_cost: number // 累计账号成本
-
   // 今日 Token 使用统计
   today_requests: number
   today_input_tokens: number
@@ -1384,9 +1355,6 @@ export interface DashboardStats {
   today_cache_creation_tokens: number
   today_cache_read_tokens: number
   today_tokens: number
-  today_cost: number // 今日标准计费
-  today_actual_cost: number // 今日实际扣除
-  today_account_cost: number // 今日账号成本
 
   // 系统运行统计
   average_duration_ms: number // 平均响应时间
@@ -1406,8 +1374,6 @@ export interface UsageStatsResponse {
   total_cache_read_tokens: number
   total_cache_creation_tokens: number
   total_tokens: number
-  total_cost: number // 标准计费
-  total_actual_cost: number // 实际扣除
   average_duration_ms: number
   models?: Record<string, number>
   endpoints?: EndpointStat[]
@@ -1425,8 +1391,6 @@ export interface TrendDataPoint {
   cache_creation_tokens: number
   cache_read_tokens: number
   total_tokens: number
-  cost: number // 标准计费
-  actual_cost: number // 实际扣除
 }
 
 export interface ModelStat {
@@ -1437,17 +1401,12 @@ export interface ModelStat {
   cache_creation_tokens: number
   cache_read_tokens: number
   total_tokens: number
-  cost: number // 标准计费
-  actual_cost: number // 实际扣除
-  account_cost?: number // 账号成本（仅管理员接口返回）
 }
 
 export interface EndpointStat {
   endpoint: string
   requests: number
   total_tokens: number
-  cost: number
-  actual_cost: number
 }
 
 export interface GroupStat {
@@ -1455,9 +1414,6 @@ export interface GroupStat {
   group_name: string
   requests: number
   total_tokens: number
-  cost: number // 标准计费
-  actual_cost: number // 实际扣除
-  account_cost?: number // 账号成本（仅管理员接口返回）
 }
 
 export interface UserBreakdownItem {
@@ -1468,9 +1424,6 @@ export interface UserBreakdownItem {
   output_tokens: number
   cache_tokens: number
   total_tokens: number
-  cost: number
-  actual_cost: number
-  account_cost: number
 }
 
 export interface UserUsageTrendPoint {
@@ -1480,22 +1433,18 @@ export interface UserUsageTrendPoint {
   username: string
   requests: number
   tokens: number
-  cost: number // 标准计费
-  actual_cost: number // 实际扣除
 }
 
 export interface UserSpendingRankingItem {
   user_id: number
   email: string
   username: string
-  actual_cost: number
   requests: number
   tokens: number
 }
 
 export interface UserSpendingRankingResponse {
   ranking: UserSpendingRankingItem[]
-  total_actual_cost: number
   total_requests: number
   total_tokens: number
   start_date: string
@@ -1644,8 +1593,6 @@ export interface UsageQueryParams {
   model?: string
   request_type?: UsageRequestType
   stream?: boolean
-  billing_type?: number | null
-  billing_mode?: string | null
   start_date?: string
   end_date?: string
   timezone?: string
@@ -1660,44 +1607,32 @@ export interface AccountUsageHistory {
   label: string
   requests: number
   tokens: number
-  cost: number
-  actual_cost: number // Account cost (account multiplier)
-  user_cost: number // User/API key billed cost (group multiplier)
 }
 
 export interface AccountUsageSummary {
   days: number
   actual_days_used: number
-  total_cost: number // Account cost (account multiplier)
-  total_user_cost: number
-  total_standard_cost: number
   total_requests: number
   total_tokens: number
-  avg_daily_cost: number // Account cost
-  avg_daily_user_cost: number
   avg_daily_requests: number
   avg_daily_tokens: number
   avg_duration_ms: number
   today: {
     date: string
-    cost: number
-    user_cost: number
     requests: number
     tokens: number
   } | null
-  highest_cost_day: {
+	highest_token_day: {
     date: string
     label: string
-    cost: number
-    user_cost: number
-    requests: number
+		requests: number
+		tokens: number
   } | null
   highest_request_day: {
     date: string
     label: string
     requests: number
-    cost: number
-    user_cost: number
+		tokens: number
   } | null
 }
 

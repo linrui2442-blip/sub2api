@@ -154,8 +154,6 @@ func TestGetMyAPIKeyDailyUsageAggregatesByDayForOwnedKey(t *testing.T) {
 				CacheCreationTokens: 4,
 				CacheReadTokens:     6,
 				TotalTokens:         40,
-				Cost:                0.5,
-				ActualCost:          0.4,
 			},
 		},
 	}
@@ -189,7 +187,5 @@ func TestGetMyAPIKeyDailyUsageAggregatesByDayForOwnedKey(t *testing.T) {
 		CacheReadTokens:  6,
 		CacheWriteTokens: 4,
 		TotalTokens:      40,
-		Cost:             0.5,
-		ActualCost:       0.4,
 	}, got.Data.Items[0])
 }

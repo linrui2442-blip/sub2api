@@ -153,7 +153,7 @@ func TestPromptAuditMigrationSchemaAndLeakageGate(t *testing.T) {
 
 func TestPromptAuditDatabasePersistsFullPromptOnEventsOnly(t *testing.T) {
 	db := openPromptAuditIntegrationDB(t)
-	repo := NewPostgreSQLRepository(db)
+	repo := NewSQLRepository(db)
 	ctx := context.Background()
 	const promptCanary = "PROMPT_AUDIT_CANARY_SECRET_DO_NOT_PERSIST"
 	request := Request{
@@ -200,7 +200,7 @@ func TestPromptAuditDatabasePersistsFullPromptOnEventsOnly(t *testing.T) {
 
 func TestPromptAuditRepositoryAdmissionClaimFencingAndEventTransaction(t *testing.T) {
 	db := openPromptAuditIntegrationDB(t)
-	repo := NewPostgreSQLRepository(db)
+	repo := NewSQLRepository(db)
 	ctx := context.Background()
 
 	start := make(chan struct{})
@@ -297,7 +297,7 @@ func TestPromptAuditRepositoryAdmissionClaimFencingAndEventTransaction(t *testin
 
 func TestPromptAuditRepositoryForeignKeysFiltersAndStableIdentitySnapshots(t *testing.T) {
 	db := openPromptAuditIntegrationDB(t)
-	repo := NewPostgreSQLRepository(db)
+	repo := NewSQLRepository(db)
 	ctx := context.Background()
 	userID := insertIdentity(t, db, "users")
 	apiKeyID := insertIdentity(t, db, "api_keys")
@@ -345,7 +345,7 @@ func TestPromptAuditRepositoryForeignKeysFiltersAndStableIdentitySnapshots(t *te
 
 func TestPromptAuditRepositoryHighWaterAndSafeDeletion(t *testing.T) {
 	db := openPromptAuditIntegrationDB(t)
-	repo := NewPostgreSQLRepository(db)
+	repo := NewSQLRepository(db)
 	ctx := context.Background()
 	first, err := repo.RecordBlocking(ctx, integrationSnapshot("first"), 1, integrationResult(EventCritical), true)
 	require.NoError(t, err)
@@ -397,7 +397,7 @@ func TestPromptAuditRepositoryHighWaterAndSafeDeletion(t *testing.T) {
 
 func TestPromptAuditServiceConfirmationKeepsPostPreviewEventsAndConcurrentDeletesAreSafe(t *testing.T) {
 	db := openPromptAuditIntegrationDB(t)
-	repo := NewPostgreSQLRepository(db)
+	repo := NewSQLRepository(db)
 	ctx := context.Background()
 	now := time.Now().UTC()
 	start, end := now.Add(-time.Hour), now.Add(time.Hour)

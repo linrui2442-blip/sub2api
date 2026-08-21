@@ -18,26 +18,19 @@ var (
 
 // CreateUsageLogRequest 创建使用日志请求
 type CreateUsageLogRequest struct {
-	UserID                int64   `json:"user_id"`
-	APIKeyID              int64   `json:"api_key_id"`
-	AccountID             int64   `json:"account_id"`
-	RequestID             string  `json:"request_id"`
-	Model                 string  `json:"model"`
-	InputTokens           int     `json:"input_tokens"`
-	OutputTokens          int     `json:"output_tokens"`
-	CacheCreationTokens   int     `json:"cache_creation_tokens"`
-	CacheReadTokens       int     `json:"cache_read_tokens"`
-	CacheCreation5mTokens int     `json:"cache_creation_5m_tokens"`
-	CacheCreation1hTokens int     `json:"cache_creation_1h_tokens"`
-	InputCost             float64 `json:"input_cost"`
-	OutputCost            float64 `json:"output_cost"`
-	CacheCreationCost     float64 `json:"cache_creation_cost"`
-	CacheReadCost         float64 `json:"cache_read_cost"`
-	TotalCost             float64 `json:"total_cost"`
-	ActualCost            float64 `json:"actual_cost"`
-	RateMultiplier        float64 `json:"rate_multiplier"`
-	Stream                bool    `json:"stream"`
-	DurationMs            *int    `json:"duration_ms"`
+	UserID                int64  `json:"user_id"`
+	APIKeyID              int64  `json:"api_key_id"`
+	AccountID             int64  `json:"account_id"`
+	RequestID             string `json:"request_id"`
+	Model                 string `json:"model"`
+	InputTokens           int    `json:"input_tokens"`
+	OutputTokens          int    `json:"output_tokens"`
+	CacheCreationTokens   int    `json:"cache_creation_tokens"`
+	CacheReadTokens       int    `json:"cache_read_tokens"`
+	CacheCreation5mTokens int    `json:"cache_creation_5m_tokens"`
+	CacheCreation1hTokens int    `json:"cache_creation_1h_tokens"`
+	Stream                bool   `json:"stream"`
+	DurationMs            *int   `json:"duration_ms"`
 }
 
 // UsageStats 使用统计
@@ -49,8 +42,6 @@ type UsageStats struct {
 	TotalCacheCreationTokens int64   `json:"total_cache_creation_tokens"`
 	TotalCacheReadTokens     int64   `json:"total_cache_read_tokens"`
 	TotalTokens              int64   `json:"total_tokens"`
-	TotalCost                float64 `json:"total_cost"`
-	TotalActualCost          float64 `json:"total_actual_cost"`
 	AverageDurationMs        float64 `json:"average_duration_ms"`
 }
 
@@ -105,13 +96,6 @@ func (s *UsageService) Create(ctx context.Context, req CreateUsageLogRequest) (*
 		CacheReadTokens:       req.CacheReadTokens,
 		CacheCreation5mTokens: req.CacheCreation5mTokens,
 		CacheCreation1hTokens: req.CacheCreation1hTokens,
-		InputCost:             req.InputCost,
-		OutputCost:            req.OutputCost,
-		CacheCreationCost:     req.CacheCreationCost,
-		CacheReadCost:         req.CacheReadCost,
-		TotalCost:             req.TotalCost,
-		ActualCost:            req.ActualCost,
-		RateMultiplier:        req.RateMultiplier,
 		Stream:                req.Stream,
 		DurationMs:            req.DurationMs,
 	}
@@ -183,8 +167,6 @@ func (s *UsageService) GetStatsByUser(ctx context.Context, userID int64, startTi
 		TotalCacheCreationTokens: stats.TotalCacheCreationTokens,
 		TotalCacheReadTokens:     stats.TotalCacheReadTokens,
 		TotalTokens:              stats.TotalTokens,
-		TotalCost:                stats.TotalCost,
-		TotalActualCost:          stats.TotalActualCost,
 		AverageDurationMs:        stats.AverageDurationMs,
 	}, nil
 }
@@ -204,8 +186,6 @@ func (s *UsageService) GetStatsByAPIKey(ctx context.Context, apiKeyID int64, sta
 		TotalCacheCreationTokens: stats.TotalCacheCreationTokens,
 		TotalCacheReadTokens:     stats.TotalCacheReadTokens,
 		TotalTokens:              stats.TotalTokens,
-		TotalCost:                stats.TotalCost,
-		TotalActualCost:          stats.TotalActualCost,
 		AverageDurationMs:        stats.AverageDurationMs,
 	}, nil
 }
@@ -225,8 +205,6 @@ func (s *UsageService) GetStatsByAccount(ctx context.Context, accountID int64, s
 		TotalCacheCreationTokens: stats.TotalCacheCreationTokens,
 		TotalCacheReadTokens:     stats.TotalCacheReadTokens,
 		TotalTokens:              stats.TotalTokens,
-		TotalCost:                stats.TotalCost,
-		TotalActualCost:          stats.TotalActualCost,
 		AverageDurationMs:        stats.AverageDurationMs,
 	}, nil
 }
@@ -246,8 +224,6 @@ func (s *UsageService) GetStatsByModel(ctx context.Context, modelName string, st
 		TotalCacheCreationTokens: stats.TotalCacheCreationTokens,
 		TotalCacheReadTokens:     stats.TotalCacheReadTokens,
 		TotalTokens:              stats.TotalTokens,
-		TotalCost:                stats.TotalCost,
-		TotalActualCost:          stats.TotalActualCost,
 		AverageDurationMs:        stats.AverageDurationMs,
 	}, nil
 }
@@ -312,7 +288,7 @@ func (s *UsageService) GetUsageTrendWithFilters(ctx context.Context, startTime, 
 		}
 		return trend, nil
 	}
-	trend, err := s.usageRepo.GetUsageTrendWithFilters(ctx, startTime, endTime, granularity, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.Model, filters.RequestType, filters.Stream, filters.BillingType)
+	trend, err := s.usageRepo.GetUsageTrendWithFilters(ctx, startTime, endTime, granularity, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.Model, filters.RequestType, filters.Stream, nil)
 	if err != nil {
 		return nil, fmt.Errorf("get usage trend with filters: %w", err)
 	}
@@ -345,13 +321,13 @@ func (s *UsageService) GetModelStatsWithFiltersBySource(ctx context.Context, sta
 		GetModelStatsWithFiltersBySource(ctx context.Context, startTime, endTime time.Time, userID, apiKeyID, accountID, groupID int64, requestType *int16, stream *bool, billingType *int8, source string) ([]usagestats.ModelStat, error)
 	}
 	if sourceRepo, ok := s.usageRepo.(modelStatsBySourceRepo); ok {
-		stats, err := sourceRepo.GetModelStatsWithFiltersBySource(ctx, startTime, endTime, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.RequestType, filters.Stream, filters.BillingType, normalizedSource)
+		stats, err := sourceRepo.GetModelStatsWithFiltersBySource(ctx, startTime, endTime, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.RequestType, filters.Stream, nil, normalizedSource)
 		if err != nil {
 			return nil, fmt.Errorf("get model stats with filters by source: %w", err)
 		}
 		return stats, nil
 	}
-	stats, err := s.usageRepo.GetModelStatsWithFilters(ctx, startTime, endTime, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.RequestType, filters.Stream, filters.BillingType)
+	stats, err := s.usageRepo.GetModelStatsWithFilters(ctx, startTime, endTime, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.RequestType, filters.Stream, nil)
 	if err != nil {
 		return nil, fmt.Errorf("get model stats with filters: %w", err)
 	}
@@ -370,7 +346,7 @@ func (s *UsageService) GetGroupStatsWithFilters(ctx context.Context, startTime, 
 		}
 		return stats, nil
 	}
-	stats, err := s.usageRepo.GetGroupStatsWithFilters(ctx, startTime, endTime, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.RequestType, filters.Stream, filters.BillingType)
+	stats, err := s.usageRepo.GetGroupStatsWithFilters(ctx, startTime, endTime, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.RequestType, filters.Stream, nil)
 	if err != nil {
 		return nil, fmt.Errorf("get group stats with filters: %w", err)
 	}
@@ -403,8 +379,6 @@ func (s *UsageService) GetAPIKeyDailyUsage(ctx context.Context, userID, apiKeyID
 			CacheReadTokens:  row.CacheReadTokens,
 			CacheWriteTokens: row.CacheCreationTokens,
 			TotalTokens:      row.TotalTokens,
-			Cost:             row.Cost,
-			ActualCost:       row.ActualCost,
 		})
 	}
 	return points, nil

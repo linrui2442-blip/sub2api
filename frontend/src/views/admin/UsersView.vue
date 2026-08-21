@@ -480,8 +480,8 @@
 
           <template #cell-usage="{ row }">
             <PlatformUsageBreakdown
-              :today="usageStats[row.id]?.today_actual_cost ?? 0"
-              :total="usageStats[row.id]?.total_actual_cost ?? 0"
+              :today="usageStats[row.id]?.today_requests ?? 0"
+              :total="usageStats[row.id]?.total_requests ?? 0"
               :by-platform="usageStats[row.id]?.by_platform"
             />
           </template>
@@ -1143,11 +1143,11 @@ const getUsageValue = (userId: number, key: string, metric: UsageMetric): number
   if (!stats) return 0
   const platform = USAGE_COLUMN_PLATFORMS[key]
   if (platform === null) {
-    return metric === 'today' ? stats.today_actual_cost ?? 0 : stats.total_actual_cost ?? 0
+    return metric === 'today' ? stats.today_requests ?? 0 : stats.total_requests ?? 0
   }
   const p = stats.by_platform?.find((x) => x.platform === platform)
   if (!p) return 0
-  return metric === 'today' ? p.today_actual_cost ?? 0 : p.total_actual_cost ?? 0
+  return metric === 'today' ? p.today_requests ?? 0 : p.total_requests ?? 0
 }
 
 // 在 server-side 排序结果之上叠加用量列的本地排序；无 usageSort 时直接透传原数组。

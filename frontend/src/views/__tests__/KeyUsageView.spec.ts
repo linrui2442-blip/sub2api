@@ -201,7 +201,8 @@ describe('KeyUsageView daily detail', () => {
     expect(text).toContain('200')
     expect(text).toContain('30')
     expect(text).toContain('10')
-    expect(text).toContain('$0.12')
+    expect(text).toContain('340')
+    expect(text).not.toContain('$0.12')
 
     wrapper.unmount()
   })

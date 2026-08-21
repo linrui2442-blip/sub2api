@@ -12,9 +12,7 @@ import (
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
-	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
 	dbgroup "github.com/Wei-Shaw/sub2api/ent/group"
-	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
@@ -465,17 +463,6 @@ func (r *userRepository) deleteUser(ctx context.Context, exec *dbent.Client, id 
 		return translatePersistenceError(err, service.ErrUserNotFound, nil)
 	}
 	if len(identityIDs) > 0 {
-		if _, err := exec.IdentityAdoptionDecision.Update().
-			Where(identityadoptiondecision.IdentityIDIn(identityIDs...)).
-			ClearIdentityID().
-			Save(ctx); err != nil {
-			return translatePersistenceError(err, service.ErrUserNotFound, nil)
-		}
-		if _, err := exec.AuthIdentityChannel.Delete().
-			Where(authidentitychannel.IdentityIDIn(identityIDs...)).
-			Exec(ctx); err != nil {
-			return translatePersistenceError(err, service.ErrUserNotFound, nil)
-		}
 		if _, err := exec.AuthIdentity.Delete().
 			Where(authidentity.UserIDEQ(id)).
 			Exec(ctx); err != nil {
@@ -1130,8 +1117,6 @@ func userSignupSourceOrDefault(signupSource string) string {
 	switch strings.TrimSpace(strings.ToLower(signupSource)) {
 	case "", "email":
 		return "email"
-	case "linuxdo", "wechat", "oidc", "dingtalk":
-		return strings.TrimSpace(strings.ToLower(signupSource))
 	default:
 		return "email"
 	}

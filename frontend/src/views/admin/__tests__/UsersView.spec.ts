@@ -223,8 +223,8 @@ describe('admin UsersView', () => {
     })
     getBatchUsersUsage.mockResolvedValue({
       stats: {
-        1: { user_id: 1, today_actual_cost: 1, total_actual_cost: 1, by_platform: [] },
-        2: { user_id: 2, today_actual_cost: 9, total_actual_cost: 9, by_platform: [] }
+        1: { user_id: 1, today_requests: 1, today_tokens: 10, total_requests: 1, total_tokens: 10, by_platform: [] },
+        2: { user_id: 2, today_requests: 9, today_tokens: 90, total_requests: 9, total_tokens: 90, by_platform: [] }
       }
     })
 

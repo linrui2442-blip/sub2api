@@ -391,10 +391,10 @@ export async function clearGroupRPMOverrides(id: number): Promise<{ message: str
  * @returns Array of group usage summaries
  */
 export async function getUsageSummary(): Promise<
-  { group_id: number; today_cost: number; yesterday_cost: number; total_cost: number }[]
+  { group_id: number; today_requests: number; today_tokens: number; yesterday_requests: number; yesterday_tokens: number; total_requests: number; total_tokens: number }[]
 > {
   const { data } = await apiClient.get<
-    { group_id: number; today_cost: number; yesterday_cost: number; total_cost: number }[]
+    { group_id: number; today_requests: number; today_tokens: number; yesterday_requests: number; yesterday_tokens: number; total_requests: number; total_tokens: number }[]
   >('/admin/groups/usage-summary')
   return data
 }

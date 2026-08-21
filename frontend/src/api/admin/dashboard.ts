@@ -268,14 +268,18 @@ export async function getUserSpendingRanking(
 
 export interface PlatformUsage {
   platform: string
-  today_actual_cost: number
-  total_actual_cost: number
+  today_requests: number
+  today_tokens: number
+  total_requests: number
+  total_tokens: number
 }
 
 export interface BatchUserUsageStats {
   user_id: number
-  today_actual_cost: number
-  total_actual_cost: number
+  today_requests: number
+  today_tokens: number
+  total_requests: number
+  total_tokens: number
   by_platform?: PlatformUsage[]
 }
 
@@ -297,8 +301,10 @@ export async function getBatchUsersUsage(userIds: number[]): Promise<BatchUsersU
 
 export interface BatchApiKeyUsageStats {
   api_key_id: number
-  today_actual_cost: number
-  total_actual_cost: number
+  today_requests: number
+  today_tokens: number
+  total_requests: number
+  total_tokens: number
 }
 
 export interface BatchApiKeysUsageResponse {

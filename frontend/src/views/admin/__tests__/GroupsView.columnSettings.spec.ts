@@ -332,7 +332,9 @@ describe('admin GroupsView column settings', () => {
   it('skips usage and capacity fetches until consuming columns are shown', async () => {
     localStorage.setItem(
       'group-hidden-columns',
+      JSON.stringify(['usage', 'capacity']),
     )
+    localStorage.setItem('group-column-settings-version', '2')
 
     const wrapper = await mountView()
 
@@ -352,15 +354,15 @@ describe('admin GroupsView column settings', () => {
 
   it('renders yesterday usage between today and total', async () => {
     getUsageSummary.mockResolvedValue([
-      { group_id: 1, today_cost: 1.25, yesterday_cost: 2.5, total_cost: 9.75 },
+      { group_id: 1, today_requests: 1, today_tokens: 125, yesterday_requests: 2, yesterday_tokens: 250, total_requests: 9, total_tokens: 975 },
     ])
 
     const wrapper = await mountView()
     const text = wrapper.get('[data-test="usage-cell"]').text()
 
-    expect(text).toContain('Today$1.25')
-    expect(text).toContain('Yesterday$2.50')
-    expect(text).toContain('Total$9.75')
+    expect(text).toContain('Today1 req / 125 tok')
+    expect(text).toContain('Yesterday2 req / 250 tok')
+    expect(text).toContain('Total9 req / 975 tok')
     expect(text.indexOf('Today')).toBeLessThan(text.indexOf('Yesterday'))
     expect(text.indexOf('Yesterday')).toBeLessThan(text.indexOf('Total'))
   })

@@ -302,45 +302,6 @@ var (
 			},
 		},
 	}
-	// AuthIdentityChannelsColumns holds the columns for the "auth_identity_channels" table.
-	AuthIdentityChannelsColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt64, Increment: true},
-		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
-		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
-		{Name: "provider_type", Type: field.TypeString, Size: 20},
-		{Name: "provider_key", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
-		{Name: "channel", Type: field.TypeString, Size: 20},
-		{Name: "channel_app_id", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
-		{Name: "channel_subject", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
-		{Name: "metadata", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
-		{Name: "identity_id", Type: field.TypeInt64},
-	}
-	// AuthIdentityChannelsTable holds the schema information for the "auth_identity_channels" table.
-	AuthIdentityChannelsTable = &schema.Table{
-		Name:       "auth_identity_channels",
-		Columns:    AuthIdentityChannelsColumns,
-		PrimaryKey: []*schema.Column{AuthIdentityChannelsColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "auth_identity_channels_auth_identities_channels",
-				Columns:    []*schema.Column{AuthIdentityChannelsColumns[9]},
-				RefColumns: []*schema.Column{AuthIdentitiesColumns[0]},
-				OnDelete:   schema.Cascade,
-			},
-		},
-		Indexes: []*schema.Index{
-			{
-				Name:    "authidentitychannel_provider_type_provider_key_channel_channel_app_id_channel_subject",
-				Unique:  true,
-				Columns: []*schema.Column{AuthIdentityChannelsColumns[3], AuthIdentityChannelsColumns[4], AuthIdentityChannelsColumns[5], AuthIdentityChannelsColumns[6], AuthIdentityChannelsColumns[7]},
-			},
-			{
-				Name:    "authidentitychannel_identity_id",
-				Unique:  false,
-				Columns: []*schema.Column{AuthIdentityChannelsColumns[9]},
-			},
-		},
-	}
 	// CompositeModelRoutesColumns holds the columns for the "composite_model_routes" table.
 	CompositeModelRoutesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -550,115 +511,6 @@ var (
 			},
 		},
 	}
-	// IdentityAdoptionDecisionsColumns holds the columns for the "identity_adoption_decisions" table.
-	IdentityAdoptionDecisionsColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt64, Increment: true},
-		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
-		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
-		{Name: "adopt_display_name", Type: field.TypeBool, Default: false},
-		{Name: "adopt_avatar", Type: field.TypeBool, Default: false},
-		{Name: "decided_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
-		{Name: "identity_id", Type: field.TypeInt64, Nullable: true},
-		{Name: "pending_auth_session_id", Type: field.TypeInt64, Unique: true},
-	}
-	// IdentityAdoptionDecisionsTable holds the schema information for the "identity_adoption_decisions" table.
-	IdentityAdoptionDecisionsTable = &schema.Table{
-		Name:       "identity_adoption_decisions",
-		Columns:    IdentityAdoptionDecisionsColumns,
-		PrimaryKey: []*schema.Column{IdentityAdoptionDecisionsColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "identity_adoption_decisions_auth_identities_adoption_decisions",
-				Columns:    []*schema.Column{IdentityAdoptionDecisionsColumns[6]},
-				RefColumns: []*schema.Column{AuthIdentitiesColumns[0]},
-				OnDelete:   schema.SetNull,
-			},
-			{
-				Symbol:     "identity_adoption_decisions_pending_auth_sessions_adoption_decision",
-				Columns:    []*schema.Column{IdentityAdoptionDecisionsColumns[7]},
-				RefColumns: []*schema.Column{PendingAuthSessionsColumns[0]},
-				OnDelete:   schema.Cascade,
-			},
-		},
-		Indexes: []*schema.Index{
-			{
-				Name:    "identityadoptiondecision_pending_auth_session_id",
-				Unique:  true,
-				Columns: []*schema.Column{IdentityAdoptionDecisionsColumns[7]},
-			},
-			{
-				Name:    "identityadoptiondecision_identity_id",
-				Unique:  false,
-				Columns: []*schema.Column{IdentityAdoptionDecisionsColumns[6]},
-			},
-		},
-	}
-	// PendingAuthSessionsColumns holds the columns for the "pending_auth_sessions" table.
-	PendingAuthSessionsColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt64, Increment: true},
-		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
-		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
-		{Name: "session_token", Type: field.TypeString, Size: 255},
-		{Name: "intent", Type: field.TypeString, Size: 40},
-		{Name: "provider_type", Type: field.TypeString, Size: 20},
-		{Name: "provider_key", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
-		{Name: "provider_subject", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
-		{Name: "redirect_to", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
-		{Name: "resolved_email", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
-		{Name: "registration_password_hash", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
-		{Name: "upstream_identity_claims", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
-		{Name: "local_flow_state", Type: field.TypeJSON, SchemaType: map[string]string{"postgres": "jsonb"}},
-		{Name: "browser_session_key", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
-		{Name: "completion_code_hash", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
-		{Name: "completion_code_expires_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
-		{Name: "email_verified_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
-		{Name: "password_verified_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
-		{Name: "totp_verified_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
-		{Name: "expires_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
-		{Name: "consumed_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
-		{Name: "target_user_id", Type: field.TypeInt64, Nullable: true},
-	}
-	// PendingAuthSessionsTable holds the schema information for the "pending_auth_sessions" table.
-	PendingAuthSessionsTable = &schema.Table{
-		Name:       "pending_auth_sessions",
-		Columns:    PendingAuthSessionsColumns,
-		PrimaryKey: []*schema.Column{PendingAuthSessionsColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "pending_auth_sessions_users_pending_auth_sessions",
-				Columns:    []*schema.Column{PendingAuthSessionsColumns[21]},
-				RefColumns: []*schema.Column{UsersColumns[0]},
-				OnDelete:   schema.SetNull,
-			},
-		},
-		Indexes: []*schema.Index{
-			{
-				Name:    "pendingauthsession_session_token",
-				Unique:  true,
-				Columns: []*schema.Column{PendingAuthSessionsColumns[3]},
-			},
-			{
-				Name:    "pendingauthsession_target_user_id",
-				Unique:  false,
-				Columns: []*schema.Column{PendingAuthSessionsColumns[21]},
-			},
-			{
-				Name:    "pendingauthsession_expires_at",
-				Unique:  false,
-				Columns: []*schema.Column{PendingAuthSessionsColumns[19]},
-			},
-			{
-				Name:    "pendingauthsession_provider_type_provider_key_provider_subject",
-				Unique:  false,
-				Columns: []*schema.Column{PendingAuthSessionsColumns[5], PendingAuthSessionsColumns[6], PendingAuthSessionsColumns[7]},
-			},
-			{
-				Name:    "pendingauthsession_completion_code_hash",
-				Unique:  false,
-				Columns: []*schema.Column{PendingAuthSessionsColumns[14]},
-			},
-		},
-	}
 	// ProxiesColumns holds the columns for the "proxies" table.
 	ProxiesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -813,25 +665,12 @@ var (
 		{Name: "upstream_model_mismatch", Type: field.TypeBool, Nullable: true},
 		{Name: "channel_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "model_mapping_chain", Type: field.TypeString, Nullable: true, Size: 500},
-		{Name: "billing_tier", Type: field.TypeString, Nullable: true, Size: 50},
-		{Name: "billing_mode", Type: field.TypeString, Nullable: true, Size: 20},
-		{Name: "subscription_id", Type: field.TypeInt64, Nullable: true},
 		{Name: "input_tokens", Type: field.TypeInt, Default: 0},
 		{Name: "output_tokens", Type: field.TypeInt, Default: 0},
 		{Name: "cache_creation_tokens", Type: field.TypeInt, Default: 0},
 		{Name: "cache_read_tokens", Type: field.TypeInt, Default: 0},
 		{Name: "cache_creation_5m_tokens", Type: field.TypeInt, Default: 0},
 		{Name: "cache_creation_1h_tokens", Type: field.TypeInt, Default: 0},
-		{Name: "input_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
-		{Name: "output_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
-		{Name: "cache_creation_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
-		{Name: "cache_read_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
-		{Name: "total_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
-		{Name: "actual_cost", Type: field.TypeFloat64, Default: 0, SchemaType: map[string]string{"postgres": "decimal(20,10)"}},
-		{Name: "rate_multiplier", Type: field.TypeFloat64, Default: 1, SchemaType: map[string]string{"postgres": "decimal(10,4)"}},
-		{Name: "long_context_billing_applied", Type: field.TypeBool, Default: false},
-		{Name: "account_rate_multiplier", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(10,4)"}},
-		{Name: "billing_type", Type: field.TypeInt8, Default: 0},
 		{Name: "stream", Type: field.TypeBool, Default: false},
 		{Name: "duration_ms", Type: field.TypeInt, Nullable: true},
 		{Name: "first_token_ms", Type: field.TypeInt, Nullable: true},
@@ -846,7 +685,6 @@ var (
 		{Name: "video_count", Type: field.TypeInt, Default: 0},
 		{Name: "video_resolution", Type: field.TypeString, Nullable: true, Size: 10},
 		{Name: "video_duration_seconds", Type: field.TypeInt, Nullable: true},
-		{Name: "cache_ttl_overridden", Type: field.TypeBool, Default: false},
 		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "api_key_id", Type: field.TypeInt64},
 		{Name: "account_id", Type: field.TypeInt64},
@@ -861,25 +699,25 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "usage_logs_api_keys_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[44]},
+				Columns:    []*schema.Column{UsageLogsColumns[30]},
 				RefColumns: []*schema.Column{APIKeysColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "usage_logs_accounts_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[45]},
+				Columns:    []*schema.Column{UsageLogsColumns[31]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "usage_logs_groups_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[46]},
+				Columns:    []*schema.Column{UsageLogsColumns[32]},
 				RefColumns: []*schema.Column{GroupsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "usage_logs_users_usage_logs",
-				Columns:    []*schema.Column{UsageLogsColumns[47]},
+				Columns:    []*schema.Column{UsageLogsColumns[33]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -888,32 +726,27 @@ var (
 			{
 				Name:    "usagelog_user_id",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[47]},
+				Columns: []*schema.Column{UsageLogsColumns[33]},
 			},
 			{
 				Name:    "usagelog_api_key_id",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[44]},
+				Columns: []*schema.Column{UsageLogsColumns[30]},
 			},
 			{
 				Name:    "usagelog_account_id",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[45]},
+				Columns: []*schema.Column{UsageLogsColumns[31]},
 			},
 			{
 				Name:    "usagelog_group_id",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[46]},
-			},
-			{
-				Name:    "usagelog_subscription_id",
-				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[11]},
+				Columns: []*schema.Column{UsageLogsColumns[32]},
 			},
 			{
 				Name:    "usagelog_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[43]},
+				Columns: []*schema.Column{UsageLogsColumns[29]},
 			},
 			{
 				Name:    "usagelog_model",
@@ -933,17 +766,17 @@ var (
 			{
 				Name:    "usagelog_user_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[47], UsageLogsColumns[43]},
+				Columns: []*schema.Column{UsageLogsColumns[33], UsageLogsColumns[29]},
 			},
 			{
 				Name:    "usagelog_api_key_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[44], UsageLogsColumns[43]},
+				Columns: []*schema.Column{UsageLogsColumns[30], UsageLogsColumns[29]},
 			},
 			{
 				Name:    "usagelog_group_id_created_at",
 				Unique:  false,
-				Columns: []*schema.Column{UsageLogsColumns[46], UsageLogsColumns[43]},
+				Columns: []*schema.Column{UsageLogsColumns[32], UsageLogsColumns[29]},
 			},
 		},
 	}
@@ -1025,13 +858,10 @@ var (
 		AccountsTable,
 		AccountGroupsTable,
 		AuthIdentitiesTable,
-		AuthIdentityChannelsTable,
 		CompositeModelRoutesTable,
 		ErrorPassthroughRulesTable,
 		GroupsTable,
 		IdempotencyRecordsTable,
-		IdentityAdoptionDecisionsTable,
-		PendingAuthSessionsTable,
 		ProxiesTable,
 		SecuritySecretsTable,
 		SettingsTable,
@@ -1063,10 +893,6 @@ func init() {
 	AuthIdentitiesTable.Annotation = &entsql.Annotation{
 		Table: "auth_identities",
 	}
-	AuthIdentityChannelsTable.ForeignKeys[0].RefTable = AuthIdentitiesTable
-	AuthIdentityChannelsTable.Annotation = &entsql.Annotation{
-		Table: "auth_identity_channels",
-	}
 	CompositeModelRoutesTable.ForeignKeys[0].RefTable = GroupsTable
 	CompositeModelRoutesTable.Annotation = &entsql.Annotation{
 		Table: "composite_model_routes",
@@ -1079,15 +905,6 @@ func init() {
 	}
 	IdempotencyRecordsTable.Annotation = &entsql.Annotation{
 		Table: "idempotency_records",
-	}
-	IdentityAdoptionDecisionsTable.ForeignKeys[0].RefTable = AuthIdentitiesTable
-	IdentityAdoptionDecisionsTable.ForeignKeys[1].RefTable = PendingAuthSessionsTable
-	IdentityAdoptionDecisionsTable.Annotation = &entsql.Annotation{
-		Table: "identity_adoption_decisions",
-	}
-	PendingAuthSessionsTable.ForeignKeys[0].RefTable = UsersTable
-	PendingAuthSessionsTable.Annotation = &entsql.Annotation{
-		Table: "pending_auth_sessions",
 	}
 	ProxiesTable.ForeignKeys[0].RefTable = ProxiesTable
 	ProxiesTable.Annotation = &entsql.Annotation{

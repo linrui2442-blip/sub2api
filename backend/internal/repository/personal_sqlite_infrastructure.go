@@ -16,6 +16,11 @@ func ensurePersonalSQLiteInfrastructure(ctx context.Context, db *sql.DB) error {
 	}
 
 	statements := []string{
+		// Remove unreachable external-user identity adoption tables from upgrades.
+		`DROP TABLE IF EXISTS identity_adoption_decisions`,
+		`DROP TABLE IF EXISTS auth_identity_channels`,
+		`DROP TABLE IF EXISTS pending_auth_sessions`,
+
 		// Soft-delete aware uniqueness normally comes from upstream migration 016.
 		`CREATE UNIQUE INDEX IF NOT EXISTS users_email_unique_active
 			ON users(email) WHERE deleted_at IS NULL`,
@@ -67,6 +72,19 @@ func ensurePersonalSQLiteInfrastructure(ctx context.Context, db *sql.DB) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_user_group_rpm_overrides_group
 			ON user_group_rpm_overrides (group_id, user_id)`,
+
+		// Local profile avatar metadata is stored beside the SQLite user record.
+		`CREATE TABLE IF NOT EXISTS user_avatars (
+			user_id INTEGER PRIMARY KEY,
+			storage_provider TEXT NOT NULL DEFAULT 'local',
+			storage_key TEXT NOT NULL DEFAULT '',
+			url TEXT NOT NULL DEFAULT '',
+			content_type TEXT NOT NULL DEFAULT '',
+			byte_size INTEGER NOT NULL DEFAULT 0,
+			sha256 TEXT NOT NULL DEFAULT '',
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+		)`,
 	}
 
 	for _, statement := range statements {

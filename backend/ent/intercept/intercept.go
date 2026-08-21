@@ -12,13 +12,10 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
-	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
 	"github.com/Wei-Shaw/sub2api/ent/compositemodelroute"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
-	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
-	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
 	"github.com/Wei-Shaw/sub2api/ent/securitysecret"
@@ -194,33 +191,6 @@ func (f TraverseAuthIdentity) Traverse(ctx context.Context, q ent.Query) error {
 	return fmt.Errorf("unexpected query type %T. expect *ent.AuthIdentityQuery", q)
 }
 
-// The AuthIdentityChannelFunc type is an adapter to allow the use of ordinary function as a Querier.
-type AuthIdentityChannelFunc func(context.Context, *ent.AuthIdentityChannelQuery) (ent.Value, error)
-
-// Query calls f(ctx, q).
-func (f AuthIdentityChannelFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
-	if q, ok := q.(*ent.AuthIdentityChannelQuery); ok {
-		return f(ctx, q)
-	}
-	return nil, fmt.Errorf("unexpected query type %T. expect *ent.AuthIdentityChannelQuery", q)
-}
-
-// The TraverseAuthIdentityChannel type is an adapter to allow the use of ordinary function as Traverser.
-type TraverseAuthIdentityChannel func(context.Context, *ent.AuthIdentityChannelQuery) error
-
-// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
-func (f TraverseAuthIdentityChannel) Intercept(next ent.Querier) ent.Querier {
-	return next
-}
-
-// Traverse calls f(ctx, q).
-func (f TraverseAuthIdentityChannel) Traverse(ctx context.Context, q ent.Query) error {
-	if q, ok := q.(*ent.AuthIdentityChannelQuery); ok {
-		return f(ctx, q)
-	}
-	return fmt.Errorf("unexpected query type %T. expect *ent.AuthIdentityChannelQuery", q)
-}
-
 // The CompositeModelRouteFunc type is an adapter to allow the use of ordinary function as a Querier.
 type CompositeModelRouteFunc func(context.Context, *ent.CompositeModelRouteQuery) (ent.Value, error)
 
@@ -327,60 +297,6 @@ func (f TraverseIdempotencyRecord) Traverse(ctx context.Context, q ent.Query) er
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.IdempotencyRecordQuery", q)
-}
-
-// The IdentityAdoptionDecisionFunc type is an adapter to allow the use of ordinary function as a Querier.
-type IdentityAdoptionDecisionFunc func(context.Context, *ent.IdentityAdoptionDecisionQuery) (ent.Value, error)
-
-// Query calls f(ctx, q).
-func (f IdentityAdoptionDecisionFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
-	if q, ok := q.(*ent.IdentityAdoptionDecisionQuery); ok {
-		return f(ctx, q)
-	}
-	return nil, fmt.Errorf("unexpected query type %T. expect *ent.IdentityAdoptionDecisionQuery", q)
-}
-
-// The TraverseIdentityAdoptionDecision type is an adapter to allow the use of ordinary function as Traverser.
-type TraverseIdentityAdoptionDecision func(context.Context, *ent.IdentityAdoptionDecisionQuery) error
-
-// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
-func (f TraverseIdentityAdoptionDecision) Intercept(next ent.Querier) ent.Querier {
-	return next
-}
-
-// Traverse calls f(ctx, q).
-func (f TraverseIdentityAdoptionDecision) Traverse(ctx context.Context, q ent.Query) error {
-	if q, ok := q.(*ent.IdentityAdoptionDecisionQuery); ok {
-		return f(ctx, q)
-	}
-	return fmt.Errorf("unexpected query type %T. expect *ent.IdentityAdoptionDecisionQuery", q)
-}
-
-// The PendingAuthSessionFunc type is an adapter to allow the use of ordinary function as a Querier.
-type PendingAuthSessionFunc func(context.Context, *ent.PendingAuthSessionQuery) (ent.Value, error)
-
-// Query calls f(ctx, q).
-func (f PendingAuthSessionFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
-	if q, ok := q.(*ent.PendingAuthSessionQuery); ok {
-		return f(ctx, q)
-	}
-	return nil, fmt.Errorf("unexpected query type %T. expect *ent.PendingAuthSessionQuery", q)
-}
-
-// The TraversePendingAuthSession type is an adapter to allow the use of ordinary function as Traverser.
-type TraversePendingAuthSession func(context.Context, *ent.PendingAuthSessionQuery) error
-
-// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
-func (f TraversePendingAuthSession) Intercept(next ent.Querier) ent.Querier {
-	return next
-}
-
-// Traverse calls f(ctx, q).
-func (f TraversePendingAuthSession) Traverse(ctx context.Context, q ent.Query) error {
-	if q, ok := q.(*ent.PendingAuthSessionQuery); ok {
-		return f(ctx, q)
-	}
-	return fmt.Errorf("unexpected query type %T. expect *ent.PendingAuthSessionQuery", q)
 }
 
 // The ProxyFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -610,8 +526,6 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.AccountGroupQuery, predicate.AccountGroup, accountgroup.OrderOption]{typ: ent.TypeAccountGroup, tq: q}, nil
 	case *ent.AuthIdentityQuery:
 		return &query[*ent.AuthIdentityQuery, predicate.AuthIdentity, authidentity.OrderOption]{typ: ent.TypeAuthIdentity, tq: q}, nil
-	case *ent.AuthIdentityChannelQuery:
-		return &query[*ent.AuthIdentityChannelQuery, predicate.AuthIdentityChannel, authidentitychannel.OrderOption]{typ: ent.TypeAuthIdentityChannel, tq: q}, nil
 	case *ent.CompositeModelRouteQuery:
 		return &query[*ent.CompositeModelRouteQuery, predicate.CompositeModelRoute, compositemodelroute.OrderOption]{typ: ent.TypeCompositeModelRoute, tq: q}, nil
 	case *ent.ErrorPassthroughRuleQuery:
@@ -620,10 +534,6 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.GroupQuery, predicate.Group, group.OrderOption]{typ: ent.TypeGroup, tq: q}, nil
 	case *ent.IdempotencyRecordQuery:
 		return &query[*ent.IdempotencyRecordQuery, predicate.IdempotencyRecord, idempotencyrecord.OrderOption]{typ: ent.TypeIdempotencyRecord, tq: q}, nil
-	case *ent.IdentityAdoptionDecisionQuery:
-		return &query[*ent.IdentityAdoptionDecisionQuery, predicate.IdentityAdoptionDecision, identityadoptiondecision.OrderOption]{typ: ent.TypeIdentityAdoptionDecision, tq: q}, nil
-	case *ent.PendingAuthSessionQuery:
-		return &query[*ent.PendingAuthSessionQuery, predicate.PendingAuthSession, pendingauthsession.OrderOption]{typ: ent.TypePendingAuthSession, tq: q}, nil
 	case *ent.ProxyQuery:
 		return &query[*ent.ProxyQuery, predicate.Proxy, proxy.OrderOption]{typ: ent.TypeProxy, tq: q}, nil
 	case *ent.SecuritySecretQuery:

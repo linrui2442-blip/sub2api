@@ -73,10 +73,10 @@ func (User) Fields() []ent.Field {
 		field.String("signup_source").
 			Validate(func(value string) error {
 				switch value {
-				case "email", "linuxdo", "wechat", "oidc", "github", "google", "dingtalk":
+				case "email":
 					return nil
 				default:
-					return fmt.Errorf("must be one of email, linuxdo, wechat, oidc, github, google, dingtalk")
+					return fmt.Errorf("must be email")
 				}
 			}).
 			Default("email"),
@@ -103,7 +103,6 @@ func (User) Edges() []ent.Edge {
 		edge.To("usage_logs", UsageLog.Type),
 		edge.To("auth_identities", AuthIdentity.Type).
 			Annotations(entsql.OnDelete(entsql.Cascade)),
-		edge.To("pending_auth_sessions", PendingAuthSession.Type),
 	}
 }
 

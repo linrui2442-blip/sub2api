@@ -21,12 +21,12 @@
         <button
           type="button"
           class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
-          :class="metric === 'actual_cost'
+          :class="metric === 'requests'
             ? 'bg-white text-gray-900 shadow-sm dark:bg-dark-700 dark:text-white'
             : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'"
-          @click="emit('update:metric', 'actual_cost')"
+          @click="emit('update:metric', 'requests')"
         >
-          {{ t('admin.dashboard.metricActualCost') }}
+          {{ t('admin.dashboard.requests') }}
         </button>
       </div>
     </div>
@@ -44,9 +44,6 @@
               <th class="pb-2 text-left">{{ t('admin.dashboard.group') }}</th>
               <th class="pb-2 text-right">{{ t('admin.dashboard.requests') }}</th>
               <th class="pb-2 text-right">{{ t('admin.dashboard.tokens') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.actual') }}</th>
-              <th v-if="showAccountCost" class="pb-2 text-right">{{ t('admin.dashboard.accountCost') }}</th>
-              <th class="pb-2 text-right">{{ t('admin.dashboard.standard') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -72,15 +69,6 @@
                 </td>
                 <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">
                   {{ formatTokens(group.total_tokens) }}
-                </td>
-                <td class="py-1.5 text-right text-green-600 dark:text-green-400">
-                  ${{ formatCost(group.actual_cost) }}
-                </td>
-                <td v-if="showAccountCost" class="py-1.5 text-right text-orange-500 dark:text-orange-400">
-                  ${{ formatCost(group.account_cost) }}
-                </td>
-                <td class="py-1.5 text-right text-gray-400 dark:text-gray-500">
-                  ${{ formatCost(group.cost) }}
                 </td>
               </tr>
               <!-- User breakdown sub-rows -->
@@ -121,7 +109,7 @@ ChartJS.register(ArcElement, Tooltip, Legend)
 
 const { t } = useI18n()
 
-type DistributionMetric = 'tokens' | 'actual_cost'
+type DistributionMetric = 'tokens' | 'requests'
 
 const props = withDefaults(defineProps<{
   groupStats: GroupStat[]
@@ -149,7 +137,7 @@ const expandedKey = ref<string | null>(null)
 const breakdownItems = ref<UserBreakdownItem[]>([])
 const breakdownLoading = ref(false)
 const showAccountCost = computed(() => props.showAccountCost)
-const distributionColspan = computed(() => showAccountCost.value ? 6 : 5)
+const distributionColspan = 3
 
 const toggleBreakdown = async (type: string, id: number | string) => {
   const key = `${type}-${id}`
@@ -191,7 +179,7 @@ const chartColors = [
 const displayGroupStats = computed(() => {
   if (!props.groupStats?.length) return []
 
-  const metricKey = props.metric === 'actual_cost' ? 'actual_cost' : 'total_tokens'
+  const metricKey = props.metric === 'requests' ? 'requests' : 'total_tokens'
   return [...props.groupStats].sort((a, b) => toFiniteNumber(b[metricKey]) - toFiniteNumber(a[metricKey]))
 })
 
@@ -202,7 +190,7 @@ const chartData = computed(() => {
     labels: displayGroupStats.value.map((g) => g.group_name || String(g.group_id)),
     datasets: [
       {
-        data: displayGroupStats.value.map((g) => toFiniteNumber(props.metric === 'actual_cost' ? g.actual_cost : g.total_tokens)),
+        data: displayGroupStats.value.map((g) => toFiniteNumber(props.metric === 'requests' ? g.requests : g.total_tokens)),
         backgroundColor: chartColors.slice(0, displayGroupStats.value.length),
         borderWidth: 0
       }
@@ -223,9 +211,7 @@ const doughnutOptions = computed(() => ({
           const value = context.raw as number
           const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
           const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : '0.0'
-          const formattedValue = props.metric === 'actual_cost'
-            ? `$${formatCost(value)}`
-            : formatTokens(value)
+          const formattedValue = props.metric === 'requests' ? formatNumber(value) : formatTokens(value)
           return `${context.label}: ${formattedValue} (${percentage}%)`
         }
       }
@@ -253,15 +239,4 @@ const toFiniteNumber = (value: unknown): number => {
   return Number.isFinite(numberValue) ? numberValue : 0
 }
 
-const formatCost = (value: number | null | undefined): string => {
-  const safeValue = toFiniteNumber(value)
-  if (safeValue >= 1000) {
-    return (safeValue / 1000).toFixed(2) + 'K'
-  } else if (safeValue >= 1) {
-    return safeValue.toFixed(2)
-  } else if (safeValue >= 0.01) {
-    return safeValue.toFixed(3)
-  }
-  return safeValue.toFixed(4)
-}
 </script>

@@ -74,9 +74,6 @@ func describeUsageCleanupFilters(filters UsageCleanupFilters) string {
 	if filters.Stream != nil {
 		parts = append(parts, fmt.Sprintf("stream=%t", *filters.Stream))
 	}
-	if filters.BillingType != nil {
-		parts = append(parts, fmt.Sprintf("billing_type=%d", *filters.BillingType))
-	}
 	return strings.Join(parts, " ")
 }
 
@@ -380,9 +377,6 @@ func sanitizeUsageCleanupFilters(filters *UsageCleanupFilters) {
 			filters.RequestType = &value
 			filters.Stream = nil
 		}
-	}
-	if filters.BillingType != nil && *filters.BillingType < 0 {
-		filters.BillingType = nil
 	}
 }
 

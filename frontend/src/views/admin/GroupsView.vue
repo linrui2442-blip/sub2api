@@ -233,9 +233,8 @@
                   t("admin.groups.usageToday")
                 }}</span>
                 <span class="ml-1 font-medium text-gray-700 dark:text-gray-300"
-                  >${{
-                    formatCost(usageMap.get(row.id)?.today_cost ?? 0)
-                  }}</span
+                  >{{ formatNumber(usageMap.get(row.id)?.today_requests ?? 0) }} req /
+                  {{ formatTokens(usageMap.get(row.id)?.today_tokens ?? 0) }} tok</span
                 >
               </div>
               <div class="text-gray-500 dark:text-gray-400">
@@ -243,9 +242,8 @@
                   t("admin.groups.usageYesterday")
                 }}</span>
                 <span class="ml-1 font-medium text-gray-700 dark:text-gray-300"
-                  >${{
-                    formatCost(usageMap.get(row.id)?.yesterday_cost ?? 0)
-                  }}</span
+                  >{{ formatNumber(usageMap.get(row.id)?.yesterday_requests ?? 0) }} req /
+                  {{ formatTokens(usageMap.get(row.id)?.yesterday_tokens ?? 0) }} tok</span
                 >
               </div>
               <div class="text-gray-500 dark:text-gray-400">
@@ -253,9 +251,8 @@
                   t("admin.groups.usageTotal")
                 }}</span>
                 <span class="ml-1 font-medium text-gray-700 dark:text-gray-300"
-                  >${{
-                    formatCost(usageMap.get(row.id)?.total_cost ?? 0)
-                  }}</span
+                  >{{ formatNumber(usageMap.get(row.id)?.total_requests ?? 0) }} req /
+                  {{ formatTokens(usageMap.get(row.id)?.total_tokens ?? 0) }} tok</span
                 >
               </div>
             </div>
@@ -3317,7 +3314,7 @@ const saveColumnsToStorage = () => {
 
 const isColumnVisible = (key: string) => !hiddenColumns.has(key);
 const hasVisibleUsageSummaryConsumer = computed(
-  () => isColumnVisible("usage") || isColumnVisible("billing_type"),
+  () => isColumnVisible("usage"),
 );
 const hasVisibleCapacityColumn = computed(() => isColumnVisible("capacity"));
 
@@ -3333,7 +3330,7 @@ const toggleColumn = (key: string) => {
   }
   saveColumnsToStorage();
 
-  if (wasHidden && (key === "usage" || key === "billing_type")) {
+  if (wasHidden && key === "usage") {
     loadUsageSummary();
   }
   if (wasHidden && key === "capacity") {
@@ -3548,9 +3545,12 @@ const copyAccountsGroupOptionsForEdit = computed(() => {
 const groups = ref<AdminGroup[]>([]);
 const loading = ref(false);
 type GroupUsageSummary = {
-  today_cost: number;
-  yesterday_cost: number;
-  total_cost: number;
+  today_requests: number;
+  today_tokens: number;
+  yesterday_requests: number;
+  yesterday_tokens: number;
+  total_requests: number;
+  total_tokens: number;
 };
 
 const usageMap = ref<Map<number, GroupUsageSummary>>(new Map());
@@ -4115,10 +4115,12 @@ const loadGroups = async () => {
   }
 };
 
-const formatCost = (cost: number): string => {
-  if (cost >= 1000) return cost.toFixed(0);
-  if (cost >= 100) return cost.toFixed(1);
-  return cost.toFixed(2);
+const formatNumber = (value: number): string => value.toLocaleString();
+
+const formatTokens = (value: number): string => {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return value.toLocaleString();
 };
 
 const loadUsageSummary = async () => {
@@ -4132,9 +4134,12 @@ const loadUsageSummary = async () => {
     const map = new Map<number, GroupUsageSummary>();
     for (const item of data) {
       map.set(item.group_id, {
-        today_cost: item.today_cost,
-        yesterday_cost: item.yesterday_cost,
-        total_cost: item.total_cost,
+        today_requests: item.today_requests,
+        today_tokens: item.today_tokens,
+        yesterday_requests: item.yesterday_requests,
+        yesterday_tokens: item.yesterday_tokens,
+        total_requests: item.total_requests,
+        total_tokens: item.total_tokens,
       });
     }
     usageMap.value = map;

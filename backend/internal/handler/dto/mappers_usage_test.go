@@ -80,12 +80,11 @@ func TestUsageLogFromService_IncludesServiceTierForUserAndAdmin(t *testing.T) {
 	inboundEndpoint := "/v1/chat/completions"
 	upstreamEndpoint := "/v1/responses"
 	log := &service.UsageLog{
-		RequestID:             "req_3",
-		Model:                 "gpt-5.4",
-		ServiceTier:           &serviceTier,
-		InboundEndpoint:       &inboundEndpoint,
-		UpstreamEndpoint:      &upstreamEndpoint,
-		AccountRateMultiplier: f64Ptr(1.5),
+		RequestID:        "req_3",
+		Model:            "gpt-5.4",
+		ServiceTier:      &serviceTier,
+		InboundEndpoint:  &inboundEndpoint,
+		UpstreamEndpoint: &upstreamEndpoint,
 	}
 
 	userDTO := UsageLogFromService(log)
@@ -102,8 +101,6 @@ func TestUsageLogFromService_IncludesServiceTierForUserAndAdmin(t *testing.T) {
 	require.Equal(t, inboundEndpoint, *adminDTO.InboundEndpoint)
 	require.NotNil(t, adminDTO.UpstreamEndpoint)
 	require.Equal(t, upstreamEndpoint, *adminDTO.UpstreamEndpoint)
-	require.NotNil(t, adminDTO.AccountRateMultiplier)
-	require.InDelta(t, 1.5, *adminDTO.AccountRateMultiplier, 1e-12)
 }
 
 func TestUsageLogFromService_UsesRequestedModelAndKeepsUpstreamAdminOnly(t *testing.T) {
@@ -140,35 +137,17 @@ func TestUsageLogFromService_UsesRequestedModelAndKeepsUpstreamAdminOnly(t *test
 	require.Contains(t, string(adminJSON), `"upstream_model_mismatch":true`)
 }
 
-func TestUsageLogFromService_KeepsUserBillingAndIPWithoutAdminCostFields(t *testing.T) {
+func TestUsageLogFromService_KeepsOperationalMetadataWithoutAdminInternals(t *testing.T) {
 	t.Parallel()
 
 	ipAddress := "203.0.113.10"
-	accountRateMultiplier := 1.5
-	accountStatsCost := 0.21
 	log := &service.UsageLog{
-		RequestID:             "req_user_visible_billing",
-		Model:                 "gpt-5.4",
-		InputCost:             0.01,
-		OutputCost:            0.02,
-		CacheCreationCost:     0.03,
-		CacheReadCost:         0.04,
-		TotalCost:             0.10,
-		ActualCost:            0.08,
-		RateMultiplier:        0.8,
-		IPAddress:             &ipAddress,
-		AccountRateMultiplier: &accountRateMultiplier,
-		AccountStatsCost:      &accountStatsCost,
+		RequestID: "req_user_usage",
+		Model:     "gpt-5.4",
+		IPAddress: &ipAddress,
 	}
 
 	userDTO := UsageLogFromService(log)
-	require.Equal(t, 0.01, userDTO.InputCost)
-	require.Equal(t, 0.02, userDTO.OutputCost)
-	require.Equal(t, 0.03, userDTO.CacheCreationCost)
-	require.Equal(t, 0.04, userDTO.CacheReadCost)
-	require.Equal(t, 0.10, userDTO.TotalCost)
-	require.Equal(t, 0.08, userDTO.ActualCost)
-	require.Equal(t, 0.8, userDTO.RateMultiplier)
 	require.NotNil(t, userDTO.IPAddress)
 	require.Equal(t, ipAddress, *userDTO.IPAddress)
 

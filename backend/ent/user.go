@@ -67,13 +67,11 @@ type UserEdges struct {
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
 	// AuthIdentities holds the value of the auth_identities edge.
 	AuthIdentities []*AuthIdentity `json:"auth_identities,omitempty"`
-	// PendingAuthSessions holds the value of the pending_auth_sessions edge.
-	PendingAuthSessions []*PendingAuthSession `json:"pending_auth_sessions,omitempty"`
 	// UserAllowedGroups holds the value of the user_allowed_groups edge.
 	UserAllowedGroups []*UserAllowedGroup `json:"user_allowed_groups,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [6]bool
+	loadedTypes [5]bool
 }
 
 // APIKeysOrErr returns the APIKeys value or an error if the edge
@@ -112,19 +110,10 @@ func (e UserEdges) AuthIdentitiesOrErr() ([]*AuthIdentity, error) {
 	return nil, &NotLoadedError{edge: "auth_identities"}
 }
 
-// PendingAuthSessionsOrErr returns the PendingAuthSessions value or an error if the edge
-// was not loaded in eager-loading.
-func (e UserEdges) PendingAuthSessionsOrErr() ([]*PendingAuthSession, error) {
-	if e.loadedTypes[4] {
-		return e.PendingAuthSessions, nil
-	}
-	return nil, &NotLoadedError{edge: "pending_auth_sessions"}
-}
-
 // UserAllowedGroupsOrErr returns the UserAllowedGroups value or an error if the edge
 // was not loaded in eager-loading.
 func (e UserEdges) UserAllowedGroupsOrErr() ([]*UserAllowedGroup, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[4] {
 		return e.UserAllowedGroups, nil
 	}
 	return nil, &NotLoadedError{edge: "user_allowed_groups"}
@@ -302,11 +291,6 @@ func (_m *User) QueryUsageLogs() *UsageLogQuery {
 // QueryAuthIdentities queries the "auth_identities" edge of the User entity.
 func (_m *User) QueryAuthIdentities() *AuthIdentityQuery {
 	return NewUserClient(_m.config).QueryAuthIdentities(_m)
-}
-
-// QueryPendingAuthSessions queries the "pending_auth_sessions" edge of the User entity.
-func (_m *User) QueryPendingAuthSessions() *PendingAuthSessionQuery {
-	return NewUserClient(_m.config).QueryPendingAuthSessions(_m)
 }
 
 // QueryUserAllowedGroups queries the "user_allowed_groups" edge of the User entity.

@@ -16,7 +16,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
 	"github.com/Wei-Shaw/sub2api/ent/group"
-	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
@@ -26,17 +25,16 @@ import (
 // UserQuery is the builder for querying User entities.
 type UserQuery struct {
 	config
-	ctx                     *QueryContext
-	order                   []user.OrderOption
-	inters                  []Interceptor
-	predicates              []predicate.User
-	withAPIKeys             *APIKeyQuery
-	withAllowedGroups       *GroupQuery
-	withUsageLogs           *UsageLogQuery
-	withAuthIdentities      *AuthIdentityQuery
-	withPendingAuthSessions *PendingAuthSessionQuery
-	withUserAllowedGroups   *UserAllowedGroupQuery
-	modifiers               []func(*sql.Selector)
+	ctx                   *QueryContext
+	order                 []user.OrderOption
+	inters                []Interceptor
+	predicates            []predicate.User
+	withAPIKeys           *APIKeyQuery
+	withAllowedGroups     *GroupQuery
+	withUsageLogs         *UsageLogQuery
+	withAuthIdentities    *AuthIdentityQuery
+	withUserAllowedGroups *UserAllowedGroupQuery
+	modifiers             []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -154,28 +152,6 @@ func (_q *UserQuery) QueryAuthIdentities() *AuthIdentityQuery {
 			sqlgraph.From(user.Table, user.FieldID, selector),
 			sqlgraph.To(authidentity.Table, authidentity.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, user.AuthIdentitiesTable, user.AuthIdentitiesColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
-// QueryPendingAuthSessions chains the current query on the "pending_auth_sessions" edge.
-func (_q *UserQuery) QueryPendingAuthSessions() *PendingAuthSessionQuery {
-	query := (&PendingAuthSessionClient{config: _q.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := _q.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := _q.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(user.Table, user.FieldID, selector),
-			sqlgraph.To(pendingauthsession.Table, pendingauthsession.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, user.PendingAuthSessionsTable, user.PendingAuthSessionsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -392,17 +368,16 @@ func (_q *UserQuery) Clone() *UserQuery {
 		return nil
 	}
 	return &UserQuery{
-		config:                  _q.config,
-		ctx:                     _q.ctx.Clone(),
-		order:                   append([]user.OrderOption{}, _q.order...),
-		inters:                  append([]Interceptor{}, _q.inters...),
-		predicates:              append([]predicate.User{}, _q.predicates...),
-		withAPIKeys:             _q.withAPIKeys.Clone(),
-		withAllowedGroups:       _q.withAllowedGroups.Clone(),
-		withUsageLogs:           _q.withUsageLogs.Clone(),
-		withAuthIdentities:      _q.withAuthIdentities.Clone(),
-		withPendingAuthSessions: _q.withPendingAuthSessions.Clone(),
-		withUserAllowedGroups:   _q.withUserAllowedGroups.Clone(),
+		config:                _q.config,
+		ctx:                   _q.ctx.Clone(),
+		order:                 append([]user.OrderOption{}, _q.order...),
+		inters:                append([]Interceptor{}, _q.inters...),
+		predicates:            append([]predicate.User{}, _q.predicates...),
+		withAPIKeys:           _q.withAPIKeys.Clone(),
+		withAllowedGroups:     _q.withAllowedGroups.Clone(),
+		withUsageLogs:         _q.withUsageLogs.Clone(),
+		withAuthIdentities:    _q.withAuthIdentities.Clone(),
+		withUserAllowedGroups: _q.withUserAllowedGroups.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -450,17 +425,6 @@ func (_q *UserQuery) WithAuthIdentities(opts ...func(*AuthIdentityQuery)) *UserQ
 		opt(query)
 	}
 	_q.withAuthIdentities = query
-	return _q
-}
-
-// WithPendingAuthSessions tells the query-builder to eager-load the nodes that are connected to
-// the "pending_auth_sessions" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *UserQuery) WithPendingAuthSessions(opts ...func(*PendingAuthSessionQuery)) *UserQuery {
-	query := (&PendingAuthSessionClient{config: _q.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	_q.withPendingAuthSessions = query
 	return _q
 }
 
@@ -553,12 +517,11 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 	var (
 		nodes       = []*User{}
 		_spec       = _q.querySpec()
-		loadedTypes = [6]bool{
+		loadedTypes = [5]bool{
 			_q.withAPIKeys != nil,
 			_q.withAllowedGroups != nil,
 			_q.withUsageLogs != nil,
 			_q.withAuthIdentities != nil,
-			_q.withPendingAuthSessions != nil,
 			_q.withUserAllowedGroups != nil,
 		}
 	)
@@ -608,15 +571,6 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		if err := _q.loadAuthIdentities(ctx, query, nodes,
 			func(n *User) { n.Edges.AuthIdentities = []*AuthIdentity{} },
 			func(n *User, e *AuthIdentity) { n.Edges.AuthIdentities = append(n.Edges.AuthIdentities, e) }); err != nil {
-			return nil, err
-		}
-	}
-	if query := _q.withPendingAuthSessions; query != nil {
-		if err := _q.loadPendingAuthSessions(ctx, query, nodes,
-			func(n *User) { n.Edges.PendingAuthSessions = []*PendingAuthSession{} },
-			func(n *User, e *PendingAuthSession) {
-				n.Edges.PendingAuthSessions = append(n.Edges.PendingAuthSessions, e)
-			}); err != nil {
 			return nil, err
 		}
 	}
@@ -776,39 +730,6 @@ func (_q *UserQuery) loadAuthIdentities(ctx context.Context, query *AuthIdentity
 		node, ok := nodeids[fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "user_id" returned %v for node %v`, fk, n.ID)
-		}
-		assign(node, n)
-	}
-	return nil
-}
-func (_q *UserQuery) loadPendingAuthSessions(ctx context.Context, query *PendingAuthSessionQuery, nodes []*User, init func(*User), assign func(*User, *PendingAuthSession)) error {
-	fks := make([]driver.Value, 0, len(nodes))
-	nodeids := make(map[int64]*User)
-	for i := range nodes {
-		fks = append(fks, nodes[i].ID)
-		nodeids[nodes[i].ID] = nodes[i]
-		if init != nil {
-			init(nodes[i])
-		}
-	}
-	if len(query.ctx.Fields) > 0 {
-		query.ctx.AppendFieldOnce(pendingauthsession.FieldTargetUserID)
-	}
-	query.Where(predicate.PendingAuthSession(func(s *sql.Selector) {
-		s.Where(sql.InValues(s.C(user.PendingAuthSessionsColumn), fks...))
-	}))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		fk := n.TargetUserID
-		if fk == nil {
-			return fmt.Errorf(`foreign-key "target_user_id" is nil for node %v`, n.ID)
-		}
-		node, ok := nodeids[*fk]
-		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "target_user_id" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

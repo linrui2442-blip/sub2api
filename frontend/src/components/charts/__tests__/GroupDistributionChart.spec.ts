@@ -41,16 +41,12 @@ describe('GroupDistributionChart', () => {
       group_name: 'group-a',
       requests: 9,
       total_tokens: 1200,
-      cost: 1.8,
-      actual_cost: 0.1,
     },
     {
       group_id: 2,
       group_name: 'group-b',
       requests: 4,
       total_tokens: 600,
-      cost: 0.7,
-      actual_cost: 0.9,
     },
   ]
 
@@ -83,11 +79,11 @@ describe('GroupDistributionChart', () => {
     expect(label).toBe('group-a: 1.20K (66.7%)')
   })
 
-  it('uses actual_cost and reorders rows in actual cost mode', () => {
+  it('uses requests and reorders rows in request mode', () => {
     const wrapper = mount(GroupDistributionChart, {
       props: {
         groupStats,
-        metric: 'actual_cost',
+        metric: 'requests',
       },
       global: {
         stubs: {
@@ -97,20 +93,20 @@ describe('GroupDistributionChart', () => {
     })
 
     const chartData = JSON.parse(wrapper.find('.chart-data').text())
-    expect(chartData.labels).toEqual(['group-b', 'group-a'])
-    expect(chartData.datasets[0].data).toEqual([0.9, 0.1])
+    expect(chartData.labels).toEqual(['group-a', 'group-b'])
+    expect(chartData.datasets[0].data).toEqual([9, 4])
 
     const rows = wrapper.findAll('tbody tr')
-    expect(rows[0].text()).toContain('group-b')
-    expect(rows[1].text()).toContain('group-a')
+    expect(rows[0].text()).toContain('group-a')
+    expect(rows[1].text()).toContain('group-b')
 
     const options = (wrapper.vm as any).$?.setupState.doughnutOptions
     const label = options.plugins.tooltip.callbacks.label({
-      label: 'group-b',
-      raw: 0.9,
-      dataset: { data: [0.9, 0.1] },
+      label: 'group-a',
+      raw: 9,
+      dataset: { data: [9, 4] },
     })
-    expect(label).toBe('group-b: $0.900 (90.0%)')
+    expect(label).toBe('group-a: 9 (69.2%)')
   })
 
   it('can hide account cost for user usage stats without account_cost', () => {
@@ -127,7 +123,7 @@ describe('GroupDistributionChart', () => {
     })
 
     expect(wrapper.text()).not.toContain('Account Cost')
-    expect(wrapper.findAll('thead th')).toHaveLength(5)
-    expect(wrapper.findAll('tbody tr')[0].findAll('td')).toHaveLength(5)
+    expect(wrapper.findAll('thead th')).toHaveLength(3)
+    expect(wrapper.findAll('tbody tr')[0].findAll('td')).toHaveLength(3)
   })
 })

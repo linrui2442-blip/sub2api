@@ -149,47 +149,6 @@ type UpdateUserInput struct {
 	ActorAdminID int64
 }
 
-// AdminBindAuthIdentityInput and its result types are retained temporarily for
-// internal migration compatibility. Personal routes deliberately do not expose
-// any user social-identity binding endpoint.
-type AdminBindAuthIdentityInput struct {
-	ProviderType    string
-	ProviderKey     string
-	ProviderSubject string
-	Issuer          *string
-	Metadata        map[string]any
-	Channel         *AdminBindAuthIdentityChannelInput
-}
-
-type AdminBindAuthIdentityChannelInput struct {
-	Channel        string
-	ChannelAppID   string
-	ChannelSubject string
-	Metadata       map[string]any
-}
-
-type AdminBoundAuthIdentity struct {
-	UserID          int64                          `json:"user_id"`
-	ProviderType    string                         `json:"provider_type"`
-	ProviderKey     string                         `json:"provider_key"`
-	ProviderSubject string                         `json:"provider_subject"`
-	VerifiedAt      *time.Time                     `json:"verified_at,omitempty"`
-	Issuer          *string                        `json:"issuer,omitempty"`
-	Metadata        map[string]any                 `json:"metadata"`
-	CreatedAt       time.Time                      `json:"created_at"`
-	UpdatedAt       time.Time                      `json:"updated_at"`
-	Channel         *AdminBoundAuthIdentityChannel `json:"channel,omitempty"`
-}
-
-type AdminBoundAuthIdentityChannel struct {
-	Channel        string         `json:"channel"`
-	ChannelAppID   string         `json:"channel_app_id"`
-	ChannelSubject string         `json:"channel_subject"`
-	Metadata       map[string]any `json:"metadata"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
-}
-
 type CreateGroupInput struct {
 	Name            string
 	Description     string

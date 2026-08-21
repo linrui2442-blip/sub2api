@@ -100,9 +100,7 @@ func (r *usageLogRepository) GetUserUsageTrend(ctx context.Context, startTime, e
 			COALESCE(us.email, '') as email,
 			COALESCE(us.username, '') as username,
 			COUNT(*) as requests,
-			COALESCE(SUM(u.input_tokens + u.output_tokens + u.cache_creation_tokens + u.cache_read_tokens), 0) as tokens,
-			COALESCE(SUM(u.total_cost), 0) as cost,
-			COALESCE(SUM(u.actual_cost), 0) as actual_cost
+			COALESCE(SUM(u.input_tokens + u.output_tokens + u.cache_creation_tokens + u.cache_read_tokens), 0) as tokens
 		FROM usage_logs u
 		LEFT JOIN users us ON u.user_id = us.id
 		WHERE u.user_id IN (SELECT user_id FROM top_users)
@@ -127,7 +125,7 @@ func (r *usageLogRepository) GetUserUsageTrend(ctx context.Context, startTime, e
 	results = make([]UserUsageTrendPoint, 0)
 	for rows.Next() {
 		var row UserUsageTrendPoint
-		if err = rows.Scan(&row.Date, &row.UserID, &row.Email, &row.Username, &row.Requests, &row.Tokens, &row.Cost, &row.ActualCost); err != nil {
+		if err = rows.Scan(&row.Date, &row.UserID, &row.Email, &row.Username, &row.Requests, &row.Tokens); err != nil {
 			return nil, err
 		}
 		results = append(results, row)
@@ -139,19 +137,19 @@ func (r *usageLogRepository) GetUserUsageTrend(ctx context.Context, startTime, e
 	return results, nil
 }
 
-// GetUserSpendingRanking returns user spending ranking aggregated within the time range.
+// GetUserSpendingRanking returns an operational usage ranking. The method name
+// remains for compatibility with the existing admin route.
 func (r *usageLogRepository) GetUserSpendingRanking(ctx context.Context, startTime, endTime time.Time, limit int) (result *UserSpendingRankingResponse, err error) {
 	if limit <= 0 {
 		limit = 12
 	}
 
 	query := `
-		WITH user_spend AS (
+		WITH user_usage AS (
 			SELECT
 				u.user_id,
 				COALESCE(us.email, '') as email,
 				COALESCE(us.username, '') as username,
-				COALESCE(SUM(u.actual_cost), 0) as actual_cost,
 				COUNT(*) as requests,
 				COALESCE(SUM(u.input_tokens + u.output_tokens + u.cache_creation_tokens + u.cache_read_tokens), 0) as tokens
 			FROM usage_logs u
@@ -164,28 +162,24 @@ func (r *usageLogRepository) GetUserSpendingRanking(ctx context.Context, startTi
 				user_id,
 				email,
 				username,
-				actual_cost,
 				requests,
 				tokens,
-				COALESCE(SUM(actual_cost) OVER (), 0) as total_actual_cost,
 				COALESCE(SUM(requests) OVER (), 0) as total_requests,
 				COALESCE(SUM(tokens) OVER (), 0) as total_tokens
-			FROM user_spend
-			ORDER BY actual_cost DESC, tokens DESC, user_id ASC
+			FROM user_usage
+			ORDER BY tokens DESC, requests DESC, user_id ASC
 			LIMIT $3
 		)
 		SELECT
 			user_id,
 			email,
 			username,
-			actual_cost,
 			requests,
 			tokens,
-			total_actual_cost,
 			total_requests,
 			total_tokens
 		FROM ranked
-		ORDER BY actual_cost DESC, tokens DESC, user_id ASC
+		ORDER BY tokens DESC, requests DESC, user_id ASC
 	`
 
 	rows, err := r.sql.QueryContext(ctx, query, startTime, endTime, limit)
@@ -200,12 +194,11 @@ func (r *usageLogRepository) GetUserSpendingRanking(ctx context.Context, startTi
 	}()
 
 	ranking := make([]UserSpendingRankingItem, 0)
-	totalActualCost := 0.0
 	totalRequests := int64(0)
 	totalTokens := int64(0)
 	for rows.Next() {
 		var row UserSpendingRankingItem
-		if err = rows.Scan(&row.UserID, &row.Email, &row.Username, &row.ActualCost, &row.Requests, &row.Tokens, &totalActualCost, &totalRequests, &totalTokens); err != nil {
+		if err = rows.Scan(&row.UserID, &row.Email, &row.Username, &row.Requests, &row.Tokens, &totalRequests, &totalTokens); err != nil {
 			return nil, err
 		}
 		ranking = append(ranking, row)
@@ -215,10 +208,9 @@ func (r *usageLogRepository) GetUserSpendingRanking(ctx context.Context, startTi
 	}
 
 	return &UserSpendingRankingResponse{
-		Ranking:         ranking,
-		TotalActualCost: totalActualCost,
-		TotalRequests:   totalRequests,
-		TotalTokens:     totalTokens,
+		Ranking:       ranking,
+		TotalRequests: totalRequests,
+		TotalTokens:   totalTokens,
 	}, nil
 }
 
@@ -234,9 +226,7 @@ func (r *usageLogRepository) GetUserUsageTrendByUserID(ctx context.Context, user
 			COALESCE(SUM(output_tokens), 0) as output_tokens,
 			COALESCE(SUM(cache_creation_tokens), 0) as cache_creation_tokens,
 			COALESCE(SUM(cache_read_tokens), 0) as cache_read_tokens,
-			COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) as total_tokens,
-			COALESCE(SUM(total_cost), 0) as cost,
-			COALESCE(SUM(actual_cost), 0) as actual_cost
+			COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) as total_tokens
 		FROM usage_logs
 		WHERE user_id = $1 AND created_at >= $2 AND created_at < $3
 		GROUP BY date
@@ -274,17 +264,10 @@ func (r *usageLogRepository) GetUsageTrendWithFilters(ctx context.Context, start
 }
 
 func (r *usageLogRepository) GetUsageTrendWithUsageFilters(ctx context.Context, startTime, endTime time.Time, granularity string, filters UsageLogFilters) (results []TrendDataPoint, err error) {
-	return r.getUsageTrendWithFilters(ctx, startTime, endTime, granularity, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.Model, filters.ModelFilterSource, filters.RequestType, filters.Stream, filters.BillingType, filters.BillingMode, filters.UpstreamModelMismatch)
+	return r.getUsageTrendWithFilters(ctx, startTime, endTime, granularity, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.Model, filters.ModelFilterSource, filters.RequestType, filters.Stream, nil, "", filters.UpstreamModelMismatch)
 }
 
 func (r *usageLogRepository) getUsageTrendWithFilters(ctx context.Context, startTime, endTime time.Time, granularity string, userID, apiKeyID, accountID, groupID int64, model string, modelSource string, requestType *int16, stream *bool, billingType *int8, billingMode string, upstreamModelMismatch *bool) (results []TrendDataPoint, err error) {
-	if shouldUsePreaggregatedTrend(granularity, userID, apiKeyID, accountID, groupID, model, requestType, stream, billingType, billingMode, upstreamModelMismatch) {
-		aggregated, aggregatedErr := r.getUsageTrendFromAggregates(ctx, startTime, endTime, granularity)
-		if aggregatedErr == nil && len(aggregated) > 0 {
-			return aggregated, nil
-		}
-	}
-
 	dateFormat := safeDateFormat(granularity)
 
 	query := fmt.Sprintf(`
@@ -295,9 +278,7 @@ func (r *usageLogRepository) getUsageTrendWithFilters(ctx context.Context, start
 			COALESCE(SUM(output_tokens), 0) as output_tokens,
 			COALESCE(SUM(cache_creation_tokens), 0) as cache_creation_tokens,
 			COALESCE(SUM(cache_read_tokens), 0) as cache_read_tokens,
-			COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) as total_tokens,
-			COALESCE(SUM(total_cost), 0) as cost,
-			COALESCE(SUM(actual_cost), 0) as actual_cost
+			COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) as total_tokens
 		FROM usage_logs
 		WHERE created_at >= $1 AND created_at < $2
 	`, dateFormat)
@@ -321,11 +302,6 @@ func (r *usageLogRepository) getUsageTrendWithFilters(ctx context.Context, start
 	}
 	query, args = appendUsageLogModelQueryFilter(query, args, model, modelSource)
 	query, args = appendRequestTypeOrStreamQueryFilter(query, args, requestType, stream)
-	if billingType != nil {
-		query += fmt.Sprintf(" AND billing_type = $%d", len(args)+1)
-		args = append(args, int16(*billingType))
-	}
-	query, args = appendUsageLogBillingModeQueryFilter(query, args, billingMode, "")
 	if upstreamModelMismatch != nil {
 		query += " AND " + upstreamModelMismatchCondition("upstream_model_mismatch", *upstreamModelMismatch)
 	}
@@ -382,9 +358,7 @@ func (r *usageLogRepository) getUsageTrendFromAggregates(ctx context.Context, st
 				output_tokens,
 				cache_creation_tokens,
 				cache_read_tokens,
-				(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens) as total_tokens,
-				total_cost as cost,
-				actual_cost
+				(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens) as total_tokens
 			FROM usage_dashboard_hourly
 			WHERE bucket_start >= $1 AND bucket_start < $2
 			ORDER BY bucket_start ASC
@@ -398,9 +372,7 @@ func (r *usageLogRepository) getUsageTrendFromAggregates(ctx context.Context, st
 				output_tokens,
 				cache_creation_tokens,
 				cache_read_tokens,
-				(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens) as total_tokens,
-				total_cost as cost,
-				actual_cost
+				(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens) as total_tokens
 			FROM usage_dashboard_daily
 			WHERE bucket_date >= $1::date AND bucket_date < $2::date
 			ORDER BY bucket_date ASC
@@ -439,16 +411,10 @@ func (r *usageLogRepository) GetModelStatsWithFiltersBySource(ctx context.Contex
 }
 
 func (r *usageLogRepository) GetModelStatsWithUsageFiltersBySource(ctx context.Context, startTime, endTime time.Time, filters UsageLogFilters, source string) (results []ModelStat, err error) {
-	return r.getModelStatsWithFiltersBySource(ctx, startTime, endTime, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.Model, filters.RequestType, filters.Stream, filters.BillingType, source, filters.BillingMode, filters.UpstreamModelMismatch)
+	return r.getModelStatsWithFiltersBySource(ctx, startTime, endTime, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.Model, filters.RequestType, filters.Stream, nil, source, "", filters.UpstreamModelMismatch)
 }
 
 func (r *usageLogRepository) getModelStatsWithFiltersBySource(ctx context.Context, startTime, endTime time.Time, userID, apiKeyID, accountID, groupID int64, model string, requestType *int16, stream *bool, billingType *int8, source string, billingMode string, upstreamModelMismatch *bool) (results []ModelStat, err error) {
-	actualCostExpr := "COALESCE(SUM(actual_cost), 0) as actual_cost"
-	// 当仅按 account_id 聚合时，实际费用使用账号倍率（total_cost * account_rate_multiplier）。
-	if accountID > 0 && userID == 0 && apiKeyID == 0 {
-		actualCostExpr = "COALESCE(SUM(COALESCE(account_stats_cost, total_cost) * COALESCE(account_rate_multiplier, 1)), 0) as actual_cost"
-	}
-	accountCostExpr := "COALESCE(SUM(COALESCE(account_stats_cost, total_cost) * COALESCE(account_rate_multiplier, 1)), 0) as account_cost"
 	modelExpr := resolveModelDimensionExpression(source)
 
 	query := fmt.Sprintf(`
@@ -459,13 +425,10 @@ func (r *usageLogRepository) getModelStatsWithFiltersBySource(ctx context.Contex
 			COALESCE(SUM(output_tokens), 0) as output_tokens,
 			COALESCE(SUM(cache_creation_tokens), 0) as cache_creation_tokens,
 			COALESCE(SUM(cache_read_tokens), 0) as cache_read_tokens,
-			COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) as total_tokens,
-			COALESCE(SUM(total_cost), 0) as cost,
-			%s,
-			%s
+			COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) as total_tokens
 		FROM usage_logs
 		WHERE created_at >= $1 AND created_at < $2
-	`, modelExpr, actualCostExpr, accountCostExpr)
+	`, modelExpr)
 
 	args := []any{startTime, endTime}
 	if userID > 0 {
@@ -489,11 +452,6 @@ func (r *usageLogRepository) getModelStatsWithFiltersBySource(ctx context.Contex
 		args = append(args, model)
 	}
 	query, args = appendRequestTypeOrStreamQueryFilter(query, args, requestType, stream)
-	if billingType != nil {
-		query += fmt.Sprintf(" AND billing_type = $%d", len(args)+1)
-		args = append(args, int16(*billingType))
-	}
-	query, args = appendUsageLogBillingModeQueryFilter(query, args, billingMode, "")
 	if upstreamModelMismatch != nil {
 		query += " AND " + upstreamModelMismatchCondition("upstream_model_mismatch", *upstreamModelMismatch)
 	}
@@ -525,7 +483,7 @@ func (r *usageLogRepository) GetGroupStatsWithFilters(ctx context.Context, start
 }
 
 func (r *usageLogRepository) GetGroupStatsWithUsageFilters(ctx context.Context, startTime, endTime time.Time, filters UsageLogFilters) (results []usagestats.GroupStat, err error) {
-	return r.getGroupStatsWithFilters(ctx, startTime, endTime, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.Model, filters.RequestType, filters.Stream, filters.BillingType, filters.BillingMode, filters.UpstreamModelMismatch)
+	return r.getGroupStatsWithFilters(ctx, startTime, endTime, filters.UserID, filters.APIKeyID, filters.AccountID, filters.GroupID, filters.Model, filters.RequestType, filters.Stream, nil, "", filters.UpstreamModelMismatch)
 }
 
 func (r *usageLogRepository) getGroupStatsWithFilters(ctx context.Context, startTime, endTime time.Time, userID, apiKeyID, accountID, groupID int64, model string, requestType *int16, stream *bool, billingType *int8, billingMode string, upstreamModelMismatch *bool) (results []usagestats.GroupStat, err error) {
@@ -534,10 +492,7 @@ func (r *usageLogRepository) getGroupStatsWithFilters(ctx context.Context, start
 			COALESCE(ul.group_id, 0) as group_id,
 			COALESCE(g.name, '') as group_name,
 			COUNT(*) as requests,
-			COALESCE(SUM(ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens), 0) as total_tokens,
-			COALESCE(SUM(ul.total_cost), 0) as cost,
-			COALESCE(SUM(ul.actual_cost), 0) as actual_cost,
-			COALESCE(SUM(COALESCE(ul.account_stats_cost, ul.total_cost) * COALESCE(ul.account_rate_multiplier, 1)), 0) as account_cost
+			COALESCE(SUM(ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens), 0) as total_tokens
 		FROM usage_logs ul
 		LEFT JOIN groups g ON g.id = ul.group_id
 		WHERE ul.created_at >= $1 AND ul.created_at < $2
@@ -566,11 +521,6 @@ func (r *usageLogRepository) getGroupStatsWithFilters(ctx context.Context, start
 		args = append(args, model)
 	}
 	query, args = appendRequestTypeOrStreamQueryFilter(query, args, requestType, stream)
-	if billingType != nil {
-		query += fmt.Sprintf(" AND ul.billing_type = $%d", len(args)+1)
-		args = append(args, int16(*billingType))
-	}
-	query, args = appendUsageLogBillingModeQueryFilter(query, args, billingMode, "ul")
 	if upstreamModelMismatch != nil {
 		query += " AND " + upstreamModelMismatchCondition("ul.upstream_model_mismatch", *upstreamModelMismatch)
 	}
@@ -595,9 +545,6 @@ func (r *usageLogRepository) getGroupStatsWithFilters(ctx context.Context, start
 			&row.GroupName,
 			&row.Requests,
 			&row.TotalTokens,
-			&row.Cost,
-			&row.ActualCost,
-			&row.AccountCost,
 		); err != nil {
 			return nil, err
 		}
@@ -619,10 +566,7 @@ func (r *usageLogRepository) GetUserBreakdownStats(ctx context.Context, startTim
 			COALESCE(SUM(ul.input_tokens), 0) as input_tokens,
 			COALESCE(SUM(ul.output_tokens), 0) as output_tokens,
 			COALESCE(SUM(ul.cache_creation_tokens + ul.cache_read_tokens), 0) as cache_tokens,
-			COALESCE(SUM(ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens), 0) as total_tokens,
-			COALESCE(SUM(ul.total_cost), 0) as cost,
-			COALESCE(SUM(ul.actual_cost), 0) as actual_cost,
-			COALESCE(SUM(COALESCE(ul.account_stats_cost, ul.total_cost) * COALESCE(ul.account_rate_multiplier, 1)), 0) as account_cost
+			COALESCE(SUM(ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens), 0) as total_tokens
 		FROM usage_logs ul
 		LEFT JOIN users u ON u.id = ul.user_id
 		WHERE ul.created_at >= $1 AND ul.created_at < $2
@@ -663,15 +607,10 @@ func (r *usageLogRepository) GetUserBreakdownStats(ctx context.Context, startTim
 		query += fmt.Sprintf(" AND ul.stream = $%d", len(args)+1)
 		args = append(args, *dim.Stream)
 	}
-	if dim.BillingType != nil {
-		query += fmt.Sprintf(" AND ul.billing_type = $%d", len(args)+1)
-		args = append(args, *dim.BillingType)
-	}
-
 	// ORDER BY 列来自固定 allowlist(非用户原样字符串),避免 SQL 注入。
-	orderBy := "actual_cost"
+	orderBy := "total_tokens"
 	switch dim.SortBy {
-	case "total_tokens", "input_tokens", "output_tokens", "cache_tokens", "requests", "cost", "actual_cost":
+	case "total_tokens", "input_tokens", "output_tokens", "cache_tokens", "requests":
 		orderBy = dim.SortBy
 	}
 	query += " GROUP BY ul.user_id, u.email ORDER BY " + orderBy + " DESC"
@@ -701,9 +640,6 @@ func (r *usageLogRepository) GetUserBreakdownStats(ctx context.Context, startTim
 			&row.OutputTokens,
 			&row.CacheTokens,
 			&row.TotalTokens,
-			&row.Cost,
-			&row.ActualCost,
-			&row.AccountCost,
 		); err != nil {
 			return nil, err
 		}
@@ -756,8 +692,6 @@ func scanTrendRows(rows *sql.Rows) ([]TrendDataPoint, error) {
 			&row.CacheCreationTokens,
 			&row.CacheReadTokens,
 			&row.TotalTokens,
-			&row.Cost,
-			&row.ActualCost,
 		); err != nil {
 			return nil, err
 		}
@@ -781,9 +715,6 @@ func scanModelStatsRows(rows *sql.Rows) ([]ModelStat, error) {
 			&row.CacheCreationTokens,
 			&row.CacheReadTokens,
 			&row.TotalTokens,
-			&row.Cost,
-			&row.ActualCost,
-			&row.AccountCost,
 		); err != nil {
 			return nil, err
 		}

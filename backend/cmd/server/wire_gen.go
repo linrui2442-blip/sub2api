@@ -175,7 +175,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	userMsgQueueCache := repository.NewUserMsgQueueCache(redisClient)
 	userMessageQueueService := service.ProvideUserMessageQueueService(userMsgQueueCache, rpmCache, configConfig)
 	configManager := securityaudit.NewConfigManager(db, settingRepository, redisClient, secretEncryptor, configConfig)
-	postgreSQLRepository := securityaudit.NewPostgreSQLRepository(db)
+	postgreSQLRepository := securityaudit.NewSQLRepository(db)
 	redisPayloadStore := securityaudit.NewRedisPayloadStore(redisClient)
 	openAICompatibleScanner := securityaudit.NewOpenAICompatibleScanner()
 	atomicMetrics := securityaudit.NewAtomicMetrics()

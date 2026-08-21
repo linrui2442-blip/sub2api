@@ -14,7 +14,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
 	"github.com/Wei-Shaw/sub2api/ent/group"
-	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 )
@@ -307,21 +306,6 @@ func (_c *UserCreate) AddAuthIdentities(v ...*AuthIdentity) *UserCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddAuthIdentityIDs(ids...)
-}
-
-// AddPendingAuthSessionIDs adds the "pending_auth_sessions" edge to the PendingAuthSession entity by IDs.
-func (_c *UserCreate) AddPendingAuthSessionIDs(ids ...int64) *UserCreate {
-	_c.mutation.AddPendingAuthSessionIDs(ids...)
-	return _c
-}
-
-// AddPendingAuthSessions adds the "pending_auth_sessions" edges to the PendingAuthSession entity.
-func (_c *UserCreate) AddPendingAuthSessions(v ...*PendingAuthSession) *UserCreate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _c.AddPendingAuthSessionIDs(ids...)
 }
 
 // Mutation returns the UserMutation object of the builder.
@@ -634,22 +618,6 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(authidentity.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := _c.mutation.PendingAuthSessionsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.PendingAuthSessionsTable,
-			Columns: []string{user.PendingAuthSessionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(pendingauthsession.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

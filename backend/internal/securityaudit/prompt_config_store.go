@@ -255,12 +255,9 @@ func (m *ConfigManager) Save(ctx context.Context, req UpdateConfigRequest, actor
 		return PublicConfig{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock($1)`, promptAuditConfigLockKey); err != nil {
-		return PublicConfig{}, err
-	}
 	current := DefaultStorageConfig()
 	var raw string
-	err = tx.QueryRowContext(ctx, `SELECT value FROM settings WHERE key=$1 FOR UPDATE`, SettingKeyPromptAuditConfig).Scan(&raw)
+	err = tx.QueryRowContext(ctx, `SELECT value FROM settings WHERE key=$1`, SettingKeyPromptAuditConfig).Scan(&raw)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return PublicConfig{}, err
 	}
@@ -286,7 +283,7 @@ func (m *ConfigManager) Save(ctx context.Context, req UpdateConfigRequest, actor
 		return PublicConfig{}, err
 	}
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO settings (key,value,updated_at) VALUES ($1,$2,NOW())
+		INSERT INTO settings (key,value,updated_at) VALUES ($1,$2,CURRENT_TIMESTAMP)
 		ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=EXCLUDED.updated_at`,
 		SettingKeyPromptAuditConfig, string(rawNext)); err != nil {
 		return PublicConfig{}, err

@@ -44,14 +44,8 @@ type UsageLog struct {
 	ChannelID *int64 `json:"channel_id,omitempty"`
 	// 模型映射链
 	ModelMappingChain *string `json:"model_mapping_chain,omitempty"`
-	// 计费层级标签
-	BillingTier *string `json:"billing_tier,omitempty"`
-	// 计费模式：token/per_request/image
-	BillingMode *string `json:"billing_mode,omitempty"`
 	// GroupID holds the value of the "group_id" field.
 	GroupID *int64 `json:"group_id,omitempty"`
-	// SubscriptionID holds the value of the "subscription_id" field.
-	SubscriptionID *int64 `json:"subscription_id,omitempty"`
 	// InputTokens holds the value of the "input_tokens" field.
 	InputTokens int `json:"input_tokens,omitempty"`
 	// OutputTokens holds the value of the "output_tokens" field.
@@ -64,26 +58,6 @@ type UsageLog struct {
 	CacheCreation5mTokens int `json:"cache_creation_5m_tokens,omitempty"`
 	// CacheCreation1hTokens holds the value of the "cache_creation_1h_tokens" field.
 	CacheCreation1hTokens int `json:"cache_creation_1h_tokens,omitempty"`
-	// InputCost holds the value of the "input_cost" field.
-	InputCost float64 `json:"input_cost,omitempty"`
-	// OutputCost holds the value of the "output_cost" field.
-	OutputCost float64 `json:"output_cost,omitempty"`
-	// CacheCreationCost holds the value of the "cache_creation_cost" field.
-	CacheCreationCost float64 `json:"cache_creation_cost,omitempty"`
-	// CacheReadCost holds the value of the "cache_read_cost" field.
-	CacheReadCost float64 `json:"cache_read_cost,omitempty"`
-	// TotalCost holds the value of the "total_cost" field.
-	TotalCost float64 `json:"total_cost,omitempty"`
-	// ActualCost holds the value of the "actual_cost" field.
-	ActualCost float64 `json:"actual_cost,omitempty"`
-	// RateMultiplier holds the value of the "rate_multiplier" field.
-	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
-	// Whether long-context pricing changed token prices for this request
-	LongContextBillingApplied bool `json:"long_context_billing_applied,omitempty"`
-	// AccountRateMultiplier holds the value of the "account_rate_multiplier" field.
-	AccountRateMultiplier *float64 `json:"account_rate_multiplier,omitempty"`
-	// BillingType holds the value of the "billing_type" field.
-	BillingType int8 `json:"billing_type,omitempty"`
 	// Stream holds the value of the "stream" field.
 	Stream bool `json:"stream,omitempty"`
 	// DurationMs holds the value of the "duration_ms" field.
@@ -110,10 +84,8 @@ type UsageLog struct {
 	VideoCount int `json:"video_count,omitempty"`
 	// 计费用视频分辨率 480p/720p/1080p
 	VideoResolution *string `json:"video_resolution,omitempty"`
-	// 提交时请求的视频时长（秒），按秒计费的乘数
+	// 提交时请求的视频时长（秒）
 	VideoDurationSeconds *int `json:"video_duration_seconds,omitempty"`
-	// CacheTTLOverridden holds the value of the "cache_ttl_overridden" field.
-	CacheTTLOverridden bool `json:"cache_ttl_overridden,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -188,13 +160,11 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case usagelog.FieldImageSizeBreakdown:
 			values[i] = new([]byte)
-		case usagelog.FieldUpstreamModelMismatch, usagelog.FieldLongContextBillingApplied, usagelog.FieldStream, usagelog.FieldCacheTTLOverridden:
+		case usagelog.FieldUpstreamModelMismatch, usagelog.FieldStream:
 			values[i] = new(sql.NullBool)
-		case usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCacheCreationCost, usagelog.FieldCacheReadCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldRateMultiplier, usagelog.FieldAccountRateMultiplier:
-			values[i] = new(sql.NullFloat64)
-		case usagelog.FieldID, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldAccountID, usagelog.FieldChannelID, usagelog.FieldGroupID, usagelog.FieldSubscriptionID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheReadTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldBillingType, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldImageCount, usagelog.FieldVideoCount, usagelog.FieldVideoDurationSeconds:
+		case usagelog.FieldID, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldAccountID, usagelog.FieldChannelID, usagelog.FieldGroupID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheReadTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldImageCount, usagelog.FieldVideoCount, usagelog.FieldVideoDurationSeconds:
 			values[i] = new(sql.NullInt64)
-		case usagelog.FieldRequestID, usagelog.FieldModel, usagelog.FieldRequestedModel, usagelog.FieldUpstreamModel, usagelog.FieldUpstreamResponseModel, usagelog.FieldModelMappingChain, usagelog.FieldBillingTier, usagelog.FieldBillingMode, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldImageSize, usagelog.FieldImageInputSize, usagelog.FieldImageOutputSize, usagelog.FieldImageSizeSource, usagelog.FieldVideoResolution:
+		case usagelog.FieldRequestID, usagelog.FieldModel, usagelog.FieldRequestedModel, usagelog.FieldUpstreamModel, usagelog.FieldUpstreamResponseModel, usagelog.FieldModelMappingChain, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldImageSize, usagelog.FieldImageInputSize, usagelog.FieldImageOutputSize, usagelog.FieldImageSizeSource, usagelog.FieldVideoResolution:
 			values[i] = new(sql.NullString)
 		case usagelog.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -291,33 +261,12 @@ func (_m *UsageLog) assignValues(columns []string, values []any) error {
 				_m.ModelMappingChain = new(string)
 				*_m.ModelMappingChain = value.String
 			}
-		case usagelog.FieldBillingTier:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field billing_tier", values[i])
-			} else if value.Valid {
-				_m.BillingTier = new(string)
-				*_m.BillingTier = value.String
-			}
-		case usagelog.FieldBillingMode:
-			if value, ok := values[i].(*sql.NullString); !ok {
-				return fmt.Errorf("unexpected type %T for field billing_mode", values[i])
-			} else if value.Valid {
-				_m.BillingMode = new(string)
-				*_m.BillingMode = value.String
-			}
 		case usagelog.FieldGroupID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field group_id", values[i])
 			} else if value.Valid {
 				_m.GroupID = new(int64)
 				*_m.GroupID = value.Int64
-			}
-		case usagelog.FieldSubscriptionID:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field subscription_id", values[i])
-			} else if value.Valid {
-				_m.SubscriptionID = new(int64)
-				*_m.SubscriptionID = value.Int64
 			}
 		case usagelog.FieldInputTokens:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -354,67 +303,6 @@ func (_m *UsageLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field cache_creation_1h_tokens", values[i])
 			} else if value.Valid {
 				_m.CacheCreation1hTokens = int(value.Int64)
-			}
-		case usagelog.FieldInputCost:
-			if value, ok := values[i].(*sql.NullFloat64); !ok {
-				return fmt.Errorf("unexpected type %T for field input_cost", values[i])
-			} else if value.Valid {
-				_m.InputCost = value.Float64
-			}
-		case usagelog.FieldOutputCost:
-			if value, ok := values[i].(*sql.NullFloat64); !ok {
-				return fmt.Errorf("unexpected type %T for field output_cost", values[i])
-			} else if value.Valid {
-				_m.OutputCost = value.Float64
-			}
-		case usagelog.FieldCacheCreationCost:
-			if value, ok := values[i].(*sql.NullFloat64); !ok {
-				return fmt.Errorf("unexpected type %T for field cache_creation_cost", values[i])
-			} else if value.Valid {
-				_m.CacheCreationCost = value.Float64
-			}
-		case usagelog.FieldCacheReadCost:
-			if value, ok := values[i].(*sql.NullFloat64); !ok {
-				return fmt.Errorf("unexpected type %T for field cache_read_cost", values[i])
-			} else if value.Valid {
-				_m.CacheReadCost = value.Float64
-			}
-		case usagelog.FieldTotalCost:
-			if value, ok := values[i].(*sql.NullFloat64); !ok {
-				return fmt.Errorf("unexpected type %T for field total_cost", values[i])
-			} else if value.Valid {
-				_m.TotalCost = value.Float64
-			}
-		case usagelog.FieldActualCost:
-			if value, ok := values[i].(*sql.NullFloat64); !ok {
-				return fmt.Errorf("unexpected type %T for field actual_cost", values[i])
-			} else if value.Valid {
-				_m.ActualCost = value.Float64
-			}
-		case usagelog.FieldRateMultiplier:
-			if value, ok := values[i].(*sql.NullFloat64); !ok {
-				return fmt.Errorf("unexpected type %T for field rate_multiplier", values[i])
-			} else if value.Valid {
-				_m.RateMultiplier = value.Float64
-			}
-		case usagelog.FieldLongContextBillingApplied:
-			if value, ok := values[i].(*sql.NullBool); !ok {
-				return fmt.Errorf("unexpected type %T for field long_context_billing_applied", values[i])
-			} else if value.Valid {
-				_m.LongContextBillingApplied = value.Bool
-			}
-		case usagelog.FieldAccountRateMultiplier:
-			if value, ok := values[i].(*sql.NullFloat64); !ok {
-				return fmt.Errorf("unexpected type %T for field account_rate_multiplier", values[i])
-			} else if value.Valid {
-				_m.AccountRateMultiplier = new(float64)
-				*_m.AccountRateMultiplier = value.Float64
-			}
-		case usagelog.FieldBillingType:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field billing_type", values[i])
-			} else if value.Valid {
-				_m.BillingType = int8(value.Int64)
 			}
 		case usagelog.FieldStream:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -511,12 +399,6 @@ func (_m *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.VideoDurationSeconds = new(int)
 				*_m.VideoDurationSeconds = int(value.Int64)
-			}
-		case usagelog.FieldCacheTTLOverridden:
-			if value, ok := values[i].(*sql.NullBool); !ok {
-				return fmt.Errorf("unexpected type %T for field cache_ttl_overridden", values[i])
-			} else if value.Valid {
-				_m.CacheTTLOverridden = value.Bool
 			}
 		case usagelog.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -625,23 +507,8 @@ func (_m *UsageLog) String() string {
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
-	if v := _m.BillingTier; v != nil {
-		builder.WriteString("billing_tier=")
-		builder.WriteString(*v)
-	}
-	builder.WriteString(", ")
-	if v := _m.BillingMode; v != nil {
-		builder.WriteString("billing_mode=")
-		builder.WriteString(*v)
-	}
-	builder.WriteString(", ")
 	if v := _m.GroupID; v != nil {
 		builder.WriteString("group_id=")
-		builder.WriteString(fmt.Sprintf("%v", *v))
-	}
-	builder.WriteString(", ")
-	if v := _m.SubscriptionID; v != nil {
-		builder.WriteString("subscription_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
@@ -662,38 +529,6 @@ func (_m *UsageLog) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("cache_creation_1h_tokens=")
 	builder.WriteString(fmt.Sprintf("%v", _m.CacheCreation1hTokens))
-	builder.WriteString(", ")
-	builder.WriteString("input_cost=")
-	builder.WriteString(fmt.Sprintf("%v", _m.InputCost))
-	builder.WriteString(", ")
-	builder.WriteString("output_cost=")
-	builder.WriteString(fmt.Sprintf("%v", _m.OutputCost))
-	builder.WriteString(", ")
-	builder.WriteString("cache_creation_cost=")
-	builder.WriteString(fmt.Sprintf("%v", _m.CacheCreationCost))
-	builder.WriteString(", ")
-	builder.WriteString("cache_read_cost=")
-	builder.WriteString(fmt.Sprintf("%v", _m.CacheReadCost))
-	builder.WriteString(", ")
-	builder.WriteString("total_cost=")
-	builder.WriteString(fmt.Sprintf("%v", _m.TotalCost))
-	builder.WriteString(", ")
-	builder.WriteString("actual_cost=")
-	builder.WriteString(fmt.Sprintf("%v", _m.ActualCost))
-	builder.WriteString(", ")
-	builder.WriteString("rate_multiplier=")
-	builder.WriteString(fmt.Sprintf("%v", _m.RateMultiplier))
-	builder.WriteString(", ")
-	builder.WriteString("long_context_billing_applied=")
-	builder.WriteString(fmt.Sprintf("%v", _m.LongContextBillingApplied))
-	builder.WriteString(", ")
-	if v := _m.AccountRateMultiplier; v != nil {
-		builder.WriteString("account_rate_multiplier=")
-		builder.WriteString(fmt.Sprintf("%v", *v))
-	}
-	builder.WriteString(", ")
-	builder.WriteString("billing_type=")
-	builder.WriteString(fmt.Sprintf("%v", _m.BillingType))
 	builder.WriteString(", ")
 	builder.WriteString("stream=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Stream))
@@ -756,9 +591,6 @@ func (_m *UsageLog) String() string {
 		builder.WriteString("video_duration_seconds=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
-	builder.WriteString(", ")
-	builder.WriteString("cache_ttl_overridden=")
-	builder.WriteString(fmt.Sprintf("%v", _m.CacheTTLOverridden))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

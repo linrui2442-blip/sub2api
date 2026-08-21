@@ -646,15 +646,6 @@ func (s *UserService) canUnbindProvider(provider string, user *User, records []U
 		return true
 	}
 
-	for _, candidate := range []string{"linuxdo", "oidc", "wechat", "dingtalk"} {
-		if candidate == provider {
-			continue
-		}
-		if len(filterUserAuthIdentities(records, candidate)) > 0 {
-			return true
-		}
-	}
-
 	return false
 }
 
@@ -714,36 +705,11 @@ func buildUserIdentityBindAuthorizeURL(provider, redirectTo string) (string, err
 		return "", err
 	}
 
-	path := ""
-	switch provider {
-	case "linuxdo":
-		path = "/api/v1/auth/oauth/linuxdo/bind/start"
-	case "oidc":
-		path = "/api/v1/auth/oauth/oidc/bind/start"
-	case "wechat":
-		path = "/api/v1/auth/oauth/wechat/bind/start"
-	case "dingtalk":
-		path = "/api/v1/auth/oauth/dingtalk/bind/start"
-	default:
-		return "", ErrIdentityProviderInvalid
-	}
-
-	query := url.Values{}
-	query.Set("redirect", redirectTo)
-	query.Set("intent", "bind_current_user")
-	return path + "?" + query.Encode(), nil
+	return "", ErrIdentityProviderInvalid
 }
 
 func normalizeUserIdentityProvider(provider string) string {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
-	case "linuxdo":
-		return "linuxdo"
-	case "oidc":
-		return "oidc"
-	case "wechat":
-		return "wechat"
-	case "dingtalk":
-		return "dingtalk"
 	case "email":
 		return "email"
 	default:

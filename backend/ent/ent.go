@@ -16,13 +16,10 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/accountgroup"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
-	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
 	"github.com/Wei-Shaw/sub2api/ent/compositemodelroute"
 	"github.com/Wei-Shaw/sub2api/ent/errorpassthroughrule"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
-	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
-	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
 	"github.com/Wei-Shaw/sub2api/ent/securitysecret"
 	"github.com/Wei-Shaw/sub2api/ent/setting"
@@ -91,25 +88,22 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			apikey.Table:                   apikey.ValidColumn,
-			account.Table:                  account.ValidColumn,
-			accountgroup.Table:             accountgroup.ValidColumn,
-			authidentity.Table:             authidentity.ValidColumn,
-			authidentitychannel.Table:      authidentitychannel.ValidColumn,
-			compositemodelroute.Table:      compositemodelroute.ValidColumn,
-			errorpassthroughrule.Table:     errorpassthroughrule.ValidColumn,
-			group.Table:                    group.ValidColumn,
-			idempotencyrecord.Table:        idempotencyrecord.ValidColumn,
-			identityadoptiondecision.Table: identityadoptiondecision.ValidColumn,
-			pendingauthsession.Table:       pendingauthsession.ValidColumn,
-			proxy.Table:                    proxy.ValidColumn,
-			securitysecret.Table:           securitysecret.ValidColumn,
-			setting.Table:                  setting.ValidColumn,
-			tlsfingerprintprofile.Table:    tlsfingerprintprofile.ValidColumn,
-			usagecleanuptask.Table:         usagecleanuptask.ValidColumn,
-			usagelog.Table:                 usagelog.ValidColumn,
-			user.Table:                     user.ValidColumn,
-			userallowedgroup.Table:         userallowedgroup.ValidColumn,
+			apikey.Table:                apikey.ValidColumn,
+			account.Table:               account.ValidColumn,
+			accountgroup.Table:          accountgroup.ValidColumn,
+			authidentity.Table:          authidentity.ValidColumn,
+			compositemodelroute.Table:   compositemodelroute.ValidColumn,
+			errorpassthroughrule.Table:  errorpassthroughrule.ValidColumn,
+			group.Table:                 group.ValidColumn,
+			idempotencyrecord.Table:     idempotencyrecord.ValidColumn,
+			proxy.Table:                 proxy.ValidColumn,
+			securitysecret.Table:        securitysecret.ValidColumn,
+			setting.Table:               setting.ValidColumn,
+			tlsfingerprintprofile.Table: tlsfingerprintprofile.ValidColumn,
+			usagecleanuptask.Table:      usagecleanuptask.ValidColumn,
+			usagelog.Table:              usagelog.ValidColumn,
+			user.Table:                  user.ValidColumn,
+			userallowedgroup.Table:      userallowedgroup.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

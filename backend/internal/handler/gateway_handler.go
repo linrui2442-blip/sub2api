@@ -1473,8 +1473,6 @@ func (h *GatewayHandler) buildUsageData(ctx context.Context, apiKeyID int64) gin
 			"cache_creation_tokens": dashStats.TodayCacheCreationTokens,
 			"cache_read_tokens":     dashStats.TodayCacheReadTokens,
 			"total_tokens":          dashStats.TodayTokens,
-			"cost":                  dashStats.TodayCost,
-			"actual_cost":           dashStats.TodayActualCost,
 		},
 		"total": gin.H{
 			"requests":              dashStats.TotalRequests,
@@ -1483,8 +1481,6 @@ func (h *GatewayHandler) buildUsageData(ctx context.Context, apiKeyID int64) gin
 			"cache_creation_tokens": dashStats.TotalCacheCreationTokens,
 			"cache_read_tokens":     dashStats.TotalCacheReadTokens,
 			"total_tokens":          dashStats.TotalTokens,
-			"cost":                  dashStats.TotalCost,
-			"actual_cost":           dashStats.TotalActualCost,
 		},
 		"average_duration_ms": dashStats.AverageDurationMs,
 		"rpm":                 dashStats.Rpm,

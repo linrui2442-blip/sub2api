@@ -185,13 +185,15 @@
               <div class="flex items-center gap-1.5">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('keys.today') }}:</span>
                 <span class="font-medium text-gray-900 dark:text-white">
-                  ${{ (usageStats[row.id]?.today_actual_cost ?? 0).toFixed(4) }}
+                  {{ formatNumber(usageStats[row.id]?.today_requests ?? 0) }} requests /
+                  {{ formatTokens(usageStats[row.id]?.today_tokens ?? 0) }} tokens
                 </span>
               </div>
               <div class="mt-0.5 flex items-center gap-1.5">
                 <span class="text-gray-500 dark:text-gray-400">{{ t('keys.total') }}:</span>
                 <span class="font-medium text-gray-900 dark:text-white">
-                  ${{ (usageStats[row.id]?.total_actual_cost ?? 0).toFixed(4) }}
+                  {{ formatNumber(usageStats[row.id]?.total_requests ?? 0) }} requests /
+                  {{ formatTokens(usageStats[row.id]?.total_tokens ?? 0) }} tokens
                 </span>
               </div>
               <!-- Quota progress (if quota is set) -->
@@ -1893,6 +1895,14 @@ function formatResetTime(resetAt: string | null): string {
   if (days > 0) return `${days}d ${hours}h`
   if (hours > 0) return `${hours}h ${mins}m`
   return `${mins}m`
+}
+
+const formatNumber = (value: number): string => value.toLocaleString()
+
+const formatTokens = (value: number): string => {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`
+  return value.toLocaleString()
 }
 
 onMounted(() => {
