@@ -3139,7 +3139,6 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
-import { useOnboardingStore } from "@/stores/onboarding";
 import { adminAPI } from "@/api/admin";
 import type {
   AdminGroup,
@@ -3200,7 +3199,6 @@ const supportsLivePlatform = (platform: string): boolean =>
 
 const { t } = useI18n();
 const appStore = useAppStore();
-const onboardingStore = useOnboardingStore();
 
 const ALWAYS_VISIBLE_COLUMNS = new Set(["name", "actions"]);
 // Default hidden columns (hidden on first load / after schema bumps).
@@ -4299,9 +4297,6 @@ const handleCreateGroup = async () => {
     appStore.showSuccess(t("admin.groups.groupCreated"));
     closeCreateModal();
     loadGroups();
-    if (onboardingStore.isCurrentStep('[data-tour="group-form-submit"]')) {
-      onboardingStore.nextStep(500);
-    }
   } catch (error: any) {
     appStore.showError(
       error.response?.data?.detail || t("admin.groups.failedToCreate"),
