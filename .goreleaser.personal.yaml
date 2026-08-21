@@ -53,6 +53,5 @@ release:
   header: |
     Windows-first private gateway build for the Personal Edition branch.
 
-    This release target only changes packaging. Until the storage/cache migration
-    milestones are completed, the server may still require upstream runtime
-    dependencies such as PostgreSQL and Redis.
+    The Personal runtime uses SQLite plus an in-process compatibility cache;
+    it does not require Docker, PostgreSQL, Redis, or WSL.

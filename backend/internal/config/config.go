@@ -1765,8 +1765,8 @@ func setDefaults() {
 	setEnvReachableDefaults()
 }
 
-// setEnvReachableDefaults registers zero-valued defaults for keys that are
-// documented in deploy/config.example.yaml but had no default of their own.
+// setEnvReachableDefaults registers zero-valued defaults for optional runtime
+// keys that had no default of their own.
 //
 // viper.Unmarshal only decodes the keys returned by AllKeys(), which unions
 // SetDefault keys, config-file keys and explicitly bound BindEnv keys.
@@ -1774,8 +1774,7 @@ func setDefaults() {
 // and the viper_bind_struct escape hatch is compiled out (we build with
 // -tags embed). So a key that lives only in the example file was unreachable by
 // environment variable: the value was read from the process environment and
-// then silently dropped. Deployments driven purely by env — which is what
-// deploy/docker-compose.yml does — got the zero value with no warning.
+// then silently dropped.
 //
 // The values below are deliberately zero rather than the documented example
 // values: an absent key already unmarshalled to the zero value, so registering

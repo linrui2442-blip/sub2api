@@ -1,102 +1,69 @@
-# Sub2 Personal Edition V1
+# Sub2API Personal Private Edition V1
 
-This branch turns upstream Sub2API into a private, Windows-first gateway for one owner and a small set of manually managed private members.
+## Purpose
 
-## Product boundary
+Sub2API is a local/private LLM gateway for the Binance Square AI Operator
+ecosystem. This repository contains only the gateway infrastructure; it does
+not implement Operator business logic.
 
-Personal Edition is not a public SaaS product. It must not expose public registration, invitation growth, payments, top-up, referral, marketplace, public pricing, or multi-tenant commercial billing flows.
+The product supports one owner plus a small, trusted private team. It is not a
+public SaaS product and it does not sell or distribute quota.
 
-The intended deployment is:
+## Runtime boundary
 
-- one owner/admin;
-- a small number of manually created private members;
-- one local/private gateway instance;
-- GPT/OpenAI and Gemini account pools first;
-- per-member API keys and usage visibility;
-- no public signup.
-
-## Upstream account sharing boundary
-
-Every upstream account must have an explicit sharing scope:
-
-- `owner_only`: only the owner may route requests through the account;
-- `private_members`: the owner plus manually approved private members may route requests through the account.
-
-The safe default is always `owner_only`.
-
-A provider/account may only be marked `private_members` when the applicable upstream plan, API terms, account policy, or other authorization actually permits that use. Consumer subscription credentials must never be assumed shareable merely because the gateway can technically route them.
-
-## V1 member policy
-
-- Public registration: disabled.
-- Self-service invitation: disabled.
-- Payment/top-up/referral: disabled.
-- Member creation: admin only.
-- Default private member cap: 10 (owner excluded).
-- Each member receives a separate gateway API key.
-- A member can be disabled without deleting upstream accounts.
-- Usage must remain attributable to the member API key.
-
-## Core capabilities to preserve
-
-The Personal Edition must preserve the upstream work that provides the actual gateway value:
-
-- OpenAI/GPT account authentication and token refresh;
-- Gemini account authentication and token refresh;
-- account health and schedulability;
-- quota/limit state where available;
-- account priority;
-- 429/temporary failure handling;
-- same-model account failover;
-- text and vision request paths;
-- structured-output compatibility;
-- request/usage logs needed for operation and troubleshooting.
-
-## Infrastructure migration
-
-The upstream production path currently assumes PostgreSQL and Redis. Personal Edition will remove those external runtime dependencies incrementally rather than deleting them blindly.
-
-Target end state:
+The Windows Personal executable runs with:
 
 ```text
-Windows
-  -> sub2api-personal.exe
-  -> local/private Web UI + API
-  -> SQLite persistent store
-  -> in-process cache / locks / scheduler
-  -> GPT + Gemini account pools
+sub2api-personal.exe
+  ├─ local Web control plane + API Gateway
+  ├─ SQLite durable store
+  ├─ in-process cache/lock compatibility service
+  └─ provider account pools
 ```
 
-Target runtime dependencies after migration:
+No Docker, WSL, external PostgreSQL or external Redis service is required.
+The default listener is loopback-only. Local data lives in
+`%LOCALAPPDATA%\Sub2 Personal` unless overridden by
+`SUB2_PERSONAL_DATA_DIR` or `SUB2_PERSONAL_SQLITE_PATH`.
 
-- no WSL requirement;
-- no Docker requirement;
-- no external PostgreSQL requirement;
-- no external Redis requirement.
+## Kept capabilities
 
-## Migration sequence
+- Provider extension boundary, registry and common gateway routing.
+- GPT/OpenAI and Gemini Provider OAuth, token persistence and refresh.
+- Claude/Anthropic-compatible extension path without gateway, scheduler or
+  account-pool redesign.
+- Account pool, priority, quota/health state, cooldown, scheduling and
+  same-model failover.
+- API Gateway and protocol conversion.
+- Owner-managed members, groups, permissions, API keys, usage and audit logs.
+- Owner initialization, TOTP/passkey support and Windows local startup.
 
-1. Freeze Personal Edition policy and Windows release target.
-2. Add a first-class `personal` run mode without changing upstream `standard` and `simple` behavior.
-3. Disable public/commercial routes and UI in personal mode.
-4. Introduce storage/cache contracts where upstream code is directly bound to PostgreSQL/Redis.
-5. Replace durable personal data with SQLite-compatible implementations.
-6. Replace distributed Redis coordination with single-process equivalents where safe.
-7. Preserve account scheduling/failover semantics and add regression tests.
-8. Produce a Windows x64 release artifact.
-9. Validate one GPT account and one Gemini account with real OAuth/token refresh/calls.
-10. Validate multiple accounts and same-model failover.
+Provider account sharing defaults to `owner_only`. `private_members` may only
+be selected when the upstream provider terms and account plan permit it.
 
-## Non-goals for V1
+## Excluded capabilities
 
-- Public internet service.
-- Public registration.
-- Selling AI quota.
-- Payment collection.
-- Referral/affiliate systems.
-- Multi-organization tenancy.
-- Rewriting provider/OAuth implementations from scratch when upstream code can be retained.
+- Public registration, invitations and social sign-in.
+- Tenant/organization and enterprise RBAC layers.
+- Payment, billing, subscriptions, balance, top-up, price or referral systems.
+- Marketplace, marketing, channel-monitor and commercial analytics features.
+- Cloud backup, S3, Docker, Kubernetes, Linux service and Apple-container
+  deployment stacks.
 
-## Upstream maintenance rule
+## Verification gates
 
-Keep the fork structurally close enough to upstream that provider/OAuth fixes can still be cherry-picked or merged. Prefer personal-mode gates and replaceable interfaces over destructive deletion of unrelated upstream code until the Personal Edition is stable.
+Each change must preserve:
+
+```powershell
+cd backend
+go generate ./cmd/server
+go test ./...
+
+cd ..\frontend
+corepack pnpm@9.15.9 run typecheck
+```
+
+The Personal Edition workflow additionally verifies the SQLite boot smoke test
+and a Windows `amd64` embedded build. Real-provider acceptance remains a
+separate, credential-bearing test: GPT OAuth/login, Gemini OAuth/login, token
+refresh, multiple-account rotation, gateway forwarding and failover.
