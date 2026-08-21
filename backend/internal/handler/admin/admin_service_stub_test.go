@@ -361,18 +361,6 @@ func (s *stubAdminService) GetGroupAPIKeys(ctx context.Context, groupID int64, p
 	return s.apiKeys, int64(len(s.apiKeys)), nil
 }
 
-func (s *stubAdminService) GetGroupRateMultipliers(_ context.Context, _ int64) ([]service.UserGroupRateEntry, error) {
-	return nil, nil
-}
-
-func (s *stubAdminService) ClearGroupRateMultipliers(_ context.Context, _ int64) error {
-	return nil
-}
-
-func (s *stubAdminService) BatchSetGroupRateMultipliers(_ context.Context, _ int64, _ []service.GroupRateMultiplierInput) error {
-	return nil
-}
-
 func (s *stubAdminService) ClearGroupRPMOverrides(_ context.Context, _ int64) error {
 	return nil
 }
