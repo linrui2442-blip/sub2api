@@ -55,8 +55,6 @@ export default {
     batchImageAgentDesc: '复制给 Agent 的任务说明',
     viewUsage: '查看使用记录',
     checkDetailedLogs: '查看详细的使用日志',
-    redeemCode: '兑换码',
-    addBalanceWithCode: '使用兑换码充值'
   },
 
   // Groups (shared)

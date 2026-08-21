@@ -55,8 +55,6 @@ export default {
     batchImageAgentDesc: 'Copy instructions for an agent',
     viewUsage: 'View Usage',
     checkDetailedLogs: 'Check detailed usage logs',
-    redeemCode: 'Redeem Code',
-    addBalanceWithCode: 'Add balance with a code'
   },
 
   // Groups (shared)
