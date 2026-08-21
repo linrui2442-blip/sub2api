@@ -51,8 +51,6 @@
                   v-if="k.group"
                   :name="k.group.name"
                   :platform="k.group.platform"
-                  :subscription-type="k.group.subscription_type"
-                  :rate-multiplier="k.group.rate_multiplier"
                 />
                 <span v-else class="text-xs text-gray-400">—</span>
               </td>

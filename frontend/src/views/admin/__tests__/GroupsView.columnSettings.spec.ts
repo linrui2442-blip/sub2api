@@ -35,8 +35,6 @@ const messages: Record<string, string> = {
   'admin.groups.columns.name': 'Name',
   'admin.groups.columns.id': 'ID',
   'admin.groups.columns.platform': 'Platform',
-  'admin.groups.columns.billingType': 'Billing Type',
-  'admin.groups.columns.rateMultiplier': 'Rate Multiplier',
   'admin.groups.columns.type': 'Type',
   'admin.groups.columns.accounts': 'Accounts',
   'admin.groups.columns.capacity': 'Capacity',
@@ -97,20 +95,6 @@ const createGroup = (overrides: Partial<AdminGroup> = {}): AdminGroup => ({
   name: 'Core Anthropic',
   description: null,
   platform: 'anthropic',
-  rate_multiplier: 1,
-  rpm_limit: 0,
-  is_exclusive: false,
-  status: 'active',
-  subscription_type: 'standard',
-  daily_limit_usd: null,
-  weekly_limit_usd: null,
-  monthly_limit_usd: null,
-  allow_image_generation: false,
-  image_rate_independent: false,
-  image_rate_multiplier: 1,
-  image_price_1k: null,
-  image_price_2k: null,
-  image_price_4k: null,
   claude_code_only: false,
   fallback_group_id: null,
   fallback_group_id_on_invalid_request: null,
@@ -267,8 +251,6 @@ describe('admin GroupsView column settings', () => {
     expect(columnKeys(wrapper)).toEqual([
       'name',
       'platform',
-      'billing_type',
-      'rate_multiplier',
       'is_exclusive',
       'account_count',
       'capacity',
@@ -293,8 +275,6 @@ describe('admin GroupsView column settings', () => {
       'name',
       'id',
       'platform',
-      'billing_type',
-      'rate_multiplier',
       'is_exclusive',
       'account_count',
       'status',
@@ -311,8 +291,6 @@ describe('admin GroupsView column settings', () => {
     expect(columnKeys(wrapper)).toEqual([
       'name',
       'platform',
-      'billing_type',
-      'rate_multiplier',
       'is_exclusive',
       'account_count',
       'capacity',
@@ -334,8 +312,6 @@ describe('admin GroupsView column settings', () => {
     expect(columnKeys(wrapper)).toEqual([
       'name',
       'platform',
-      'billing_type',
-      'rate_multiplier',
       'is_exclusive',
       'account_count',
       'capacity',
@@ -357,8 +333,6 @@ describe('admin GroupsView column settings', () => {
       'name',
       'id',
       'platform',
-      'billing_type',
-      'rate_multiplier',
       'is_exclusive',
       'account_count',
       'capacity',
@@ -372,7 +346,6 @@ describe('admin GroupsView column settings', () => {
   it('skips usage and capacity fetches until consuming columns are shown', async () => {
     localStorage.setItem(
       'group-hidden-columns',
-      JSON.stringify(['billing_type', 'usage', 'capacity']),
     )
 
     const wrapper = await mountView()

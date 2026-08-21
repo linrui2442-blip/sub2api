@@ -365,7 +365,7 @@ export async function getGroupRPMOverrides(id: number): Promise<GroupRPMOverride
 
 /**
  * Batch set RPM overrides for users in a group.
- * Only touches rpm_override column; preserves rate_multiplier on existing rows.
+ * Only touches the per-user RPM override column.
  */
 export async function batchSetGroupRPMOverrides(
   id: number,
@@ -379,7 +379,7 @@ export async function batchSetGroupRPMOverrides(
 }
 
 /**
- * Clear all RPM overrides for a group (preserves rate_multiplier).
+ * Clear all per-user RPM overrides for a group.
  */
 export async function clearGroupRPMOverrides(id: number): Promise<{ message: string }> {
   const { data } = await apiClient.delete<{ message: string }>(`/admin/groups/${id}/rpm-overrides`)
