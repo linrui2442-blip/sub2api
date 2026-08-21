@@ -2346,14 +2346,6 @@ func (a *Account) getExtraString(key string) string {
 	return ""
 }
 
-// getExtraStringDefault 从 Extra 中读取指定 key 的字符串值，不存在时返回 defaultVal
-func (a *Account) getExtraStringDefault(key, defaultVal string) string {
-	if v := a.getExtraString(key); v != "" {
-		return v
-	}
-	return defaultVal
-}
-
 // getExtraInt 从 Extra 中读取指定 key 的 int 值
 func (a *Account) getExtraInt(key string) int {
 	if a.Extra == nil {

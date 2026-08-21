@@ -83,10 +83,3 @@ func ProvideHTTPServer(cfg *config.Config, router *gin.Engine) *http.Server {
 	server.Handler = httpHandler
 	return server
 }
-
-func derefInt64(p *int64) int64 {
-	if p == nil {
-		return 0
-	}
-	return *p
-}

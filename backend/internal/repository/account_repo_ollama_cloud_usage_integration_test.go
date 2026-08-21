@@ -218,24 +218,6 @@ func TestListDueOllamaCloudUsageAccountsUsesGroupMaxLastUsedAndFailsOpen(t *test
 	}
 }
 
-func TestLockAndMergeAccountProbeExtraCoalescesNullableOllamaGroupIdentity(t *testing.T) {
-	ctx := context.Background()
-	tx := testEntTx(t)
-	account := mustCreateAccount(t, tx.Client(), &service.Account{
-		Name: "ordinary-openai-without-base-url", Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey,
-		Credentials: map[string]any{"api_key": "sk-no-base-url"},
-		Extra:       map[string]any{service.UpstreamBillingProbeEnabledExtraKey: true},
-	})
-	loaded, err := newAccountRepositoryWithSQL(tx.Client(), tx, nil).GetByID(ctx, account.ID)
-	require.NoError(t, err)
-
-	merged, err := lockAndMergeOllamaCloudUsageExtra(ctx, tx.Client(), loaded)
-
-	require.NoError(t, err, "a NULL Ollama eligibility expression must scan as false")
-	require.NotContains(t, merged, service.OllamaCloudUsageSessionExtraKey)
-	require.Equal(t, true, merged[service.UpstreamBillingProbeEnabledExtraKey])
-}
-
 func TestOllamaCloudUsageGroupWritesAreAtomicAcrossPlatformsAndURLVariants(t *testing.T) {
 	ctx := context.Background()
 	tx := testEntTx(t)

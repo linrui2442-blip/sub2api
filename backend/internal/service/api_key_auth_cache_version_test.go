@@ -21,10 +21,10 @@ func TestAPIKeyService_RejectsV10AuthSnapshotWithoutModelsListConfig(t *testing.
 				Concurrency: 3,
 			},
 			Group: &APIKeyAuthGroupSnapshot{
-				ID:               groupID,
-				Name:             "openai",
-				Platform:         PlatformOpenAI,
-				Status:           StatusActive,
+				ID:       groupID,
+				Name:     "openai",
+				Platform: PlatformOpenAI,
+				Status:   StatusActive,
 			},
 		},
 	})
