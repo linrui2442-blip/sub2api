@@ -11,7 +11,6 @@ import type {
   AuthResponse,
   CurrentUserResponse,
   PublicSettings,
-  ActionCaptchaRequestProof,
   TotpLoginResponse,
   TotpLogin2FARequest
 } from '@/types'
@@ -47,12 +46,11 @@ export function buildOAuthLoginStartURL(request: OAuthLoginStart): string {
 }
 
 export async function startOAuthLogin(
-  request: OAuthLoginStart,
-  proof: ActionCaptchaRequestProof
+	request: OAuthLoginStart
 ): Promise<OAuthLoginStartResponse> {
   const { data } = await apiClient.post<OAuthLoginStartResponse>(
     `/auth/oauth/${request.provider}/start`,
-    proof,
+		undefined,
     { params: request.params }
   )
   return data
@@ -314,7 +312,7 @@ export function isAuthenticated(): boolean {
 
 /**
  * Get public settings (no auth required)
- * @returns Public settings including registration and Turnstile config
+ * @returns Public settings used by the local runtime
  */
 export async function getPublicSettings(): Promise<PublicSettings> {
   const { data } = await apiClient.get<PublicSettings>('/settings/public')

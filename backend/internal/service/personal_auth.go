@@ -15,19 +15,13 @@ type PersonalAuthService struct {
 
 // ProvidePersonalAuthService deliberately leaves public-account provisioning
 // dependencies nil: redeem/invitation, registration email delivery, promo,
-// default subscription assignment and affiliate flows.
-// Personal routes never expose those flows. Captcha services remain available
-// so an existing local configuration cannot turn login/passkey checks into a
-// nil dependency after an upgrade.
+// default subscription assignment, affiliate flows, and public captcha.
 func ProvidePersonalAuthService(
 	entClient *dbent.Client,
 	userRepo UserRepository,
 	refreshTokenCache RefreshTokenCache,
 	cfg *config.Config,
 	settingService *SettingService,
-	turnstileService *TurnstileService,
-	tencentCaptchaService *TencentCaptchaService,
-	aliyunCaptchaService *AliyunCaptchaService,
 ) *PersonalAuthService {
 	svc := NewAuthService(
 		entClient,
@@ -35,9 +29,6 @@ func ProvidePersonalAuthService(
 		refreshTokenCache,
 		cfg,
 		settingService,
-		turnstileService,
 	)
-	svc.SetTencentCaptchaService(tencentCaptchaService)
-	svc.SetAliyunCaptchaService(aliyunCaptchaService)
 	return &PersonalAuthService{AuthService: svc}
 }

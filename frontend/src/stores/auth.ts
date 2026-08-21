@@ -9,8 +9,7 @@ import { authAPI, isTotp2FARequired, passkeyAPI, type LoginResponse } from '@/ap
 import type {
   User,
   LoginRequest,
-  AuthResponse,
-  ActionCaptchaRequestProof
+	AuthResponse
 } from '@/types'
 
 const AUTH_TOKEN_KEY = 'auth_token'
@@ -280,9 +279,9 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function loginWithPasskey(proof?: ActionCaptchaRequestProof): Promise<User> {
-    try {
-      const response = await passkeyAPI.login(proof)
+	async function loginWithPasskey(): Promise<User> {
+		try {
+			const response = await passkeyAPI.login()
       setAuthFromResponse(response)
       return user.value!
     } catch (error) {

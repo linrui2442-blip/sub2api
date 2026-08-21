@@ -114,9 +114,6 @@ var ProviderSet = wire.NewSet(
 	NewAESEncryptor,
 
 	// HTTP service ports (DI Strategy A: return interface directly)
-	NewTurnstileVerifier,
-	NewTencentCaptchaVerifier,
-	NewAliyunCaptchaVerifier,
 	ProvideGitHubReleaseClient,
 	NewProxyExitInfoProber,
 	NewClaudeUsageFetcher,

@@ -200,22 +200,6 @@ export interface SystemSettings {
   smtp_from_email: string;
   smtp_from_name: string;
   smtp_use_tls: boolean;
-  // Cloudflare Turnstile settings
-  turnstile_enabled: boolean;
-  turnstile_site_key: string;
-  turnstile_secret_key_configured: boolean;
-  tencent_captcha_enabled: boolean;
-  tencent_captcha_app_id: string;
-  tencent_captcha_app_secret_key_configured: boolean;
-  tencent_captcha_cloud_secret_id_configured: boolean;
-  tencent_captcha_cloud_secret_key_configured: boolean;
-  tencent_captcha_region: string;
-  aliyun_captcha_enabled: boolean;
-  aliyun_captcha_access_key_id: string;
-  aliyun_captcha_access_key_secret_configured: boolean;
-  aliyun_captcha_scene_id: string;
-  aliyun_captcha_prefix: string;
-  aliyun_captcha_region: string;
   api_key_acl_trust_forwarded_ip: boolean;
   forwarded_client_ip_headers: string[];
 
@@ -436,21 +420,6 @@ export interface UpdateSettingsRequest {
   smtp_from_email?: string;
   smtp_from_name?: string;
   smtp_use_tls?: boolean;
-  turnstile_enabled?: boolean;
-  turnstile_site_key?: string;
-  turnstile_secret_key?: string;
-  tencent_captcha_enabled?: boolean;
-  tencent_captcha_app_id?: string;
-  tencent_captcha_app_secret_key?: string;
-  tencent_captcha_cloud_secret_id?: string;
-  tencent_captcha_cloud_secret_key?: string;
-  tencent_captcha_region?: string;
-  aliyun_captcha_enabled?: boolean;
-  aliyun_captcha_access_key_id?: string;
-  aliyun_captcha_access_key_secret?: string;
-  aliyun_captcha_scene_id?: string;
-  aliyun_captcha_prefix?: string;
-  aliyun_captcha_region?: string;
   api_key_acl_trust_forwarded_ip?: boolean;
   forwarded_client_ip_headers?: string[];
   linuxdo_connect_enabled?: boolean;

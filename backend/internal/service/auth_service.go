@@ -22,7 +22,7 @@ import (
 var (
 	ErrInvalidCredentials           = infraerrors.Unauthorized("INVALID_CREDENTIALS", "invalid email or password")
 	ErrEmailExists                  = infraerrors.Conflict("EMAIL_EXISTS", "email already exists")
-	ErrEmailDomainRegistrationLimit = infraerrors.BadRequest("EMAIL_DOMAIN_REGISTRATION_LIMIT", "email domain registration limit reached")
+	ErrEmailDomainRegistrationLimit = infraerrors.Forbidden("EMAIL_DOMAIN_REGISTRATION_LIMIT", "email domain registration limit reached")
 	ErrUserNotActive                = infraerrors.Forbidden("USER_NOT_ACTIVE", "user is not active")
 	ErrInvalidToken                 = infraerrors.Unauthorized("INVALID_TOKEN", "invalid token")
 	ErrTokenExpired                 = infraerrors.Unauthorized("TOKEN_EXPIRED", "token has expired")
@@ -33,7 +33,6 @@ var (
 	ErrRefreshTokenExpired          = infraerrors.Unauthorized("REFRESH_TOKEN_EXPIRED", "refresh token has expired")
 	ErrRefreshTokenReused           = infraerrors.Unauthorized("REFRESH_TOKEN_REUSED", "refresh token has been reused")
 	ErrServiceUnavailable           = infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "service temporarily unavailable")
-	ErrCaptchaProviderConflict      = infraerrors.ServiceUnavailable("CAPTCHA_PROVIDER_CONFLICT", "multiple captcha providers are enabled")
 )
 
 const maxTokenLength = 8192
@@ -50,24 +49,15 @@ type JWTClaims struct {
 }
 
 type AuthService struct {
-	entClient             *dbent.Client
-	userRepo              UserRepository
-	refreshTokenCache     RefreshTokenCache
-	cfg                   *config.Config
-	settingService        *SettingService
-	turnstileService      *TurnstileService
-	tencentCaptchaService *TencentCaptchaService
-	aliyunCaptchaService  *AliyunCaptchaService
+	entClient         *dbent.Client
+	userRepo          UserRepository
+	refreshTokenCache RefreshTokenCache
+	cfg               *config.Config
+	settingService    *SettingService
 }
 
-type CaptchaProof struct {
-	TurnstileToken string
-	TencentTicket  string
-	TencentRandstr string
-}
-
-func NewAuthService(entClient *dbent.Client, userRepo UserRepository, refreshTokenCache RefreshTokenCache, cfg *config.Config, settingService *SettingService, turnstileService *TurnstileService) *AuthService {
-	return &AuthService{entClient: entClient, userRepo: userRepo, refreshTokenCache: refreshTokenCache, cfg: cfg, settingService: settingService, turnstileService: turnstileService}
+func NewAuthService(entClient *dbent.Client, userRepo UserRepository, refreshTokenCache RefreshTokenCache, cfg *config.Config, settingService *SettingService) *AuthService {
+	return &AuthService{entClient: entClient, userRepo: userRepo, refreshTokenCache: refreshTokenCache, cfg: cfg, settingService: settingService}
 }
 
 type TokenPair struct {
@@ -86,102 +76,6 @@ func (s *AuthService) EntClient() *dbent.Client {
 		return nil
 	}
 	return s.entClient
-}
-
-func (s *AuthService) SetTencentCaptchaService(tencentCaptchaService *TencentCaptchaService) {
-	s.tencentCaptchaService = tencentCaptchaService
-}
-
-func (s *AuthService) SetAliyunCaptchaService(aliyunCaptchaService *AliyunCaptchaService) {
-	s.aliyunCaptchaService = aliyunCaptchaService
-}
-
-func (s *AuthService) VerifyCaptcha(ctx context.Context, proof CaptchaProof, remoteIP string) error {
-	required := s.cfg != nil && s.cfg.Server.Mode == "release" && s.cfg.Turnstile.Required
-	if s.settingService == nil {
-		if required {
-			return ErrTurnstileNotConfigured
-		}
-		return nil
-	}
-	providerConfig, err := s.settingService.GetCaptchaProviderConfig(ctx)
-	if err != nil {
-		return ErrServiceUnavailable
-	}
-	if captchaProvidersConflict(providerConfig.TurnstileEnabled, providerConfig.Tencent.Enabled, providerConfig.Aliyun.Enabled) {
-		return ErrCaptchaProviderConflict
-	}
-	if providerConfig.Tencent.Enabled {
-		if s.tencentCaptchaService == nil {
-			return ErrTencentCaptchaNotConfigured
-		}
-		return s.tencentCaptchaService.VerifyTicketWithConfig(ctx, providerConfig.Tencent, proof.TencentTicket, proof.TencentRandstr, remoteIP)
-	}
-	if providerConfig.Aliyun.Enabled {
-		if s.aliyunCaptchaService == nil {
-			return ErrAliyunCaptchaNotConfigured
-		}
-		return s.aliyunCaptchaService.VerifyParamWithConfig(ctx, providerConfig.Aliyun, proof.TurnstileToken)
-	}
-	if providerConfig.TurnstileEnabled {
-		if s.turnstileService == nil || strings.TrimSpace(providerConfig.TurnstileSecretKey) == "" {
-			return ErrTurnstileNotConfigured
-		}
-		return s.turnstileService.VerifyTokenWithSecret(ctx, providerConfig.TurnstileSecretKey, proof.TurnstileToken, remoteIP)
-	}
-	if required {
-		return ErrTurnstileNotConfigured
-	}
-	return nil
-}
-
-func captchaProvidersConflict(enabled ...bool) bool {
-	count := 0
-	for _, e := range enabled {
-		if e {
-			count++
-		}
-	}
-	return count > 1
-}
-
-// VerifyActionCaptchaIfEnabled 仅保护动作触发的扩展入口（OAuth 登录启动、passkey 登录），
-// 腾讯天御与阿里云验证码启用时拦截；不扩大 Cloudflare Turnstile 的既有覆盖范围。
-
-func (s *AuthService) VerifyActionCaptchaIfEnabled(ctx context.Context, proof CaptchaProof, remoteIP string) error {
-	if s == nil || s.settingService == nil {
-		return ErrServiceUnavailable
-	}
-
-	providerConfig, err := s.settingService.GetCaptchaProviderConfig(ctx)
-	if err != nil {
-		logger.LegacyPrintf("service.auth", "%s", "[Auth] Failed to read captcha provider settings")
-		return ErrServiceUnavailable
-	}
-	tencentEnabled := providerConfig.Tencent.Enabled
-	aliyunEnabled := providerConfig.Aliyun.Enabled
-	if !tencentEnabled && !aliyunEnabled {
-		return nil
-	}
-	if captchaProvidersConflict(providerConfig.TurnstileEnabled, tencentEnabled, aliyunEnabled) {
-		return ErrCaptchaProviderConflict
-	}
-	if aliyunEnabled {
-		if s.aliyunCaptchaService == nil {
-			return ErrAliyunCaptchaNotConfigured
-		}
-		return s.aliyunCaptchaService.VerifyParamWithConfig(ctx, providerConfig.Aliyun, proof.TurnstileToken)
-	}
-	if s.tencentCaptchaService == nil {
-		return ErrTencentCaptchaNotConfigured
-	}
-	return s.tencentCaptchaService.VerifyTicketWithConfig(
-		ctx,
-		providerConfig.Tencent,
-		proof.TencentTicket,
-		proof.TencentRandstr,
-		remoteIP,
-	)
 }
 
 func (s *AuthService) Login(ctx context.Context, email, password string) (string, *User, error) {
