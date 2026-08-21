@@ -488,9 +488,6 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.Platform != "" {
 		group.Platform = NormalizeGroupPlatform(input.Platform)
 	}
-	if group.FallbackGroupIDOnInvalidRequest != nil && group.Platform != PlatformAnthropic && group.Platform != PlatformAntigravity {
-		return nil, fmt.Errorf("invalid request fallback only supported for anthropic or antigravity groups")
-	}
 	if input.IsExclusive != nil {
 		group.IsExclusive = *input.IsExclusive
 	}
@@ -519,6 +516,9 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 		} else {
 			group.FallbackGroupIDOnInvalidRequest = nil
 		}
+	}
+	if group.FallbackGroupIDOnInvalidRequest != nil && group.Platform != PlatformAnthropic && group.Platform != PlatformAntigravity {
+		return nil, fmt.Errorf("invalid request fallback only supported for anthropic or antigravity groups")
 	}
 	if input.ModelRouting != nil {
 		group.ModelRouting = input.ModelRouting
