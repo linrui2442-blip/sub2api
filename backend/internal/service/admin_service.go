@@ -23,7 +23,6 @@ type AdminService interface {
 	GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int, sortBy, sortOrder string) ([]APIKey, int64, error)
 	GetUserUsageStats(ctx context.Context, userID int64, period string) (any, error)
 	GetUserRPMStatus(ctx context.Context, userID int64) (*UserRPMStatus, error)
-	BindUserAuthIdentity(ctx context.Context, userID int64, input AdminBindAuthIdentityInput) (*AdminBoundAuthIdentity, error)
 
 	// Group management
 	ListGroups(ctx context.Context, page, pageSize int, platform, status, search string, isExclusive *bool, sortBy, sortOrder string) ([]Group, int64, error)
@@ -150,6 +149,9 @@ type UpdateUserInput struct {
 	ActorAdminID int64
 }
 
+// AdminBindAuthIdentityInput and its result types are retained temporarily for
+// internal migration compatibility. Personal routes deliberately do not expose
+// any user social-identity binding endpoint.
 type AdminBindAuthIdentityInput struct {
 	ProviderType    string
 	ProviderKey     string
