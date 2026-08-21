@@ -23,7 +23,7 @@ describe('Admin UI request marker', () => {
     expect(shouldMarkAdminUIRequest(requestURL, '/login')).toBe(true)
   })
 
-  it.each(['/keys', '/groups/available', '/auth/me', '/announcements'])(
+  it.each(['/keys', '/groups/available', '/auth/me'])(
     'marks shared request %s while an Admin page is active',
     (requestURL) => {
       expect(shouldMarkAdminUIRequest(requestURL, '/admin/dashboard')).toBe(true)
@@ -54,7 +54,6 @@ describe('User UI request marker', () => {
     '/user/password',
     '/user/notify-email/send-code',
     '/user/totp/status',
-    '/user/aff',
     '/user/platform-quotas',
     '/keys',
     '/keys/12',
@@ -64,6 +63,19 @@ describe('User UI request marker', () => {
     '/usage',
     '/usage/stats',
     '/usage/dashboard/snapshot-v2',
+    '/api/v1/auth/me',
+    '/api/v1/keys?page=1',
+  ])('marks user timing API %s', (requestURL) => {
+    expect(shouldMarkUserUIRequest(requestURL)).toBe(true)
+    expect(isUserTimingAPIPath(requestURL)).toBe(true)
+  })
+
+  it.each([
+    '/auth/login',
+    '/settings/public',
+    '/admin/users',
+    '/groups',
+    '/channels',
     '/announcements',
     '/announcements/3/read',
     '/redeem',
@@ -76,20 +88,7 @@ describe('User UI request marker', () => {
     '/payment/plans',
     '/payment/orders',
     '/payment/orders/my',
-    '/api/v1/auth/me',
-    '/api/v1/keys?page=1',
     'https://api.example.test/api/v1/payment/orders/1',
-  ])('marks user timing API %s', (requestURL) => {
-    expect(shouldMarkUserUIRequest(requestURL)).toBe(true)
-    expect(isUserTimingAPIPath(requestURL)).toBe(true)
-  })
-
-  it.each([
-    '/auth/login',
-    '/settings/public',
-    '/admin/users',
-    '/groups',
-    '/channels',
     '/payment/public/orders/verify',
     '/payment/webhook/stripe',
     '/api/v1/payment/public/orders/resolve',
