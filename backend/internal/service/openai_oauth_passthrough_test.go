@@ -24,8 +24,6 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-func f64p(v float64) *float64 { return &v }
-
 type httpUpstreamRecorder struct {
 	lastReq      *http.Request
 	lastBody     []byte
