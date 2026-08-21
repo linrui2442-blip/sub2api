@@ -41,93 +41,6 @@ type SystemSettings struct {
 	APIKeyACLTrustForwardedIP bool
 	ForwardedClientIPHeaders  []string
 
-	// LinuxDo Connect OAuth 登录
-	LinuxDoConnectEnabled                bool
-	LinuxDoConnectClientID               string
-	LinuxDoConnectClientSecret           string
-	LinuxDoConnectClientSecretConfigured bool
-	LinuxDoConnectRedirectURL            string
-
-	// DingTalk Connect OAuth 登录
-	DingTalkConnectEnabled                 bool
-	DingTalkConnectClientID                string
-	DingTalkConnectClientSecret            string
-	DingTalkConnectClientSecretConfigured  bool
-	DingTalkConnectRedirectURL             string
-	DingTalkConnectCorpRestrictionPolicy   string
-	DingTalkConnectInternalCorpID          string
-	DingTalkConnectBypassRegistration      bool
-	DingTalkConnectSyncCorpEmail           bool
-	DingTalkConnectSyncDisplayName         bool
-	DingTalkConnectSyncDept                bool
-	DingTalkConnectSyncCorpEmailAttrKey    string
-	DingTalkConnectSyncDisplayNameAttrKey  string
-	DingTalkConnectSyncDeptAttrKey         string
-	DingTalkConnectSyncCorpEmailAttrName   string
-	DingTalkConnectSyncDisplayNameAttrName string
-	DingTalkConnectSyncDeptAttrName        string
-
-	// WeChat Connect OAuth 登录
-	WeChatConnectEnabled                   bool
-	WeChatConnectAppID                     string
-	WeChatConnectAppSecret                 string
-	WeChatConnectAppSecretConfigured       bool
-	WeChatConnectOpenAppID                 string
-	WeChatConnectOpenAppSecret             string
-	WeChatConnectOpenAppSecretConfigured   bool
-	WeChatConnectMPAppID                   string
-	WeChatConnectMPAppSecret               string
-	WeChatConnectMPAppSecretConfigured     bool
-	WeChatConnectMobileAppID               string
-	WeChatConnectMobileAppSecret           string
-	WeChatConnectMobileAppSecretConfigured bool
-	WeChatConnectOpenEnabled               bool
-	WeChatConnectMPEnabled                 bool
-	WeChatConnectMobileEnabled             bool
-	WeChatConnectMode                      string
-	WeChatConnectScopes                    string
-	WeChatConnectRedirectURL               string
-	WeChatConnectFrontendRedirectURL       string
-
-	// Generic OIDC OAuth 登录
-	OIDCConnectEnabled                bool
-	OIDCConnectProviderName           string
-	OIDCConnectClientID               string
-	OIDCConnectClientSecret           string
-	OIDCConnectClientSecretConfigured bool
-	OIDCConnectIssuerURL              string
-	OIDCConnectDiscoveryURL           string
-	OIDCConnectAuthorizeURL           string
-	OIDCConnectTokenURL               string
-	OIDCConnectUserInfoURL            string
-	OIDCConnectJWKSURL                string
-	OIDCConnectScopes                 string
-	OIDCConnectRedirectURL            string
-	OIDCConnectFrontendRedirectURL    string
-	OIDCConnectTokenAuthMethod        string
-	OIDCConnectUsePKCE                bool
-	OIDCConnectValidateIDToken        bool
-	OIDCConnectAllowedSigningAlgs     string
-	OIDCConnectClockSkewSeconds       int
-	OIDCConnectRequireEmailVerified   bool
-	OIDCConnectUserInfoEmailPath      string
-	OIDCConnectUserInfoIDPath         string
-	OIDCConnectUserInfoUsernamePath   string
-
-	// GitHub / Google 邮箱快捷登录
-	GitHubOAuthEnabled                bool
-	GitHubOAuthClientID               string
-	GitHubOAuthClientSecret           string
-	GitHubOAuthClientSecretConfigured bool
-	GitHubOAuthRedirectURL            string
-	GitHubOAuthFrontendRedirectURL    string
-	GoogleOAuthEnabled                bool
-	GoogleOAuthClientID               string
-	GoogleOAuthClientSecret           string
-	GoogleOAuthClientSecretConfigured bool
-	GoogleOAuthRedirectURL            string
-	GoogleOAuthFrontendRedirectURL    string
-
 	SiteName             string
 	SiteLogo             string
 	SiteSubtitle         string
@@ -272,18 +185,8 @@ type PublicSettings struct {
 	CustomMenuItems      string // JSON array of custom menu items
 	CustomEndpoints      string // JSON array of custom endpoints
 
-	LinuxDoOAuthEnabled      bool
-	DingTalkOAuthEnabled     bool
-	WeChatOAuthEnabled       bool
-	WeChatOAuthOpenEnabled   bool
-	WeChatOAuthMPEnabled     bool
-	WeChatOAuthMobileEnabled bool
-	BackendModeEnabled       bool
-	OIDCOAuthEnabled         bool
-	OIDCOAuthProviderName    string
-	GitHubOAuthEnabled       bool
-	GoogleOAuthEnabled       bool
-	Version                  string
+	BackendModeEnabled bool
+	Version            string
 
 	AccountQuotaNotifyEnabled bool
 
@@ -305,66 +208,6 @@ type LoginAgreementDocument struct {
 	ID        string `json:"id"`
 	Title     string `json:"title"`
 	ContentMD string `json:"content_md"`
-}
-
-type WeChatConnectOAuthConfig struct {
-	Enabled             bool
-	LegacyAppID         string
-	LegacyAppSecret     string
-	OpenAppID           string
-	OpenAppSecret       string
-	MPAppID             string
-	MPAppSecret         string
-	MobileAppID         string
-	MobileAppSecret     string
-	OpenEnabled         bool
-	MPEnabled           bool
-	MobileEnabled       bool
-	Mode                string
-	Scopes              string
-	RedirectURL         string
-	FrontendRedirectURL string
-}
-
-func (cfg WeChatConnectOAuthConfig) SupportsMode(mode string) bool {
-	switch normalizeWeChatConnectModeSetting(mode) {
-	case "mp":
-		return cfg.MPEnabled
-	case "mobile":
-		return cfg.MobileEnabled
-	default:
-		return cfg.OpenEnabled
-	}
-}
-
-func (cfg WeChatConnectOAuthConfig) ScopeForMode(mode string) string {
-	switch normalizeWeChatConnectModeSetting(mode) {
-	case "mp":
-		return normalizeWeChatConnectScopeSetting(cfg.Scopes, "mp")
-	case "mobile":
-		return ""
-	}
-	return defaultWeChatConnectScopeForMode("open")
-}
-
-func (cfg WeChatConnectOAuthConfig) AppIDForMode(mode string) string {
-	switch normalizeWeChatConnectModeSetting(mode) {
-	case "mp":
-		return strings.TrimSpace(firstNonEmpty(cfg.MPAppID, cfg.LegacyAppID))
-	case "mobile":
-		return strings.TrimSpace(firstNonEmpty(cfg.MobileAppID, cfg.LegacyAppID))
-	}
-	return strings.TrimSpace(firstNonEmpty(cfg.OpenAppID, cfg.LegacyAppID))
-}
-
-func (cfg WeChatConnectOAuthConfig) AppSecretForMode(mode string) string {
-	switch normalizeWeChatConnectModeSetting(mode) {
-	case "mp":
-		return strings.TrimSpace(firstNonEmpty(cfg.MPAppSecret, cfg.LegacyAppSecret))
-	case "mobile":
-		return strings.TrimSpace(firstNonEmpty(cfg.MobileAppSecret, cfg.LegacyAppSecret))
-	}
-	return strings.TrimSpace(firstNonEmpty(cfg.OpenAppSecret, cfg.LegacyAppSecret))
 }
 
 // StreamTimeoutSettings 流超时处理配置（仅控制超时后的处理方式，超时判定由网关配置控制）

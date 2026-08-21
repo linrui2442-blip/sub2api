@@ -186,11 +186,7 @@ type UserIdentitySummary struct {
 }
 
 type UserIdentitySummarySet struct {
-	Email    UserIdentitySummary `json:"email"`
-	LinuxDo  UserIdentitySummary `json:"linuxdo"`
-	OIDC     UserIdentitySummary `json:"oidc"`
-	WeChat   UserIdentitySummary `json:"wechat"`
-	DingTalk UserIdentitySummary `json:"dingtalk"`
+	Email UserIdentitySummary `json:"email"`
 }
 
 type StartUserIdentityBindingRequest struct {
@@ -301,64 +297,9 @@ func (s *UserService) GetProfileIdentitySummaries(ctx context.Context, userID in
 		return UserIdentitySummarySet{}, err
 	}
 
-	summaries := UserIdentitySummarySet{
-		Email:    s.buildEmailIdentitySummary(user, records),
-		LinuxDo:  s.buildProviderIdentitySummary("linuxdo", user, records),
-		OIDC:     s.buildProviderIdentitySummary("oidc", user, records),
-		WeChat:   s.buildProviderIdentitySummary("wechat", user, records),
-		DingTalk: s.buildProviderIdentitySummary("dingtalk", user, records),
-	}
+	summaries := UserIdentitySummarySet{Email: s.buildEmailIdentitySummary(user, records)}
 
-	s.applyExplicitProviderAvailability(ctx, &summaries)
 	return summaries, nil
-}
-
-func (s *UserService) applyExplicitProviderAvailability(ctx context.Context, summaries *UserIdentitySummarySet) {
-	if s == nil || summaries == nil || s.settingRepo == nil {
-		return
-	}
-
-	settings, err := s.settingRepo.GetMultiple(ctx, []string{
-		SettingKeyLinuxDoConnectEnabled,
-		SettingKeyOIDCConnectEnabled,
-		SettingKeyWeChatConnectEnabled,
-		SettingKeyWeChatConnectOpenEnabled,
-		SettingKeyWeChatConnectMPEnabled,
-		SettingKeyWeChatConnectMobileEnabled,
-		SettingKeyWeChatConnectMode,
-		SettingKeyDingTalkConnectEnabled,
-	})
-	if err != nil {
-		return
-	}
-
-	if raw, ok := settings[SettingKeyLinuxDoConnectEnabled]; ok && strings.TrimSpace(raw) != "" && raw != "true" {
-		disableIdentityBindAction(&summaries.LinuxDo)
-	}
-	if raw, ok := settings[SettingKeyDingTalkConnectEnabled]; ok && strings.TrimSpace(raw) != "" && raw != "true" {
-		disableIdentityBindAction(&summaries.DingTalk)
-	}
-	if raw, ok := settings[SettingKeyOIDCConnectEnabled]; ok && strings.TrimSpace(raw) != "" && raw != "true" {
-		disableIdentityBindAction(&summaries.OIDC)
-	}
-	if raw, ok := settings[SettingKeyWeChatConnectEnabled]; ok && strings.TrimSpace(raw) != "" {
-		if raw != "true" {
-			disableIdentityBindAction(&summaries.WeChat)
-			return
-		}
-		openEnabled, mpEnabled, _ := parseWeChatConnectCapabilitySettings(settings, true, settings[SettingKeyWeChatConnectMode])
-		if !openEnabled && !mpEnabled {
-			disableIdentityBindAction(&summaries.WeChat)
-		}
-	}
-}
-
-func disableIdentityBindAction(summary *UserIdentitySummary) {
-	if summary == nil || summary.Bound {
-		return
-	}
-	summary.CanBind = false
-	summary.BindStartPath = ""
 }
 
 func (s *UserService) PrepareIdentityBindingStart(_ context.Context, req StartUserIdentityBindingRequest) (*StartUserIdentityBindingResult, error) {
@@ -667,10 +608,10 @@ func (s *UserService) buildEmailIdentitySummary(user *User, records []UserAuthId
 		if email == "" {
 			email = strings.TrimSpace(primary.ProviderSubject)
 		}
-		if email == "" || isReservedEmail(email) {
+		if email == "" {
 			email = strings.TrimSpace(user.Email)
 		}
-		if email == "" || isReservedEmail(email) {
+		if email == "" {
 			email = strings.TrimSpace(primary.ProviderKey)
 		}
 
@@ -685,7 +626,7 @@ func (s *UserService) buildEmailIdentitySummary(user *User, records []UserAuthId
 
 	// Compatibility fallback for legacy normal-email users that predate auth_identities backfill.
 	email := strings.TrimSpace(user.Email)
-	if email == "" || isReservedEmail(email) {
+	if email == "" {
 		return summary
 	}
 	summary.Bound = true
@@ -757,7 +698,7 @@ func (s *UserService) canUseEmailAsSignInMethod(user *User, records []UserAuthId
 	}
 
 	email := strings.ToLower(strings.TrimSpace(user.Email))
-	if email == "" || isReservedEmail(email) {
+	if email == "" {
 		return false
 	}
 

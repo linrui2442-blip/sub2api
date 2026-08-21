@@ -126,16 +126,6 @@ export interface PublicSettings {
   table_page_size_options: number[]
   custom_menu_items: CustomMenuItem[]
   custom_endpoints: CustomEndpoint[]
-  linuxdo_oauth_enabled: boolean
-  dingtalk_oauth_enabled?: boolean
-  wechat_oauth_enabled: boolean
-  wechat_oauth_open_enabled?: boolean
-  wechat_oauth_mp_enabled?: boolean
-  wechat_oauth_mobile_enabled?: boolean
-  oidc_oauth_enabled: boolean
-  oidc_oauth_provider_name: string
-  github_oauth_enabled: boolean
-  google_oauth_enabled: boolean
   backend_mode_enabled: boolean
   version: string
   // 服务器全局时区（IANA 名称与当前 UTC 偏移），高峰时段等服务端本地时间窗口的展示标注用；

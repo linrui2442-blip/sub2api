@@ -122,18 +122,6 @@ const (
 	SubscriptionStatusRevoked = "revoked"
 )
 
-// LinuxDoConnectSyntheticEmailDomain 是 LinuxDo Connect 用户的合成邮箱后缀（RFC 保留域名）。
-const LinuxDoConnectSyntheticEmailDomain = "@linuxdo-connect.invalid"
-
-// OIDCConnectSyntheticEmailDomain 是 OIDC 用户的合成邮箱后缀（RFC 保留域名）。
-const OIDCConnectSyntheticEmailDomain = "@oidc-connect.invalid"
-
-// WeChatConnectSyntheticEmailDomain 是 WeChat Connect 用户的合成邮箱后缀（RFC 保留域名）。
-const WeChatConnectSyntheticEmailDomain = "@wechat-connect.invalid"
-
-// DingTalkConnectSyntheticEmailDomain 是 DingTalk Connect 用户的合成邮箱后缀（RFC 保留域名）。
-const DingTalkConnectSyntheticEmailDomain = "@dingtalk-connect.invalid"
-
 // Setting keys
 const (
 	// 注册设置
@@ -183,84 +171,6 @@ const (
 
 	// 操作审计日志设置
 	SettingKeyAuditLogRetentionDays = "audit_log_retention_days" // 审计日志保留天数（<=0 永久保留），默认 180
-
-	// LinuxDo Connect OAuth 登录设置
-	SettingKeyLinuxDoConnectEnabled      = "linuxdo_connect_enabled"
-	SettingKeyLinuxDoConnectClientID     = "linuxdo_connect_client_id"
-	SettingKeyLinuxDoConnectClientSecret = "linuxdo_connect_client_secret"
-	SettingKeyLinuxDoConnectRedirectURL  = "linuxdo_connect_redirect_url"
-
-	// DingTalk Connect OAuth 登录设置
-	SettingKeyDingTalkConnectEnabled                 = "dingtalk_connect_enabled"
-	SettingKeyDingTalkConnectClientID                = "dingtalk_connect_client_id"
-	SettingKeyDingTalkConnectClientSecret            = "dingtalk_connect_client_secret"
-	SettingKeyDingTalkConnectRedirectURL             = "dingtalk_connect_redirect_url"
-	SettingKeyDingTalkConnectCorpRestrictionPolicy   = "dingtalk_connect_corp_restriction_policy"
-	SettingKeyDingTalkConnectInternalCorpID          = "dingtalk_connect_internal_corp_id"
-	SettingKeyDingTalkConnectBypassRegistration      = "dingtalk_connect_bypass_registration"
-	SettingKeyDingTalkConnectSyncCorpEmail           = "dingtalk_connect_sync_corp_email"
-	SettingKeyDingTalkConnectSyncDisplayName         = "dingtalk_connect_sync_display_name"
-	SettingKeyDingTalkConnectSyncDept                = "dingtalk_connect_sync_dept"
-	SettingKeyDingTalkConnectSyncCorpEmailAttrKey    = "dingtalk_connect_sync_corp_email_attr_key"
-	SettingKeyDingTalkConnectSyncDisplayNameAttrKey  = "dingtalk_connect_sync_display_name_attr_key"
-	SettingKeyDingTalkConnectSyncDeptAttrKey         = "dingtalk_connect_sync_dept_attr_key"
-	SettingKeyDingTalkConnectSyncCorpEmailAttrName   = "dingtalk_connect_sync_corp_email_attr_name"
-	SettingKeyDingTalkConnectSyncDisplayNameAttrName = "dingtalk_connect_sync_display_name_attr_name"
-	SettingKeyDingTalkConnectSyncDeptAttrName        = "dingtalk_connect_sync_dept_attr_name"
-
-	// WeChat Connect OAuth 登录设置
-	SettingKeyWeChatConnectEnabled             = "wechat_connect_enabled"
-	SettingKeyWeChatConnectAppID               = "wechat_connect_app_id"
-	SettingKeyWeChatConnectAppSecret           = "wechat_connect_app_secret"
-	SettingKeyWeChatConnectOpenAppID           = "wechat_connect_open_app_id"
-	SettingKeyWeChatConnectOpenAppSecret       = "wechat_connect_open_app_secret"
-	SettingKeyWeChatConnectMPAppID             = "wechat_connect_mp_app_id"
-	SettingKeyWeChatConnectMPAppSecret         = "wechat_connect_mp_app_secret"
-	SettingKeyWeChatConnectMobileAppID         = "wechat_connect_mobile_app_id"
-	SettingKeyWeChatConnectMobileAppSecret     = "wechat_connect_mobile_app_secret"
-	SettingKeyWeChatConnectOpenEnabled         = "wechat_connect_open_enabled"
-	SettingKeyWeChatConnectMPEnabled           = "wechat_connect_mp_enabled"
-	SettingKeyWeChatConnectMobileEnabled       = "wechat_connect_mobile_enabled"
-	SettingKeyWeChatConnectMode                = "wechat_connect_mode"
-	SettingKeyWeChatConnectScopes              = "wechat_connect_scopes"
-	SettingKeyWeChatConnectRedirectURL         = "wechat_connect_redirect_url"
-	SettingKeyWeChatConnectFrontendRedirectURL = "wechat_connect_frontend_redirect_url"
-
-	// Generic OIDC OAuth 登录设置
-	SettingKeyOIDCConnectEnabled              = "oidc_connect_enabled"
-	SettingKeyOIDCConnectProviderName         = "oidc_connect_provider_name"
-	SettingKeyOIDCConnectClientID             = "oidc_connect_client_id"
-	SettingKeyOIDCConnectClientSecret         = "oidc_connect_client_secret"
-	SettingKeyOIDCConnectIssuerURL            = "oidc_connect_issuer_url"
-	SettingKeyOIDCConnectDiscoveryURL         = "oidc_connect_discovery_url"
-	SettingKeyOIDCConnectAuthorizeURL         = "oidc_connect_authorize_url"
-	SettingKeyOIDCConnectTokenURL             = "oidc_connect_token_url"
-	SettingKeyOIDCConnectUserInfoURL          = "oidc_connect_userinfo_url"
-	SettingKeyOIDCConnectJWKSURL              = "oidc_connect_jwks_url"
-	SettingKeyOIDCConnectScopes               = "oidc_connect_scopes"
-	SettingKeyOIDCConnectRedirectURL          = "oidc_connect_redirect_url"
-	SettingKeyOIDCConnectFrontendRedirectURL  = "oidc_connect_frontend_redirect_url"
-	SettingKeyOIDCConnectTokenAuthMethod      = "oidc_connect_token_auth_method"
-	SettingKeyOIDCConnectUsePKCE              = "oidc_connect_use_pkce"
-	SettingKeyOIDCConnectValidateIDToken      = "oidc_connect_validate_id_token"
-	SettingKeyOIDCConnectAllowedSigningAlgs   = "oidc_connect_allowed_signing_algs"
-	SettingKeyOIDCConnectClockSkewSeconds     = "oidc_connect_clock_skew_seconds"
-	SettingKeyOIDCConnectRequireEmailVerified = "oidc_connect_require_email_verified"
-	SettingKeyOIDCConnectUserInfoEmailPath    = "oidc_connect_userinfo_email_path"
-	SettingKeyOIDCConnectUserInfoIDPath       = "oidc_connect_userinfo_id_path"
-	SettingKeyOIDCConnectUserInfoUsernamePath = "oidc_connect_userinfo_username_path"
-
-	// GitHub / Google 邮箱快捷登录设置
-	SettingKeyGitHubOAuthEnabled             = "github_oauth_enabled"
-	SettingKeyGitHubOAuthClientID            = "github_oauth_client_id"
-	SettingKeyGitHubOAuthClientSecret        = "github_oauth_client_secret"
-	SettingKeyGitHubOAuthRedirectURL         = "github_oauth_redirect_url"
-	SettingKeyGitHubOAuthFrontendRedirectURL = "github_oauth_frontend_redirect_url"
-	SettingKeyGoogleOAuthEnabled             = "google_oauth_enabled"
-	SettingKeyGoogleOAuthClientID            = "google_oauth_client_id"
-	SettingKeyGoogleOAuthClientSecret        = "google_oauth_client_secret"
-	SettingKeyGoogleOAuthRedirectURL         = "google_oauth_redirect_url"
-	SettingKeyGoogleOAuthFrontendRedirectURL = "google_oauth_frontend_redirect_url"
 
 	// OEM设置
 	SettingKeySiteName             = "site_name"               // 网站名称

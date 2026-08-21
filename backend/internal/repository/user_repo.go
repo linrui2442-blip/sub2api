@@ -423,12 +423,6 @@ func normalizeEmailAuthIdentitySubject(email string) string {
 	if normalized == "" {
 		return ""
 	}
-	if strings.HasSuffix(normalized, service.LinuxDoConnectSyntheticEmailDomain) ||
-		strings.HasSuffix(normalized, service.OIDCConnectSyntheticEmailDomain) ||
-		strings.HasSuffix(normalized, service.WeChatConnectSyntheticEmailDomain) ||
-		strings.HasSuffix(normalized, service.DingTalkConnectSyntheticEmailDomain) {
-		return ""
-	}
 	return normalized
 }
 

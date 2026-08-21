@@ -538,11 +538,3 @@ func (s *AuthService) RecordSuccessfulLogin(ctx context.Context, userID int64) {
 		logger.LegacyPrintf("service.auth", "[Auth] Failed to record successful login for user %d: %v", userID, err)
 	}
 }
-
-func isReservedEmail(email string) bool {
-	normalized := strings.ToLower(strings.TrimSpace(email))
-	return strings.HasSuffix(normalized, LinuxDoConnectSyntheticEmailDomain) ||
-		strings.HasSuffix(normalized, OIDCConnectSyntheticEmailDomain) ||
-		strings.HasSuffix(normalized, WeChatConnectSyntheticEmailDomain) ||
-		strings.HasSuffix(normalized, DingTalkConnectSyntheticEmailDomain)
-}

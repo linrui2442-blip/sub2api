@@ -139,22 +139,8 @@ type SettingService struct {
 }
 
 const (
-	defaultWeChatConnectMode     = "open"
-	defaultWeChatConnectScopes   = "snsapi_login"
-	defaultWeChatConnectFrontend = "/auth/wechat/callback"
-	defaultGitHubOAuthAuthorize  = "https://github.com/login/oauth/authorize"
-	defaultGitHubOAuthToken      = "https://github.com/login/oauth/access_token"
-	defaultGitHubOAuthUserInfo   = "https://api.github.com/user"
-	defaultGitHubOAuthEmails     = "https://api.github.com/user/emails"
-	defaultGitHubOAuthScopes     = "read:user user:email"
-	defaultGitHubOAuthFrontend   = "/auth/oauth/callback"
-	defaultGoogleOAuthAuthorize  = "https://accounts.google.com/o/oauth2/v2/auth"
-	defaultGoogleOAuthToken      = "https://oauth2.googleapis.com/token"
-	defaultGoogleOAuthUserInfo   = "https://openidconnect.googleapis.com/v1/userinfo"
-	defaultGoogleOAuthScopes     = "openid email profile"
-	defaultGoogleOAuthFrontend   = "/auth/oauth/callback"
-	defaultLoginAgreementMode    = "modal"
-	defaultLoginAgreementDate    = "2026-03-31"
+	defaultLoginAgreementMode = "modal"
+	defaultLoginAgreementDate = "2026-03-31"
 )
 
 // NewSettingService 创建系统设置服务实例
