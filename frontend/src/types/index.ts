@@ -34,56 +34,11 @@ export interface NotifyEmailEntry {
 
 // ==================== User & Auth Types ====================
 
-export type UserAuthProvider = 'email' | 'linuxdo' | 'oidc' | 'wechat' | 'github' | 'google' | 'dingtalk'
-
-export interface UserAuthBindingStatus {
-  bound?: boolean
-  bound_count?: number
-  provider?: UserAuthProvider | string
-  provider_key?: string | null
-  provider_subject?: string | null
-  issuer?: string | null
-  label?: string | null
-  provider_label?: string | null
-  display_name?: string | null
-  subject_hint?: string | null
-  verified_at?: string | null
-  bind_start_path?: string | null
-  can_bind?: boolean
-  can_unbind?: boolean
-  note_key?: string | null
-  note?: string | null
-  metadata?: Record<string, unknown>
-}
-
-export interface UserProfileSourceContext {
-  provider?: UserAuthProvider | string
-  source?: string | null
-  label?: string | null
-  provider_label?: string | null
-}
-
 export interface User {
   id: number
   username: string
   email: string
   avatar_url?: string | null
-  avatar_source?: string | UserProfileSourceContext | null
-  username_source?: string | UserProfileSourceContext | null
-  display_name_source?: string | UserProfileSourceContext | null
-  nickname_source?: string | UserProfileSourceContext | null
-  profile_sources?: {
-    avatar?: string | UserProfileSourceContext | null
-    username?: string | UserProfileSourceContext | null
-    display_name?: string | UserProfileSourceContext | null
-    nickname?: string | UserProfileSourceContext | null
-  }
-  auth_bindings?: Partial<Record<UserAuthProvider, boolean | UserAuthBindingStatus>>
-  identity_bindings?: Partial<Record<UserAuthProvider, boolean | UserAuthBindingStatus>>
-  email_bound?: boolean
-  linuxdo_bound?: boolean
-  oidc_bound?: boolean
-  wechat_bound?: boolean
   role: 'admin' | 'user' // User role for authorization
   concurrency: number // Allowed concurrent requests
   rpm_limit?: number // User-level RPM cap (0 = unlimited); effective as fallback when group has no rpm_limit
@@ -123,31 +78,6 @@ export interface ActionCaptchaRequestProof extends Partial<TencentCaptchaRequest
   turnstile_token?: string
 }
 
-export interface AffiliateInvitee {
-  user_id: number
-  email: string
-  username: string
-  created_at?: string
-  total_rebate: number
-}
-
-export interface UserAffiliateDetail {
-  user_id: number
-  aff_code: string
-  inviter_id?: number | null
-  aff_count: number
-  aff_quota: number
-  aff_frozen_quota: number
-  aff_history_quota: number
-  /** 当前用户作为邀请人时实际生效的返利比例（专属覆盖全局）。0-100。 */
-  effective_rebate_rate_percent: number
-  invitees: AffiliateInvitee[]
-}
-
-export interface AffiliateTransferResponse {
-  transferred_quota: number
-  balance: number
-}
 
 export interface SendVerifyCodeRequest {
   email: string
