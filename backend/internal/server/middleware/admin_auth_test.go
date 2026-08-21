@@ -198,14 +198,6 @@ func (s *stubUserRepo) DeductBalance(ctx context.Context, id int64, amount float
 	panic("unexpected DeductBalance call")
 }
 
-func (s *stubUserRepo) AdjustBalance(ctx context.Context, id int64, delta float64) (service.BalanceChange, error) {
-	panic("unexpected AdjustBalance call")
-}
-
-func (s *stubUserRepo) SetBalance(ctx context.Context, id int64, value float64) (service.BalanceChange, error) {
-	panic("unexpected SetBalance call")
-}
-
 func (s *stubUserRepo) UpdateConcurrency(ctx context.Context, id int64, amount int) error {
 	panic("unexpected UpdateConcurrency call")
 }

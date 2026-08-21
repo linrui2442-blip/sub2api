@@ -162,7 +162,7 @@ func newTestGatewayHandler(t *testing.T, group *service.Group, accounts []*servi
 	schedulerSnapshot := service.NewSchedulerSnapshotService(schedulerCache, nil, nil, nil, nil)
 
 	gwSvc := service.NewGatewayService(
-		nil, &fakeGroupRepo{group: group}, nil, nil, nil, nil, nil,
+		nil, &fakeGroupRepo{group: group}, nil, nil, nil, nil,
 		schedulerSnapshot, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 
@@ -237,7 +237,6 @@ func TestGatewayHandlerMessages_InterceptWarmup_AntigravityAccount_MixedScheduli
 		User: &service.User{
 			ID:          4001,
 			Concurrency: 10,
-			Balance:     100,
 		},
 		Group: group,
 	}
@@ -327,7 +326,6 @@ func TestGatewayHandlerMessages_InterceptWarmup_AntigravityAccount_ForcePlatform
 		User: &service.User{
 			ID:          4002,
 			Concurrency: 10,
-			Balance:     100,
 		},
 		Group: group,
 	}

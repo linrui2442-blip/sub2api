@@ -101,17 +101,6 @@ func TestSettingService_GetPublicSettings_ExposesCompactHomeEnabled(t *testing.T
 	require.False(t, missingSettings.CompactHomeEnabled)
 }
 
-func TestSettingService_GetPublicSettings_ExposesForceEmailOnThirdPartySignup(t *testing.T) {
-	repo := &settingPublicRepoStub{
-		values: map[string]string{},
-	}
-	svc := NewSettingService(repo, &config.Config{})
-
-	settings, err := svc.GetPublicSettings(context.Background())
-	require.NoError(t, err)
-	require.True(t, settings.ForceEmailOnThirdPartySignup)
-}
-
 func TestSettingService_GetPublicSettings_ExposesAllowUserViewErrorRequests(t *testing.T) {
 	repo := &settingPublicRepoStub{
 		values: map[string]string{

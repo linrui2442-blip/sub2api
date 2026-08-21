@@ -95,7 +95,7 @@ func TestGoogleAPIKeyAuthInvalidAbuseReturnsProtocol429(t *testing.T) {
 
 func TestInvalidAuthAbuseDoesNotCountValidOrOperationalFailures(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	user := &service.User{ID: 1, Status: service.StatusActive, Role: service.RoleUser, Balance: 1}
+	user := &service.User{ID: 1, Status: service.StatusActive, Role: service.RoleUser}
 	repo := &stubApiKeyRepo{getByKey: func(_ context.Context, key string) (*service.APIKey, error) {
 		switch key {
 		case "valid-key":

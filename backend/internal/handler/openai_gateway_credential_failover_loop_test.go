@@ -892,7 +892,7 @@ func newGrokCredentialFailoverHandler(t *testing.T, mode string) (*OpenAIGateway
 	cfg := &config.Config{RunMode: config.RunModeSimple}
 	cfg.Gateway.MaxAccountSwitches = 3
 	gateway := service.NewOpenAIGatewayService(
-		repo, nil, nil, nil, nil, cfg, nil, nil, nil, upstream,
+		repo, nil, nil, nil, cfg, nil, nil, nil, upstream,
 		&service.DeferredService{}, nil, provider, nil, nil,
 	)
 	cache := &concurrencyCacheMock{

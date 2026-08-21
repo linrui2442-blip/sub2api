@@ -202,7 +202,6 @@ func TestAPIKeyService_GetByKey_UsesL2Cache(t *testing.T) {
 				ID:          2,
 				Status:      StatusActive,
 				Role:        RoleUser,
-				Balance:     10,
 				Concurrency: 3,
 			},
 			Group: &APIKeyAuthGroupSnapshot{
@@ -244,7 +243,6 @@ func TestAPIKeyService_SnapshotRoundTrip_PreservesMessagesDispatchModelConfig(t 
 			ID:          2,
 			Status:      StatusActive,
 			Role:        RoleUser,
-			Balance:     10,
 			Concurrency: 3,
 		},
 		Group: &Group{
@@ -287,7 +285,6 @@ func TestAPIKeyService_SnapshotRoundTrip_PreservesReasoningEffortPolicy(t *testi
 			ID:          2,
 			Status:      StatusActive,
 			Role:        RoleUser,
-			Balance:     10,
 			Concurrency: 3,
 		},
 		Group: &Group{
@@ -328,7 +325,6 @@ func TestAPIKeyService_GetByKey_IgnoresLegacyAuthCacheSnapshotWithoutMessagesDis
 					ID:          2,
 					Status:      StatusActive,
 					Role:        RoleUser,
-					Balance:     10,
 					Concurrency: 3,
 				},
 				Group: &Group{
@@ -365,7 +361,6 @@ func TestAPIKeyService_GetByKey_IgnoresLegacyAuthCacheSnapshotWithoutMessagesDis
 					ID:          2,
 					Status:      StatusActive,
 					Role:        RoleUser,
-					Balance:     10,
 					Concurrency: 3,
 				},
 				Group: &APIKeyAuthGroupSnapshot{
@@ -421,7 +416,6 @@ func TestAPIKeyService_GetByKey_CacheMissStoresL2(t *testing.T) {
 					ID:          7,
 					Status:      StatusActive,
 					Role:        RoleUser,
-					Balance:     12,
 					Concurrency: 2,
 				},
 			}, nil
@@ -458,7 +452,6 @@ func TestAPIKeyService_GetByKey_UsesL1Cache(t *testing.T) {
 					ID:          3,
 					Status:      StatusActive,
 					Role:        RoleUser,
-					Balance:     5,
 					Concurrency: 2,
 				},
 			}, nil
@@ -647,7 +640,6 @@ func TestAPIKeyService_GetByKey_SingleflightCollapses(t *testing.T) {
 					ID:          2,
 					Status:      StatusActive,
 					Role:        RoleUser,
-					Balance:     1,
 					Concurrency: 1,
 				},
 			}, nil

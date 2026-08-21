@@ -39,7 +39,7 @@ func TestGatewayHandlerPreCancelledCompatibleRequestsDoNotSelectAccount(t *testi
 	}
 	schedulerCache := &countingGatewaySchedulerCache{fakeSchedulerCache: &fakeSchedulerCache{accounts: []*service.Account{account}}}
 	schedulerSnapshot := service.NewSchedulerSnapshotService(schedulerCache, nil, nil, nil, nil)
-	gatewayService := service.NewGatewayService(nil, &fakeGroupRepo{group: group}, nil, nil, nil, nil, nil, schedulerSnapshot, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	gatewayService := service.NewGatewayService(nil, &fakeGroupRepo{group: group}, nil, nil, nil, nil, schedulerSnapshot, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	cfg := &config.Config{RunMode: config.RunModeSimple}
 	h := &GatewayHandler{
 		gatewayService:     gatewayService,
@@ -49,7 +49,7 @@ func TestGatewayHandlerPreCancelledCompatibleRequestsDoNotSelectAccount(t *testi
 	}
 	apiKey := &service.APIKey{
 		ID: 9102, UserID: 9103, GroupID: &groupID, Group: group, Status: service.StatusActive,
-		User: &service.User{ID: 9103, Concurrency: 10, Balance: 100},
+		User: &service.User{ID: 9103, Concurrency: 10},
 	}
 
 	tests := []struct {

@@ -409,10 +409,9 @@ func TestAdminService_CreateGroup_NormalizesMessagesDispatchModelConfig(t *testi
 	svc := &adminServiceImpl{groupRepo: repo}
 
 	group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
-		Name:           "dispatch-group",
-		Description:    "dispatch config",
-		Platform:       PlatformOpenAI,
-		RateMultiplier: 1.0,
+		Name:        "dispatch-group",
+		Description: "dispatch config",
+		Platform:    PlatformOpenAI,
 		MessagesDispatchModelConfig: OpenAIMessagesDispatchModelConfig{
 			OpusMappedModel:   " gpt-5.4-high ",
 			SonnetMappedModel: " gpt-5.3-codex ",
@@ -472,7 +471,6 @@ func TestAdminService_CreateGroup_ClearsMessagesDispatchFieldsForNonOpenAIPlatfo
 		Name:                  "anthropic-group",
 		Description:           "non-openai",
 		Platform:              PlatformAnthropic,
-		RateMultiplier:        1.0,
 		AllowMessagesDispatch: true,
 		AllowLive:             true,
 		DefaultMappedModel:    "gpt-5.4",
@@ -494,10 +492,9 @@ func TestAdminService_CreateCompositeGroupPreservesLive(t *testing.T) {
 	svc := &adminServiceImpl{groupRepo: repo}
 
 	group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
-		Name:           "composite-group",
-		Platform:       PlatformComposite,
-		RateMultiplier: 1.0,
-		AllowLive:      true,
+		Name:      "composite-group",
+		Platform:  PlatformComposite,
+		AllowLive: true,
 	})
 
 	require.NoError(t, err)

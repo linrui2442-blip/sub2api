@@ -211,13 +211,6 @@ func (m *mockUserRepo) DeductAvailableBalance(ctx context.Context, id int64, amo
 	return amount, nil
 }
 
-func (m *mockUserRepo) AdjustBalance(ctx context.Context, id int64, delta float64) (BalanceChange, error) {
-	panic("unexpected AdjustBalance call")
-}
-
-func (m *mockUserRepo) SetBalance(ctx context.Context, id int64, value float64) (BalanceChange, error) {
-	panic("unexpected SetBalance call")
-}
 func (m *mockUserRepo) UpdateConcurrency(context.Context, int64, int) error { return nil }
 func (m *mockUserRepo) ExistsByEmail(context.Context, string) (bool, error) { return false, nil }
 func (m *mockUserRepo) ExistsByEmailAlias(context.Context, string) (bool, error) {

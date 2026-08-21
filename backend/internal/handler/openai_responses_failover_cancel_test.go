@@ -77,7 +77,7 @@ func newOpenAIResponsesFailoverTestHandler(t *testing.T, upstream service.HTTPUp
 	}
 	accountRepo := &grokCredentialHandlerRepo{accounts: accounts}
 	cfg := &config.Config{RunMode: config.RunModeSimple}
-	gatewayService := service.NewOpenAIGatewayService(accountRepo, nil, nil, nil, nil, cfg, nil, nil, nil, upstream, nil, nil, nil, nil, nil)
+	gatewayService := service.NewOpenAIGatewayService(accountRepo, nil, nil, nil, cfg, nil, nil, nil, upstream, nil, nil, nil, nil, nil)
 	concurrencyService := service.NewConcurrencyService(nil)
 	handler := NewOpenAIGatewayHandler(
 		gatewayService,
