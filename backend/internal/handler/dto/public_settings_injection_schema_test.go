@@ -13,9 +13,7 @@ import (
 //
 // Why this test exists: before we extracted a named PublicSettingsInjectionPayload
 // type, the inline struct was manually kept in sync with dto.PublicSettings and
-// drifted — AvailableChannelsEnabled was missing, which
-// made the frontend read `undefined` on refresh and hide the "可用渠道" menu
-// until the async /api/v1/settings/public round-trip finished.
+// drifted from the frontend payload after a feature was added.
 //
 // This test compares the two JSON-tag sets and fails if injection is missing
 // any field that dto.PublicSettings exposes. Adding a new feature flag with
