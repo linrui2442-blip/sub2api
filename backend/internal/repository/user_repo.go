@@ -143,7 +143,6 @@ func (r *userRepository) create(ctx context.Context, userIn *service.User, guard
 		SetNotes(userIn.Notes).
 		SetPasswordHash(userIn.PasswordHash).
 		SetRole(userIn.Role).
-		SetBalance(userIn.Balance).
 		SetConcurrency(userIn.Concurrency).
 		SetStatus(userIn.Status).
 		SetSignupSource(userSignupSourceOrDefault(userIn.SignupSource)).
@@ -312,18 +311,6 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User, field
 	}
 	if fields.Status {
 		updateOp = updateOp.SetStatus(userIn.Status)
-	}
-	if fields.BalanceNotifySettings {
-		updateOp = updateOp.
-			SetBalanceNotifyEnabled(userIn.BalanceNotifyEnabled).
-			SetBalanceNotifyThresholdType(userIn.BalanceNotifyThresholdType).
-			SetNillableBalanceNotifyThreshold(userIn.BalanceNotifyThreshold)
-		if userIn.BalanceNotifyThreshold == nil {
-			updateOp = updateOp.ClearBalanceNotifyThreshold()
-		}
-	}
-	if fields.BalanceNotifyExtraEmails {
-		updateOp = updateOp.SetBalanceNotifyExtraEmails(marshalExtraEmails(userIn.BalanceNotifyExtraEmails))
 	}
 	if fields.SignupSource && userIn.SignupSource != "" {
 		updateOp = updateOp.SetSignupSource(userIn.SignupSource)
@@ -624,9 +611,6 @@ func userListOrder(params pagination.PaginationParams) []func(*entsql.Selector) 
 	case "role":
 		field = dbuser.FieldRole
 		defaultField = false
-	case "balance":
-		field = dbuser.FieldBalance
-		defaultField = false
 	case "concurrency":
 		field = dbuser.FieldConcurrency
 		defaultField = false
@@ -732,195 +716,6 @@ func userLastUsedAtOrder(sortOrder string) []func(*entsql.Selector) {
 	return []func(*entsql.Selector){
 		orderExpr("DESC", "LAST", entsql.Desc),
 	}
-}
-
-func (r *userRepository) UpdateBalance(ctx context.Context, id int64, amount float64) error {
-	client := clientFromContext(ctx, r.client)
-	update := client.User.Update().Where(dbuser.IDEQ(id)).AddBalance(amount)
-	// Track cumulative recharge amount for percentage-based notifications
-	if amount > 0 {
-		update = update.AddTotalRecharged(amount)
-	}
-	n, err := update.Save(ctx)
-	if err != nil {
-		return translatePersistenceError(err, service.ErrUserNotFound, nil)
-	}
-	if n == 0 {
-		return service.ErrUserNotFound
-	}
-	return nil
-}
-
-// DeductBalance 扣除用户余额
-// 透支策略：允许余额变为负数，确保当前请求能够完成
-// 中间件会阻止余额 <= 0 的用户发起后续请求
-func (r *userRepository) DeductBalance(ctx context.Context, id int64, amount float64) error {
-	client := clientFromContext(ctx, r.client)
-	n, err := client.User.Update().
-		Where(dbuser.IDEQ(id), dbuser.BalanceGTE(amount)).
-		AddBalance(-amount).
-		Save(ctx)
-	if err != nil {
-		return err
-	}
-	if n > 0 {
-		return nil
-	}
-
-	n, err = client.User.Update().
-		Where(dbuser.IDEQ(id)).
-		AddBalance(-amount).
-		Save(ctx)
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return service.ErrUserNotFound
-	}
-	return nil
-}
-
-// DeductAvailableBalance atomically deducts min(amount, max(balance, 0)).
-// Unlike DeductBalance, this refund-specific operation never increases an
-// existing deficit or permits a concurrent deduction to cause an overdraft.
-func (r *userRepository) DeductAvailableBalance(ctx context.Context, id int64, amount float64) (deducted float64, err error) {
-	if amount < 0 {
-		return 0, fmt.Errorf("deduction amount must be nonnegative")
-	}
-	const updateSQL = `
-		WITH target AS (
-			SELECT id, balance
-			FROM users
-			WHERE id = $2 AND deleted_at IS NULL
-			FOR UPDATE
-		), updated AS (
-			UPDATE users AS u
-			SET balance = target.balance - LEAST($1, GREATEST(target.balance, 0)), updated_at = NOW()
-			FROM target
-			WHERE u.id = target.id AND u.deleted_at IS NULL
-			RETURNING target.balance - u.balance AS deducted
-		)
-		SELECT deducted FROM updated
-	`
-	rows, err := clientFromContext(ctx, r.client).QueryContext(ctx, updateSQL, amount, id)
-	if err != nil {
-		return 0, err
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil && err == nil {
-			err = closeErr
-		}
-	}()
-	if !rows.Next() {
-		if rowsErr := rows.Err(); rowsErr != nil {
-			return 0, rowsErr
-		}
-		return 0, service.ErrUserNotFound
-	}
-	if err := rows.Scan(&deducted); err != nil {
-		return 0, err
-	}
-	return deducted, rows.Err()
-}
-
-// AdjustBalance 原子地把 delta 累加到余额上，结果为负时整条语句不生效。
-// 相比"读余额 → 算新值 → 整行写回"，这里把读与写压进同一条 UPDATE，
-// 并发的计费扣款不会被旧快照覆盖。
-func (r *userRepository) AdjustBalance(ctx context.Context, id int64, delta float64) (service.BalanceChange, error) {
-	const updateSQL = `
-		UPDATE users
-		SET balance = balance + $1, updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL AND balance + $1 >= 0
-		RETURNING balance - $1, balance
-	`
-	change, ok, err := scanBalanceChange(ctx, clientFromContext(ctx, r.client), updateSQL, delta, id)
-	if err != nil {
-		return service.BalanceChange{}, err
-	}
-	if ok {
-		return change, nil
-	}
-
-	// 0 行既可能是用户不存在，也可能是余额不足以承受这次扣减，需要区分。
-	current, err := r.currentBalance(ctx, id)
-	if err != nil {
-		return service.BalanceChange{}, err
-	}
-	return service.BalanceChange{Old: current, New: current + delta}, service.ErrBalanceNegative
-}
-
-// SetBalance 原子地把余额置为 value，并返回变更前后的值。
-func (r *userRepository) SetBalance(ctx context.Context, id int64, value float64) (service.BalanceChange, error) {
-	if value < 0 {
-		// 连同当前余额一起返回，便于上层给出可读的错误信息。
-		current, err := r.currentBalance(ctx, id)
-		if err != nil {
-			return service.BalanceChange{}, err
-		}
-		return service.BalanceChange{Old: current, New: value}, service.ErrBalanceNegative
-	}
-	const updateSQL = `
-		UPDATE users AS u
-		SET balance = $1, updated_at = NOW()
-		FROM (SELECT id, balance FROM users WHERE id = $2 AND deleted_at IS NULL) AS prev
-		WHERE u.id = prev.id AND u.deleted_at IS NULL
-		RETURNING prev.balance, u.balance
-	`
-	change, ok, err := scanBalanceChange(ctx, clientFromContext(ctx, r.client), updateSQL, value, id)
-	if err != nil {
-		return service.BalanceChange{}, err
-	}
-	if !ok {
-		return service.BalanceChange{}, service.ErrUserNotFound
-	}
-	return change, nil
-}
-
-// currentBalance 读取用户当前余额，用户不存在时返回 ErrUserNotFound。
-func (r *userRepository) currentBalance(ctx context.Context, id int64) (balance float64, err error) {
-	rows, err := clientFromContext(ctx, r.client).QueryContext(ctx,
-		`SELECT balance FROM users WHERE id = $1 AND deleted_at IS NULL`, id)
-	if err != nil {
-		return 0, err
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil && err == nil {
-			err = closeErr
-		}
-	}()
-	if !rows.Next() {
-		if rowsErr := rows.Err(); rowsErr != nil {
-			return 0, rowsErr
-		}
-		return 0, service.ErrUserNotFound
-	}
-	if err := rows.Scan(&balance); err != nil {
-		return 0, err
-	}
-	return balance, rows.Err()
-}
-
-// scanBalanceChange 执行一条 RETURNING 旧余额、新余额的语句。ok 为 false 表示语句未命中任何行。
-func scanBalanceChange(ctx context.Context, client *dbent.Client, query string, args ...any) (change service.BalanceChange, ok bool, err error) {
-	rows, err := client.QueryContext(ctx, query, args...)
-	if err != nil {
-		return service.BalanceChange{}, false, err
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil && err == nil {
-			err = closeErr
-		}
-	}()
-	if !rows.Next() {
-		if rowsErr := rows.Err(); rowsErr != nil {
-			return service.BalanceChange{}, false, rowsErr
-		}
-		return service.BalanceChange{}, false, nil
-	}
-	if err := rows.Scan(&change.Old, &change.New); err != nil {
-		return service.BalanceChange{}, false, err
-	}
-	return change, true, rows.Err()
 }
 
 func (r *userRepository) UpdateConcurrency(ctx context.Context, id int64, amount int) error {

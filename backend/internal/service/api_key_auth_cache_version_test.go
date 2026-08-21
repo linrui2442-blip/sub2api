@@ -17,7 +17,6 @@ func TestAPIKeyService_RejectsV10AuthSnapshotWithoutModelsListConfig(t *testing.
 				ID:          2,
 				Status:      StatusActive,
 				Role:        RoleUser,
-				Balance:     10,
 				Concurrency: 3,
 			},
 			Group: &APIKeyAuthGroupSnapshot{

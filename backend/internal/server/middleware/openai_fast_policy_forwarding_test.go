@@ -153,7 +153,6 @@ func newOpenAIFastPolicyForwardingAPIKey(id int64, key string, userID, groupID i
 			ID:          userID,
 			Role:        service.RoleUser,
 			Status:      service.StatusActive,
-			Balance:     10,
 			Concurrency: 1,
 		},
 		Group: group,

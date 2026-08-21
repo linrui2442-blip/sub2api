@@ -27,10 +27,6 @@ const (
 	FieldPasswordHash = "password_hash"
 	// FieldRole holds the string denoting the role field in the database.
 	FieldRole = "role"
-	// FieldBalance holds the string denoting the balance field in the database.
-	FieldBalance = "balance"
-	// FieldFrozenBalance holds the string denoting the frozen_balance field in the database.
-	FieldFrozenBalance = "frozen_balance"
 	// FieldConcurrency holds the string denoting the concurrency field in the database.
 	FieldConcurrency = "concurrency"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -51,16 +47,6 @@ const (
 	FieldLastLoginAt = "last_login_at"
 	// FieldLastActiveAt holds the string denoting the last_active_at field in the database.
 	FieldLastActiveAt = "last_active_at"
-	// FieldBalanceNotifyEnabled holds the string denoting the balance_notify_enabled field in the database.
-	FieldBalanceNotifyEnabled = "balance_notify_enabled"
-	// FieldBalanceNotifyThresholdType holds the string denoting the balance_notify_threshold_type field in the database.
-	FieldBalanceNotifyThresholdType = "balance_notify_threshold_type"
-	// FieldBalanceNotifyThreshold holds the string denoting the balance_notify_threshold field in the database.
-	FieldBalanceNotifyThreshold = "balance_notify_threshold"
-	// FieldBalanceNotifyExtraEmails holds the string denoting the balance_notify_extra_emails field in the database.
-	FieldBalanceNotifyExtraEmails = "balance_notify_extra_emails"
-	// FieldTotalRecharged holds the string denoting the total_recharged field in the database.
-	FieldTotalRecharged = "total_recharged"
 	// FieldRpmLimit holds the string denoting the rpm_limit field in the database.
 	FieldRpmLimit = "rpm_limit"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
@@ -128,8 +114,6 @@ var Columns = []string{
 	FieldEmail,
 	FieldPasswordHash,
 	FieldRole,
-	FieldBalance,
-	FieldFrozenBalance,
 	FieldConcurrency,
 	FieldStatus,
 	FieldUsername,
@@ -140,11 +124,6 @@ var Columns = []string{
 	FieldSignupSource,
 	FieldLastLoginAt,
 	FieldLastActiveAt,
-	FieldBalanceNotifyEnabled,
-	FieldBalanceNotifyThresholdType,
-	FieldBalanceNotifyThreshold,
-	FieldBalanceNotifyExtraEmails,
-	FieldTotalRecharged,
 	FieldRpmLimit,
 }
 
@@ -186,10 +165,6 @@ var (
 	DefaultRole string
 	// RoleValidator is a validator for the "role" field. It is called by the builders before save.
 	RoleValidator func(string) error
-	// DefaultBalance holds the default value on creation for the "balance" field.
-	DefaultBalance float64
-	// DefaultFrozenBalance holds the default value on creation for the "frozen_balance" field.
-	DefaultFrozenBalance float64
 	// DefaultConcurrency holds the default value on creation for the "concurrency" field.
 	DefaultConcurrency int
 	// DefaultStatus holds the default value on creation for the "status" field.
@@ -208,14 +183,6 @@ var (
 	DefaultSignupSource string
 	// SignupSourceValidator is a validator for the "signup_source" field. It is called by the builders before save.
 	SignupSourceValidator func(string) error
-	// DefaultBalanceNotifyEnabled holds the default value on creation for the "balance_notify_enabled" field.
-	DefaultBalanceNotifyEnabled bool
-	// DefaultBalanceNotifyThresholdType holds the default value on creation for the "balance_notify_threshold_type" field.
-	DefaultBalanceNotifyThresholdType string
-	// DefaultBalanceNotifyExtraEmails holds the default value on creation for the "balance_notify_extra_emails" field.
-	DefaultBalanceNotifyExtraEmails string
-	// DefaultTotalRecharged holds the default value on creation for the "total_recharged" field.
-	DefaultTotalRecharged float64
 	// DefaultRpmLimit holds the default value on creation for the "rpm_limit" field.
 	DefaultRpmLimit int
 )
@@ -256,16 +223,6 @@ func ByPasswordHash(opts ...sql.OrderTermOption) OrderOption {
 // ByRole orders the results by the role field.
 func ByRole(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRole, opts...).ToFunc()
-}
-
-// ByBalance orders the results by the balance field.
-func ByBalance(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldBalance, opts...).ToFunc()
-}
-
-// ByFrozenBalance orders the results by the frozen_balance field.
-func ByFrozenBalance(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldFrozenBalance, opts...).ToFunc()
 }
 
 // ByConcurrency orders the results by the concurrency field.
@@ -316,31 +273,6 @@ func ByLastLoginAt(opts ...sql.OrderTermOption) OrderOption {
 // ByLastActiveAt orders the results by the last_active_at field.
 func ByLastActiveAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLastActiveAt, opts...).ToFunc()
-}
-
-// ByBalanceNotifyEnabled orders the results by the balance_notify_enabled field.
-func ByBalanceNotifyEnabled(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldBalanceNotifyEnabled, opts...).ToFunc()
-}
-
-// ByBalanceNotifyThresholdType orders the results by the balance_notify_threshold_type field.
-func ByBalanceNotifyThresholdType(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldBalanceNotifyThresholdType, opts...).ToFunc()
-}
-
-// ByBalanceNotifyThreshold orders the results by the balance_notify_threshold field.
-func ByBalanceNotifyThreshold(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldBalanceNotifyThreshold, opts...).ToFunc()
-}
-
-// ByBalanceNotifyExtraEmails orders the results by the balance_notify_extra_emails field.
-func ByBalanceNotifyExtraEmails(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldBalanceNotifyExtraEmails, opts...).ToFunc()
-}
-
-// ByTotalRecharged orders the results by the total_recharged field.
-func ByTotalRecharged(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldTotalRecharged, opts...).ToFunc()
 }
 
 // ByRpmLimit orders the results by the rpm_limit field.

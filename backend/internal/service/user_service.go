@@ -86,38 +86,27 @@ type UserListFilters struct {
 // UserUpdateFields 声明 UserRepository.Update 允许写回的列。
 //
 // 未声明的列保持数据库当前值，不会被调用方手里的快照覆盖。用户行上有多条
-// 不经过 Update 的原子写入路径（DeductBalance/UpdateBalance 扣加余额、
-// UpdateConcurrency、BatchUpdateLimits、UpdateUserLastActiveAt 等），
+// 不经过 Update 的原子写入路径（UpdateConcurrency、BatchUpdateLimits、
+// UpdateUserLastActiveAt 等），
 // status/role 也可能被其他流程并发改写。若 Update 无条件整行回写，
 // 一次"读-改-写"就会静默回滚这些并发结果（lost update），
 // 因此每个调用方必须显式声明它真正要改的列。
-//
-// 注意这里没有 balance / total_recharged：余额只能经由 AdjustBalance、
-// SetBalance、UpdateBalance、DeductBalance 等原子接口修改，Update 永远不碰它们。
 type UserUpdateFields struct {
-	Email        bool
-	Username     bool
-	Notes        bool
-	PasswordHash bool
-	Role         bool
-	Status       bool
-	Concurrency  bool
-	RPMLimit     bool
-	SignupSource bool
-	LastLoginAt  bool
-	LastActiveAt bool
-	// BalanceNotifySettings 覆盖 balance_notify_enabled / _threshold_type / _threshold。
-	BalanceNotifySettings bool
-	// BalanceNotifyExtraEmails 与上一项分开，避免"改通知阈值"覆盖并发的"加通知邮箱"。
+	Email                    bool
+	Username                 bool
+	Notes                    bool
+	PasswordHash             bool
+	Role                     bool
+	Status                   bool
+	Concurrency              bool
+	RPMLimit                 bool
+	SignupSource             bool
+	LastLoginAt              bool
+	LastActiveAt             bool
+	BalanceNotifySettings    bool
 	BalanceNotifyExtraEmails bool
 	// AllowedGroups 为 true 时才同步 user_allowed_groups 关联表。
 	AllowedGroups bool
-}
-
-// BalanceChange 记录一次余额变更前后的值。
-type BalanceChange struct {
-	Old float64
-	New float64
 }
 
 // IsEmpty 报告该次 Update 是否不写任何列（此时仓储直接返回，不产生写操作）。
@@ -150,14 +139,6 @@ type UserRepository interface {
 	GetLatestUsedAtByUserID(ctx context.Context, userID int64) (*time.Time, error)
 	UpdateUserLastActiveAt(ctx context.Context, userID int64, activeAt time.Time) error
 
-	UpdateBalance(ctx context.Context, id int64, amount float64) error
-	DeductBalance(ctx context.Context, id int64, amount float64) error
-	// AdjustBalance 原子地把 delta 累加到余额上，并返回变更前后的值。结果为负时
-	// 拒绝写入并返回 ErrBalanceNegative。管理员的加/扣款必须走这里而不是
-	// "读余额→算新值→整行写回"，否则并发的计费扣款会被旧快照抹掉。
-	AdjustBalance(ctx context.Context, id int64, delta float64) (BalanceChange, error)
-	// SetBalance 原子地把余额置为 value（value 必须 >= 0），返回变更前后的值。
-	SetBalance(ctx context.Context, id int64, value float64) (BalanceChange, error)
 	UpdateConcurrency(ctx context.Context, id int64, amount int) error
 	BatchSetConcurrency(ctx context.Context, userIDs []int64, value int) (int, error)
 	BatchAddConcurrency(ctx context.Context, userIDs []int64, delta int) (int, error)

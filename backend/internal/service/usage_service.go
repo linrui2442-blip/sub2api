@@ -74,7 +74,7 @@ func NewUsageService(usageRepo UsageLogRepository, userRepo UserRepository, entC
 
 // Create 创建使用日志
 func (s *UsageService) Create(ctx context.Context, req CreateUsageLogRequest) (*UsageLog, error) {
-	// 使用数据库事务保证「使用日志插入」与「扣费」的原子性，避免重复扣费或漏扣风险。
+	// 使用数据库事务保证使用日志原子写入。
 	tx, err := s.entClient.Tx(ctx)
 	if err != nil && !errors.Is(err, dbent.ErrTxStarted) {
 		return nil, fmt.Errorf("begin transaction: %w", err)
@@ -121,31 +121,15 @@ func (s *UsageService) Create(ctx context.Context, req CreateUsageLogRequest) (*
 		return nil, fmt.Errorf("create usage log: %w", err)
 	}
 
-	// 扣除用户余额
-	balanceUpdated := false
-	if inserted && req.ActualCost > 0 {
-		if err := s.userRepo.UpdateBalance(txCtx, req.UserID, -req.ActualCost); err != nil {
-			return nil, fmt.Errorf("update user balance: %w", err)
-		}
-		balanceUpdated = true
-	}
-
 	if tx != nil {
 		if err := tx.Commit(); err != nil {
 			return nil, fmt.Errorf("commit transaction: %w", err)
 		}
 	}
 
-	s.invalidateUsageCaches(ctx, req.UserID, balanceUpdated)
+	_ = inserted
 
 	return usageLog, nil
-}
-
-func (s *UsageService) invalidateUsageCaches(ctx context.Context, userID int64, balanceUpdated bool) {
-	if !balanceUpdated || s.authCacheInvalidator == nil {
-		return
-	}
-	s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
 }
 
 // GetByID 根据ID获取使用日志

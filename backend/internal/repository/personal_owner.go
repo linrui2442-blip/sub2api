@@ -35,7 +35,6 @@ func CreatePersonalOwner(ctx context.Context, client *ent.Client, email, passwor
 		Email:        email,
 		Role:         service.RoleAdmin,
 		Status:       service.StatusActive,
-		Balance:      0,
 		Concurrency:  PersonalOwnerConcurrency,
 		SignupSource: "email",
 	}
@@ -47,7 +46,6 @@ func CreatePersonalOwner(ctx context.Context, client *ent.Client, email, passwor
 		SetEmail(owner.Email).
 		SetPasswordHash(owner.PasswordHash).
 		SetRole(owner.Role).
-		SetBalance(owner.Balance).
 		SetConcurrency(owner.Concurrency).
 		SetStatus(owner.Status).
 		SetSignupSource(owner.SignupSource).
