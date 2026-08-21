@@ -184,8 +184,6 @@ func (s *AuthService) VerifyActionCaptchaIfEnabled(ctx context.Context, proof Ca
 	)
 }
 
-// VerifyTurnstileForRegister 保留旧内部接口，生产 handler 使用 VerifyCaptchaForRegister。
-
 func (s *AuthService) Login(ctx context.Context, email, password string) (string, *User, error) {
 	// 查找用户
 	user, err := s.userRepo.GetByEmail(ctx, email)
@@ -216,13 +214,6 @@ func (s *AuthService) Login(ctx context.Context, email, password string) (string
 
 	return token, user, nil
 }
-
-// LoginOrRegisterOAuth 用于第三方 OAuth/SSO 登录：
-// - 如果邮箱已存在：直接登录（不需要本地密码）
-// - 如果邮箱不存在：创建新用户并登录
-//
-// 注意：该函数用于 LinuxDo OAuth 登录场景（不同于上游账号的 OAuth，例如 Claude/OpenAI/Gemini）。
-// 为了满足现有数据库约束（需要密码哈希），新用户会生成随机密码并进行哈希保存。
 
 func (s *AuthService) ValidateToken(tokenString string) (*JWTClaims, error) {
 	// 先做长度校验，尽早拒绝异常超长 token，降低 DoS 风险。
@@ -387,9 +378,6 @@ func (s *AuthService) RefreshToken(ctx context.Context, oldTokenString string) (
 	// 生成新token
 	return s.GenerateToken(ctx, user)
 }
-
-// IsPasswordResetEnabled 检查是否启用密码重置功能
-// 要求：必须同时开启邮件验证且 SMTP 配置正确
 
 func (s *AuthService) GenerateTokenPair(ctx context.Context, user *User, familyID string) (*TokenPair, error) {
 	// 检查 refreshTokenCache 是否可用
