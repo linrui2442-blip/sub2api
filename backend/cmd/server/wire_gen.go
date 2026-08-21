@@ -127,7 +127,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	grokOAuthClient := repository.NewGrokOAuthClient()
 	grokOAuthService := service.ProvideGrokOAuthService(proxyRepository, grokOAuthClient, configConfig, redisClient)
 	grokTokenProvider := service.ProvideGrokTokenProvider(accountRepository, geminiTokenCache, grokOAuthService, oAuthRefreshAPI, tempUnschedCache)
-	openAIGatewayService := service.NewOpenAIGatewayService(accountRepository, usageLogRepository, userRepository, userGroupRateRepository, gatewayCache, configConfig, schedulerSnapshotService, concurrencyService, rateLimitService, httpUpstream, deferredService, openAITokenProvider, grokTokenProvider, channelService, settingService)
+	openAIGatewayService := service.ProvideOpenAIGatewayService(accountRepository, usageLogRepository, userRepository, userGroupRateRepository, gatewayCache, configConfig, schedulerSnapshotService, concurrencyService, rateLimitService, httpUpstream, deferredService, openAITokenProvider, grokTokenProvider, channelService, settingService, privacyClientFactory)
 	geminiOAuthClient := repository.NewGeminiOAuthClient(configConfig)
 	geminiCliCodeAssistClient := repository.NewGeminiCliCodeAssistClient()
 	driveClient := repository.NewGeminiDriveClient()

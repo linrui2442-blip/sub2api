@@ -46,7 +46,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 		service.ProvidePersonalAPIKeyService,
 		service.NewUserService,
 		service.NewGatewayService,
-		service.NewOpenAIGatewayService,
+		service.ProvideOpenAIGatewayService,
 		service.NewPersonalAdminService,
 		service.NewChannelService,
 		wire.Bind(new(service.ChannelCacheInvalidator), new(*service.ChannelService)),

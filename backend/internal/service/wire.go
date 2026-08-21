@@ -54,6 +54,36 @@ func ProvideOpenAIOAuthService(
 	return svc
 }
 
+// ProvideOpenAIGatewayService keeps ChatGPT OAuth image-pointer downloads on
+// the same impersonated, account-proxy-aware client path as token lifecycle
+// and account metadata requests.
+func ProvideOpenAIGatewayService(
+	accountRepo AccountRepository,
+	usageLogRepo UsageLogRepository,
+	userRepo UserRepository,
+	userGroupRateRepo UserGroupRateRepository,
+	cache GatewayCache,
+	cfg *config.Config,
+	schedulerSnapshot *SchedulerSnapshotService,
+	concurrencyService *ConcurrencyService,
+	rateLimitService *RateLimitService,
+	httpUpstream HTTPUpstream,
+	deferredService *DeferredService,
+	openAITokenProvider *OpenAITokenProvider,
+	grokTokenProvider *GrokTokenProvider,
+	channelService *ChannelService,
+	settingService *SettingService,
+	privacyClientFactory PrivacyClientFactory,
+) *OpenAIGatewayService {
+	svc := NewOpenAIGatewayService(
+		accountRepo, usageLogRepo, userRepo, userGroupRateRepo, cache, cfg,
+		schedulerSnapshot, concurrencyService, rateLimitService, httpUpstream,
+		deferredService, openAITokenProvider, grokTokenProvider, channelService, settingService,
+	)
+	svc.SetPrivacyClientFactory(privacyClientFactory)
+	return svc
+}
+
 // ProvideTokenRefreshService creates and starts TokenRefreshService
 func ProvideTokenRefreshService(
 	accountRepo AccountRepository,

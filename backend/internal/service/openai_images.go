@@ -897,7 +897,7 @@ func (s *OpenAIGatewayService) handleOpenAIImagesNonStreamingResponse(resp *http
 	c.Data(resp.StatusCode, contentType, body)
 
 	usage, _ := extractOpenAIUsageFromJSONBytes(body)
-	return usage, extractOpenAIImageCountFromJSONBytes(body), collectOpenAIResponseImageOutputSizesFromJSONBytes(body), nil
+	return usage, extractOpenAIImagesBillableCountFromJSONBytes(body), collectOpenAIResponseImageOutputSizesFromJSONBytes(body), nil
 }
 
 func (s *OpenAIGatewayService) handleOpenAIImagesStreamingResponse(
@@ -1337,7 +1337,8 @@ func normalizeOpenAIImageBase64(raw string) string {
 		}
 	}
 	raw = strings.TrimSpace(raw)
-	raw = strings.TrimRight(raw, "=") + strings.Repeat("=", (4-len(raw)%4)%4)
+	raw = strings.TrimRight(raw, "=")
+	raw += strings.Repeat("=", (4-len(raw)%4)%4)
 	if raw == "" {
 		return ""
 	}

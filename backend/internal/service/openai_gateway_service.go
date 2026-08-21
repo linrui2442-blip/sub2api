@@ -422,6 +422,7 @@ type OpenAIGatewayService struct {
 	openaiWSResolver      OpenAIWSProtocolResolver
 	channelService        *ChannelService
 	settingService        *SettingService
+	privacyClientFactory  PrivacyClientFactory
 
 	openaiWSPoolOnce               sync.Once
 	openaiWSStateStoreOnce         sync.Once
@@ -458,6 +459,14 @@ type OpenAIGatewayService struct {
 	// 剥离跨账号回带（openai_codex_turn_state.go）。
 	openaiCodexTurnStateOrigins sync.Map
 	openaiCodexTurnStateWrites  atomic.Uint64
+}
+
+// SetPrivacyClientFactory supplies the impersonated, per-proxy client used to
+// resolve image pointers returned by the ChatGPT OAuth image backend.
+func (s *OpenAIGatewayService) SetPrivacyClientFactory(factory PrivacyClientFactory) {
+	if s != nil {
+		s.privacyClientFactory = factory
+	}
 }
 
 // NewOpenAIGatewayService creates a new OpenAIGatewayService
