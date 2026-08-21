@@ -130,18 +130,6 @@ export interface ActionCaptchaRequestProof extends Partial<TencentCaptchaRequest
   turnstile_token?: string
 }
 
-export interface RegisterRequest {
-  email: string
-  password: string
-  verify_code?: string
-  turnstile_token?: string
-  tencent_captcha_ticket?: string
-  tencent_captcha_randstr?: string
-  promo_code?: string
-  invitation_code?: string
-  aff_code?: string
-}
-
 export interface AffiliateInvitee {
   user_id: number
   email: string

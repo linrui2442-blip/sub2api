@@ -8,7 +8,6 @@ import { refreshAuthTokens, type RefreshTokenResponse } from './tokenRefresh'
 export type { RefreshTokenResponse } from './tokenRefresh'
 import type {
   LoginRequest,
-  RegisterRequest,
   AuthResponse,
   CurrentUserResponse,
   SendVerifyCodeRequest,
@@ -153,27 +152,6 @@ export async function login(credentials: LoginRequest): Promise<LoginResponse> {
  */
 export async function login2FA(request: TotpLogin2FARequest): Promise<AuthResponse> {
   const { data } = await apiClient.post<AuthResponse>('/auth/login/2fa', request)
-
-  // Store token and user data
-  setAuthToken(data.access_token)
-  if (data.refresh_token) {
-    setRefreshToken(data.refresh_token)
-  }
-  if (data.expires_in) {
-    setTokenExpiresAt(data.expires_in)
-  }
-  localStorage.setItem('auth_user', JSON.stringify(data.user))
-
-  return data
-}
-
-/**
- * User registration
- * @param userData - Registration data (username, email, password)
- * @returns Authentication response with token and user data
- */
-export async function register(userData: RegisterRequest): Promise<AuthResponse> {
-  const { data } = await apiClient.post<AuthResponse>('/auth/register', userData)
 
   // Store token and user data
   setAuthToken(data.access_token)
@@ -682,7 +660,6 @@ export const authAPI = {
   login,
   login2FA,
   isTotp2FARequired,
-  register,
   getCurrentUser,
   logout,
   isAuthenticated,

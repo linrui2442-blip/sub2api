@@ -9,5 +9,5 @@ export { useAdminSettingsStore } from './adminSettings'
 export { useOnboardingStore } from './onboarding'
 export { useAdminComplianceStore } from './adminCompliance'
 
-export type { User, LoginRequest, RegisterRequest, AuthResponse } from '@/types'
+export type { User, LoginRequest, AuthResponse } from '@/types'
 export type { Toast, ToastType, AppState } from '@/types'
