@@ -1597,7 +1597,7 @@ func (h *GatewayHandler) usageQuotaLimited(c *gin.Context, ctx context.Context, 
 	c.JSON(http.StatusOK, resp)
 }
 
-// usageUnrestricted 处理 unrestricted 模式的响应（向后兼容）
+// usageUnrestricted returns usage for a Personal Edition key without an explicit quota.
 func (h *GatewayHandler) usageUnrestricted(c *gin.Context, _ context.Context, apiKey *service.APIKey, _ middleware2.AuthSubject, usageData gin.H, dailyUsage any, modelStats any) {
 	resp := gin.H{
 		"mode":     "personal",

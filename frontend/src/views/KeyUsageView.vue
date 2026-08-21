@@ -601,7 +601,7 @@ const statusInfo = computed(() => {
   }
 
   return {
-    label: data.planName || t('keyUsage.walletBalance'),
+    label: data.planName || t('keyUsage.personalEdition'),
     statusText: 'Active',
     isActive: true,
   }
@@ -631,24 +631,6 @@ const ringItems = computed<RingItem[]>(() => {
           resetAt: rl.reset_at,
         })
       }
-    }
-  } else {
-    if (data.subscription) {
-      const sub = data.subscription
-      const limits = [
-        { label: t('keyUsage.limitDaily'), usage: sub.daily_usage_usd, limit: sub.daily_limit_usd },
-        { label: t('keyUsage.limitWeekly'), usage: sub.weekly_usage_usd, limit: sub.weekly_limit_usd },
-        { label: t('keyUsage.limitMonthly'), usage: sub.monthly_usage_usd, limit: sub.monthly_limit_usd },
-      ]
-      for (const l of limits) {
-        if (l.limit != null && l.limit > 0) {
-          const pct = Math.min(Math.round((l.usage / l.limit) * 100), 100)
-          items.push({ title: l.label, pct, amount: `${usd(l.usage)} / ${usd(l.limit)}`, iconType: 'calendar' })
-        }
-      }
-    }
-    if (!data.subscription && data.balance != null) {
-      items.push({ title: t('keyUsage.walletBalance'), pct: 0, amount: usd(data.balance), isBalance: true, iconType: 'dollar' })
     }
   }
 
@@ -728,47 +710,14 @@ const detailRows = computed<DetailRow[]>(() => {
   } else {
     rows.push({
       iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', iconSvg: ICON_CHECK,
-      label: t('keyUsage.subscriptionType'), value: data.planName || t('keyUsage.walletBalance'), valueClass: '',
+      label: t('keyUsage.accessMode'), value: data.planName || t('keyUsage.personalEdition'), valueClass: '',
     })
-
-    if (data.subscription) {
-      const sub = data.subscription
-      if (sub.daily_limit_usd > 0) {
-        const pct = (sub.daily_usage_usd / sub.daily_limit_usd) * 100
-        rows.push({
-          iconBg: 'bg-primary-500/10', iconColor: 'text-primary-500', iconSvg: ICON_DOLLAR,
-          label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '日' : 'D'})`, value: `${usd(sub.daily_usage_usd)} / ${usd(sub.daily_limit_usd)}`, valueClass: getUsageColor(pct),
-        })
-      }
-      if (sub.weekly_limit_usd > 0) {
-        const pct = (sub.weekly_usage_usd / sub.weekly_limit_usd) * 100
-        rows.push({
-          iconBg: 'bg-indigo-500/10', iconColor: 'text-indigo-500', iconSvg: ICON_DOLLAR,
-          label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '周' : 'W'})`, value: `${usd(sub.weekly_usage_usd)} / ${usd(sub.weekly_limit_usd)}`, valueClass: getUsageColor(pct),
-        })
-      }
-      if (sub.monthly_limit_usd > 0) {
-        const pct = (sub.monthly_usage_usd / sub.monthly_limit_usd) * 100
-        rows.push({
-          iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', iconSvg: ICON_DOLLAR,
-          label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '月' : 'M'})`, value: `${usd(sub.monthly_usage_usd)} / ${usd(sub.monthly_limit_usd)}`, valueClass: getUsageColor(pct),
-        })
-      }
-      if (sub.expires_at) {
-        rows.push({
-          iconBg: 'bg-amber-500/10', iconColor: 'text-amber-500', iconSvg: ICON_CALENDAR,
-          label: t('keyUsage.subscriptionExpires'), value: formatDate(sub.expires_at), valueClass: '',
-        })
-      }
+    if (data.group) {
+      rows.push({
+        iconBg: 'bg-primary-500/10', iconColor: 'text-primary-500', iconSvg: ICON_SHIELD,
+        label: t('keyUsage.group'), value: data.group, valueClass: '',
+      })
     }
-
-    const remainColor = data.remaining != null
-      ? (data.remaining <= 0 ? 'text-rose-500' : data.remaining < 10 ? 'text-amber-500' : 'text-emerald-500')
-      : ''
-    rows.push({
-      iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', iconSvg: ICON_SHIELD,
-      label: t('keyUsage.remainingQuota'), value: data.remaining != null ? usd(data.remaining) : '-', valueClass: remainColor,
-    })
   }
 
   return rows
