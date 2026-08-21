@@ -58,6 +58,7 @@ func TestUserHandlerGetProfileInfersProfileSourceOnlyWhenIdentityMatches(t *test
 			ID: 9, Email: "member@example.com", Username: "provider-name", AvatarURL: "https://example.test/avatar.png",
 			Role: service.RoleUser, Status: service.StatusActive,
 		},
+		avatar: &service.UserAvatar{URL: "https://example.test/avatar.png"},
 		identities: []service.UserAuthIdentityRecord{{
 			ProviderType: "oidc", ProviderKey: "https://issuer.example.test", ProviderSubject: "member-9",
 			Metadata: map[string]any{"suggested_display_name": "provider-name", "avatar_url": "https://example.test/avatar.png"},

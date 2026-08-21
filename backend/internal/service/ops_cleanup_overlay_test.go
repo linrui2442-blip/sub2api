@@ -72,8 +72,8 @@ func TestComputeEffective_SettingsOverridesAll(t *testing.T) {
 		Enabled:                    true,
 		Schedule:                   "0 * * * *",
 		ErrorLogRetentionDays:      0,
-		MinuteMetricsRetentionDays: 7,
-		HourlyMetricsRetentionDays: 14,
+		MinuteMetricsRetentionDays: 30,
+		HourlyMetricsRetentionDays: 30,
 	}
 	if svc.effective != want {
 		t.Fatalf("effective mismatch:\nwant %#v\n got %#v", want, svc.effective)

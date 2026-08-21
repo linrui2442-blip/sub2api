@@ -29,6 +29,7 @@ func TestAuthHandlerGetCurrentUserReturnsProfileCompatibilityFields(t *testing.T
 			AvatarURL:    "https://cdn.example.com/linuxdo.png",
 			AvatarSource: "remote_url",
 		},
+		avatar: &service.UserAvatar{URL: "https://cdn.example.com/linuxdo.png"},
 		identities: []service.UserAuthIdentityRecord{
 			{
 				ProviderType:    "linuxdo",

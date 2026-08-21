@@ -2473,45 +2473,21 @@ func validTimePricingForTest() *ChannelTimePricing {
 
 func TestValidatePricingTimePricing(t *testing.T) {
 	token := []ChannelModelPricing{{BillingMode: BillingModeToken, TimePricing: validTimePricingForTest()}}
-	require.NoError(t, validatePricingTimePricing(token))
+	tokenErr := infraerrors.FromError(validatePricingTimePricing(token))
+	require.Equal(t, int32(http.StatusBadRequest), tokenErr.Code)
+	require.Equal(t, "TIME_PRICING_REMOVED", tokenErr.Reason)
 
 	implicitToken := []ChannelModelPricing{{TimePricing: validTimePricingForTest()}}
-	require.NoError(t, validatePricingTimePricing(implicitToken))
+	implicitTokenErr := infraerrors.FromError(validatePricingTimePricing(implicitToken))
+	require.Equal(t, int32(http.StatusBadRequest), implicitTokenErr.Code)
+	require.Equal(t, "TIME_PRICING_REMOVED", implicitTokenErr.Reason)
 
 	image := []ChannelModelPricing{{BillingMode: BillingModeImage, TimePricing: validTimePricingForTest()}}
 	modeErr := infraerrors.FromError(validatePricingTimePricing(image))
 	require.Equal(t, int32(http.StatusBadRequest), modeErr.Code)
 	require.Equal(t, "TIME_PRICING_UNSUPPORTED_MODE", modeErr.Reason)
 
-	invalid := []ChannelModelPricing{{
-		Platform:    PlatformOpenAI,
-		Models:      []string{"gpt-5"},
-		BillingMode: BillingModeToken,
-		TimePricing: &ChannelTimePricing{Timezone: "UTC+8", Periods: validTimePricingForTest().Periods},
-	}}
-	invalidErr := infraerrors.FromError(validatePricingTimePricing(invalid))
-	require.Equal(t, int32(http.StatusBadRequest), invalidErr.Code)
-	require.Equal(t, "INVALID_TIME_PRICING", invalidErr.Reason)
-	require.Contains(t, invalidErr.Message, "platform 'openai'")
-	require.Contains(t, invalidErr.Message, "models [gpt-5]")
-
-	invalidMultiplier := []ChannelModelPricing{{
-		Platform:    PlatformOpenAI,
-		Models:      []string{"gpt-5"},
-		BillingMode: BillingModeToken,
-		TimePricing: &ChannelTimePricing{Timezone: "Asia/Shanghai", Periods: []ChannelTimePricingPeriod{{
-			StartTime: "09:00", EndTime: "12:00", Multiplier: 1e-12,
-		}}},
-	}}
-	invalidMultiplierRawErr := validatePricingTimePricing(invalidMultiplier)
-	require.Error(t, invalidMultiplierRawErr)
-	invalidMultiplierErr := infraerrors.FromError(invalidMultiplierRawErr)
-	require.Equal(t, int32(http.StatusBadRequest), invalidMultiplierErr.Code)
-	require.Equal(t, "INVALID_TIME_PRICING", invalidMultiplierErr.Reason)
-
-	empty := []ChannelModelPricing{{BillingMode: BillingModeToken, TimePricing: &ChannelTimePricing{Timezone: "Asia/Shanghai"}}}
-	require.NoError(t, validatePricingTimePricing(empty))
-	require.Nil(t, empty[0].TimePricing)
+	require.NoError(t, validatePricingTimePricing([]ChannelModelPricing{{BillingMode: BillingModeToken}}))
 }
 
 func TestValidateAccountStatsPricingRulesRejectsTimePricing(t *testing.T) {
