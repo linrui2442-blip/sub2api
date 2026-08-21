@@ -11,7 +11,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 	"github.com/google/wire"
 	"github.com/redis/go-redis/v9"
-	"go.uber.org/zap"
 )
 
 func ProvideGrokOAuthService(proxyRepo ProxyRepository, oauthClient GrokOAuthClient, cfg *config.Config, redisClient *redis.Client) *GrokOAuthService {
@@ -500,42 +499,6 @@ func ProvideAPIKeyAuthCacheInvalidator(apiKeyService *APIKeyService) APIKeyAuthC
 	return apiKeyService
 }
 
-// ProvideImageStorageSettingService 构造异步生图对象存储的后台设置服务。
-//
-// config.yaml 里的 image_storage 作为回落：后台从未保存过设置时沿用它，
-// 使升级前已通过配置文件开启该功能的部署不被打断。
-func ProvideImageStorageSettingService(
-	settingRepo SettingRepository,
-	encryptor SecretEncryptor,
-	backup *BackupService,
-	factory ImageStorageFactory,
-	cfg *config.Config,
-) *ImageStorageSettingService {
-	if cfg.ImageStorage.Enabled && !cfg.ImageStorage.Active() {
-		// 列出具体缺失的键。若这些键其实已在环境变量里设过，说明它们没被读进来，
-		// 请确认 setDefaults 中已为其注册默认值（见 config.setEnvReachableDefaults）。
-		logger.L().Warn("image_storage.enabled is true in config but object storage is not fully configured; configure it in the admin UI or complete the config file",
-			zap.Strings("missing_keys", cfg.ImageStorage.MissingCredentialKeys()))
-	}
-	return NewImageStorageSettingService(settingRepo, encryptor, backup, factory, cfg.ImageStorage)
-}
-
-// ProvideBackupService creates and starts BackupService
-func ProvideBackupService(
-	settingRepo SettingRepository,
-	cfg *config.Config,
-	encryptor SecretEncryptor,
-	storeFactory BackupObjectStoreFactory,
-	dumper DBDumper,
-	lockCache LeaderLockCache,
-	db *sql.DB,
-) *BackupService {
-	svc := NewBackupService(settingRepo, cfg, encryptor, storeFactory, dumper)
-	svc.SetLeaderLock(lockCache, db)
-	svc.Start()
-	return svc
-}
-
 // ProvideOpsService constructs OpsService and wires the SettingService-backed quota
 // auto-pause cache sink. Mirrors the SetCleanupReloader pattern: OpsService doesn't
 // hold a *SettingService reference, but wire injects a tiny callback so writes to
@@ -643,7 +606,6 @@ var ProviderSet = wire.NewSet(
 	NewProxyService,
 	NewUsageService,
 	NewDashboardService,
-	ProvideImageStorageSettingService,
 	NewOAuthService,
 	ProvideOpenAIOAuthService,
 	ProvideGrokOAuthService,
@@ -671,8 +633,6 @@ var ProviderSet = wire.NewSet(
 	ProvideAccountTestService,
 	ProvideOllamaCloudUsageService,
 	ProvideSettingService,
-	NewDataManagementService,
-	ProvideBackupService,
 	ProvideOpsSystemLogSink,
 	ProvideOpsService,
 	ProvideOpsIngressRejectAggregator,

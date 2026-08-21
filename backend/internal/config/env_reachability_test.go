@@ -49,8 +49,8 @@ func collectMapstructureKeys(t reflect.Type, prefix string, out map[string]strin
 	}
 }
 
-// TestConfigKeysAreEnvReachable is the systemic guard behind the image_storage
-// bug: viper.Unmarshal only decodes keys returned by AllKeys(), which unions
+// TestConfigKeysAreEnvReachable guards environment-backed configuration:
+// viper.Unmarshal only decodes keys returned by AllKeys(), which unions
 // SetDefault keys, config-file keys and explicit BindEnv keys. AutomaticEnv can
 // override a key already in that union but never introduces one, and the
 // viper_bind_struct escape hatch is compiled out (we build with -tags embed).
@@ -58,9 +58,6 @@ func collectMapstructureKeys(t reflect.Type, prefix string, out map[string]strin
 // So a Config field with no registered default is unreachable by environment
 // variable whenever the deployment has no config.yaml containing it — the
 // operator sets the variable, the loader discards it, and the feature behaves
-// as if it were never configured. That is exactly how image_storage credentials
-// were lost, silently disabling async image tasks for env-driven deployments.
-//
 // When this fails, register a zero-valued default in setEnvReachableDefaults
 // for each reported key.
 func TestConfigKeysAreEnvReachable(t *testing.T) {
