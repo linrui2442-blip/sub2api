@@ -148,21 +148,19 @@ type SystemSettings struct {
 	GoogleOAuthRedirectURL            string
 	GoogleOAuthFrontendRedirectURL    string
 
-	SiteName                    string
-	SiteLogo                    string
-	SiteSubtitle                string
-	APIBaseURL                  string
-	ContactInfo                 string
-	DocURL                      string
-	HomeContent                 string
-	CompactHomeEnabled          bool
-	HideCcsImportButton         bool
-	PurchaseSubscriptionEnabled bool
-	PurchaseSubscriptionURL     string
-	TableDefaultPageSize        int
-	TablePageSizeOptions        []int
-	CustomMenuItems             string // JSON array of custom menu items
-	CustomEndpoints             string // JSON array of custom endpoints
+	SiteName             string
+	SiteLogo             string
+	SiteSubtitle         string
+	APIBaseURL           string
+	ContactInfo          string
+	DocURL               string
+	HomeContent          string
+	CompactHomeEnabled   bool
+	HideCcsImportButton  bool
+	TableDefaultPageSize int
+	TablePageSizeOptions []int
+	CustomMenuItems      string // JSON array of custom menu items
+	CustomEndpoints      string // JSON array of custom endpoints
 
 	DefaultConcurrency          int
 	RiskControlEnabled          bool
@@ -298,12 +296,10 @@ type PublicSettings struct {
 	CompactHomeEnabled                  bool
 	HideCcsImportButton                 bool
 
-	PurchaseSubscriptionEnabled bool
-	PurchaseSubscriptionURL     string
-	TableDefaultPageSize        int
-	TablePageSizeOptions        []int
-	CustomMenuItems             string // JSON array of custom menu items
-	CustomEndpoints             string // JSON array of custom endpoints
+	TableDefaultPageSize int
+	TablePageSizeOptions []int
+	CustomMenuItems      string // JSON array of custom menu items
+	CustomEndpoints      string // JSON array of custom endpoints
 
 	LinuxDoOAuthEnabled      bool
 	DingTalkOAuthEnabled     bool
