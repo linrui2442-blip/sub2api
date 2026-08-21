@@ -140,15 +140,6 @@ const (
 	AccountTypeServiceAccount = domain.AccountTypeServiceAccount // Google Service Account 类型账号（用于 Vertex AI）
 )
 
-// Redeem type constants
-const (
-	RedeemTypeBalance          = domain.RedeemTypeBalance
-	RedeemTypeConcurrency      = domain.RedeemTypeConcurrency
-	RedeemTypeSubscription     = domain.RedeemTypeSubscription
-	RedeemTypeInvitation       = domain.RedeemTypeInvitation
-	RedeemTypeAffiliateBalance = "affiliate_balance"
-)
-
 // PromoCode status constants
 const (
 	PromoCodeStatusActive   = domain.PromoCodeStatusActive

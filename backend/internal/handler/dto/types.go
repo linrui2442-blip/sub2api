@@ -378,36 +378,6 @@ type ProxyAccountSummary struct {
 	Notes    *string `json:"notes,omitempty"`
 }
 
-type RedeemCode struct {
-	ID        int64      `json:"id"`
-	Code      string     `json:"code"`
-	Type      string     `json:"type"`
-	Value     float64    `json:"value"`
-	Status    string     `json:"status"`
-	UsedBy    *int64     `json:"used_by"`
-	UsedAt    *time.Time `json:"used_at"`
-	CreatedAt time.Time  `json:"created_at"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-
-	GroupID      *int64 `json:"group_id"`
-	ValidityDays int    `json:"validity_days"`
-
-	// Notes is only populated for admin_balance/admin_concurrency types
-	// so users can see why they were charged or credited
-	Notes *string `json:"notes,omitempty"`
-
-	User  *User  `json:"user,omitempty"`
-	Group *Group `json:"group,omitempty"`
-}
-
-// AdminRedeemCode 是管理员接口使用的 redeem code DTO（包含 notes 等字段）。
-// 注意：普通用户接口不得返回 notes 等内部信息。
-type AdminRedeemCode struct {
-	RedeemCode
-
-	Notes string `json:"notes"`
-}
-
 type NullableTimeField struct {
 	Set   bool
 	Value *time.Time
@@ -444,21 +414,6 @@ func (f *NullableInt64Field) UnmarshalJSON(data []byte) error {
 	}
 	f.Value = &value
 	return nil
-}
-
-type BatchUpdateRedeemCodeFields struct {
-	Status    *string            `json:"status,omitempty"`
-	ExpiresAt NullableTimeField  `json:"expires_at,omitempty"`
-	Notes     *string            `json:"notes,omitempty"`
-	GroupID   NullableInt64Field `json:"group_id,omitempty"`
-
-	Type  *string  `json:"type,omitempty"`
-	Value *float64 `json:"value,omitempty"`
-}
-
-type BatchUpdateRedeemCodesRequest struct {
-	IDs    []int64                     `json:"ids" binding:"required,min=1"`
-	Fields BatchUpdateRedeemCodeFields `json:"fields" binding:"required"`
 }
 
 // UsageLog 是普通用户接口使用的 usage log DTO（不包含管理员字段）。

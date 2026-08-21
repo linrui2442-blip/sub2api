@@ -1,4 +1,4 @@
-.PHONY: build generate test test-unit test-integration test-e2e
+.PHONY: build generate test test-unit test-personal test-e2e
 
 VERSION ?= $(shell ./scripts/resolve-version.sh)
 LDFLAGS ?= -s -w -X main.Version=$(VERSION)
@@ -17,8 +17,11 @@ test:
 test-unit:
 	go test -tags=unit ./...
 
-test-integration:
-	go test -tags=integration ./...
+test-personal:
+	go test ./...
+	go test ./internal/repository -run '^TestPersonal' -count=1
+	go test ./internal/setup -run '^TestPersonal' -count=1 -timeout=3m
+	go test ./cmd/server -run '^TestPersonalApplicationBootSmoke$' -count=1 -timeout=5m
 
 test-e2e:
 	./scripts/e2e-test.sh

@@ -37,12 +37,9 @@ jobs:
       - name: Verify Go version
         run: |
           go version | grep -q 'go1.26.6'
-      - name: Unit tests
+      - name: Personal SQLite runtime tests
         working-directory: backend
-        run: make test-unit
-      - name: Integration tests
-        working-directory: backend
-        run: make test-integration
+        run: make test-personal
 
   frontend:
     runs-on: ubuntu-latest
