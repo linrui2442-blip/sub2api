@@ -38,14 +38,6 @@ type User struct {
 	TotpEnabled         bool       // 是否启用 TOTP
 	TotpEnabledAt       *time.Time // TOTP 启用时间
 
-	// Deprecated compatibility fields. Personal runtime does not persist member
-	// balance notifications; these remain only while the legacy profile API is
-	// removed in a follow-up cleanup.
-	BalanceNotifyEnabled       bool
-	BalanceNotifyThresholdType string
-	BalanceNotifyThreshold     *float64
-	BalanceNotifyExtraEmails   []NotifyEmailEntry
-
 	// RPMLimit 用户级每分钟请求数上限（0 = 不限制）。仅在所用分组未设置 rpm_limit
 	// 且该 (用户, 分组) 无 rpm_override 时作为全局兜底生效，计数键 rpm:u:{userID}:{min}。
 	RPMLimit int

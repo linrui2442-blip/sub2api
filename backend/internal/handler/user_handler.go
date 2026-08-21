@@ -153,28 +153,6 @@ type SendEmailBindingCodeRequest struct {
 	Email string `json:"email" binding:"required,email"`
 }
 
-// SendNotifyEmailCodeRequest represents the request to send notify email verification code
-type SendNotifyEmailCodeRequest struct {
-	Email string `json:"email" binding:"required,email"`
-}
-
-// VerifyNotifyEmailRequest represents the request to verify and add notify email
-type VerifyNotifyEmailRequest struct {
-	Email string `json:"email" binding:"required,email"`
-	Code  string `json:"code" binding:"required,len=6"`
-}
-
-// RemoveNotifyEmailRequest represents the request to remove a notify email
-type RemoveNotifyEmailRequest struct {
-	Email string `json:"email" binding:"required,email"`
-}
-
-// ToggleNotifyEmailRequest represents the request to toggle a notify email's disabled state
-type ToggleNotifyEmailRequest struct {
-	Email    string `json:"email" binding:"required,email"`
-	Disabled bool   `json:"disabled"`
-}
-
 func (h *UserHandler) buildUserProfileResponse(ctx context.Context, userID int64, user *service.User) (userProfileResponse, error) {
 	identities, err := h.userService.GetProfileIdentitySummaries(ctx, userID, user)
 	if err != nil {
