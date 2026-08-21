@@ -34,8 +34,7 @@ type User struct {
 	// RPMLimit 用户级每分钟请求数上限（0 = 不限制），仅在所用分组未设置 rpm_limit 时作为兜底生效。
 	RPMLimit int `json:"rpm_limit"`
 
-	APIKeys       []APIKey           `json:"api_keys,omitempty"`
-	Subscriptions []UserSubscription `json:"subscriptions,omitempty"`
+	APIKeys []APIKey `json:"api_keys,omitempty"`
 }
 
 // AdminUser 是管理员接口使用的 user DTO（包含敏感/内部字段）。
@@ -434,8 +433,7 @@ type UsageLog struct {
 	// UpstreamEndpoint is the normalized upstream endpoint path, e.g. /v1/responses.
 	UpstreamEndpoint *string `json:"upstream_endpoint,omitempty"`
 
-	GroupID        *int64 `json:"group_id"`
-	SubscriptionID *int64 `json:"subscription_id"`
+	GroupID *int64 `json:"group_id"`
 
 	InputTokens         int `json:"input_tokens"`
 	OutputTokens        int `json:"output_tokens"`
@@ -490,10 +488,9 @@ type UsageLog struct {
 
 	CreatedAt time.Time `json:"created_at"`
 
-	User         *User             `json:"user,omitempty"`
-	APIKey       *APIKey           `json:"api_key,omitempty"`
-	Group        *Group            `json:"group,omitempty"`
-	Subscription *UserSubscription `json:"subscription,omitempty"`
+	User   *User   `json:"user,omitempty"`
+	APIKey *APIKey `json:"api_key,omitempty"`
+	Group  *Group  `json:"group,omitempty"`
 }
 
 // AdminUsageLog 是管理员接口使用的 usage log DTO（包含管理员字段）。
@@ -567,51 +564,4 @@ type Setting struct {
 	Key       string    `json:"key"`
 	Value     string    `json:"value"`
 	UpdatedAt time.Time `json:"updated_at"`
-}
-
-type UserSubscription struct {
-	ID      int64 `json:"id"`
-	UserID  int64 `json:"user_id"`
-	GroupID int64 `json:"group_id"`
-
-	StartsAt  time.Time `json:"starts_at"`
-	ExpiresAt time.Time `json:"expires_at"`
-	Status    string    `json:"status"`
-
-	DailyWindowStart   *time.Time `json:"daily_window_start"`
-	WeeklyWindowStart  *time.Time `json:"weekly_window_start"`
-	MonthlyWindowStart *time.Time `json:"monthly_window_start"`
-
-	DailyUsageUSD   float64 `json:"daily_usage_usd"`
-	WeeklyUsageUSD  float64 `json:"weekly_usage_usd"`
-	MonthlyUsageUSD float64 `json:"monthly_usage_usd"`
-
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	RevokedAt *time.Time `json:"revoked_at,omitempty"`
-
-	User  *User  `json:"user,omitempty"`
-	Group *Group `json:"group,omitempty"`
-}
-
-// AdminUserSubscription 是管理员接口使用的订阅 DTO（包含分配信息/备注等字段）。
-// 注意：普通用户接口不得返回 assigned_by/assigned_at/notes/assigned_by_user 等管理员字段。
-type AdminUserSubscription struct {
-	UserSubscription
-
-	AssignedBy *int64    `json:"assigned_by"`
-	AssignedAt time.Time `json:"assigned_at"`
-	Notes      string    `json:"notes"`
-
-	AssignedByUser *User `json:"assigned_by_user,omitempty"`
-}
-
-type BulkAssignResult struct {
-	SuccessCount  int                     `json:"success_count"`
-	CreatedCount  int                     `json:"created_count"`
-	ReusedCount   int                     `json:"reused_count"`
-	FailedCount   int                     `json:"failed_count"`
-	Subscriptions []AdminUserSubscription `json:"subscriptions"`
-	Errors        []string                `json:"errors"`
-	Statuses      map[string]string       `json:"statuses,omitempty"`
 }
