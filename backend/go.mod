@@ -12,8 +12,6 @@ require (
 	github.com/alitto/pond/v2 v2.6.2
 	github.com/andybalholm/brotli v1.2.0
 	github.com/aws/aws-sdk-go-v2 v1.41.5
-	github.com/aws/aws-sdk-go-v2/config v1.32.10
-	github.com/aws/aws-sdk-go-v2/credentials v1.19.10
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/coder/websocket v1.8.14
 	github.com/dgraph-io/ristretto v0.2.0
@@ -33,16 +31,13 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/shirou/gopsutil/v4 v4.25.6
 	github.com/shopspring/decimal v1.4.0
-	github.com/smartwalle/alipay/v3 v3.2.29
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.11.1
-	github.com/stripe/stripe-go/v85 v85.0.0
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/captcha v1.3.52
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.3.52
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/sjson v1.2.5
 	github.com/tiktoken-go/tokenizer v0.8.0
-	github.com/wechatpay-apiv3/wechatpay-go v0.2.21
 	github.com/zeromicro/go-zero v1.9.4
 	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.53.0
