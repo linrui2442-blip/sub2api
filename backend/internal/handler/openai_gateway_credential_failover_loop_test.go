@@ -664,37 +664,6 @@ func TestResponsesGrok429FailoverHandlesMixedStatuses(t *testing.T) {
 	})
 }
 
-func TestGrokMedia429FailoverIsBounded(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	t.Run("first 429 selects one healthy followup", func(t *testing.T) {
-		_, _, upstream, router, cleanup := newGrokCredentialFailoverHandler(t, "first_429")
-		defer cleanup()
-		recorder := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/openai/v1/videos/generations", bytes.NewBufferString(`{"model":"grok-imagine-video","prompt":"waves"}`))
-		req.Header.Set("Content-Type", "application/json")
-
-		router.ServeHTTP(recorder, req)
-
-		require.Equal(t, http.StatusOK, recorder.Code, recorder.Body.String())
-		require.Equal(t, []int64{801, 802}, upstream.accountHits())
-	})
-
-	t.Run("second 429 stops without sweeping a third account", func(t *testing.T) {
-		_, _, upstream, router, cleanup := newGrokCredentialFailoverHandler(t, "all_429")
-		defer cleanup()
-		recorder := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/openai/v1/videos/generations", bytes.NewBufferString(`{"model":"grok-imagine-video","prompt":"waves"}`))
-		req.Header.Set("Content-Type", "application/json")
-
-		router.ServeHTTP(recorder, req)
-
-		require.Equal(t, http.StatusTooManyRequests, recorder.Code, recorder.Body.String())
-		require.Equal(t, []int64{801, 802}, upstream.accountHits())
-		require.NotContains(t, recorder.Body.String(), "rate limited")
-	})
-}
-
 func TestGrokOAuthCredentialFailoverAcrossHTTPHandlers(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	endpoints := []struct {
@@ -923,21 +892,19 @@ func newGrokCredentialFailoverHandler(t *testing.T, mode string) (*OpenAIGateway
 	}
 	cfg := &config.Config{RunMode: config.RunModeSimple}
 	cfg.Gateway.MaxAccountSwitches = 3
-	billingCache := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
 	gateway := service.NewOpenAIGatewayService(
-		repo, nil, nil, nil, nil, nil, nil, cfg, nil, nil,
-		service.NewBillingService(cfg, nil), nil, billingCache, upstream,
-		&service.DeferredService{}, nil, provider, nil, nil, nil, nil, nil,
+		repo, nil, nil, nil, nil, cfg, nil, nil, nil, upstream,
+		&service.DeferredService{}, nil, provider, nil, nil,
 	)
 	cache := &concurrencyCacheMock{
 		acquireUserSlotFn:    func(context.Context, int64, int, string) (bool, error) { return true, nil },
 		acquireAccountSlotFn: func(context.Context, int64, int, string) (bool, error) { return true, nil },
 	}
-	h := NewOpenAIGatewayHandler(gateway, service.NewConcurrencyService(cache), billingCache, &service.APIKeyService{}, nil, nil, nil, nil, cfg)
+	h := NewOpenAIGatewayHandler(gateway, service.NewConcurrencyService(cache), nil, &service.APIKeyService{}, nil, nil, nil, cfg)
 	apiKey := &service.APIKey{
 		ID: 902, GroupID: &groupID,
 		User:  &service.User{ID: 903, Status: service.StatusActive},
-		Group: &service.Group{ID: groupID, Platform: service.PlatformGrok, Status: service.StatusActive, AllowImageGeneration: true},
+		Group: &service.Group{ID: groupID, Platform: service.PlatformGrok, Status: service.StatusActive},
 	}
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
@@ -949,12 +916,9 @@ func newGrokCredentialFailoverHandler(t *testing.T, mode string) (*OpenAIGateway
 	router.GET("/openai/v1/responses", h.ResponsesWebSocket)
 	router.POST("/openai/v1/messages", h.Messages)
 	router.POST("/openai/v1/chat/completions", h.ChatCompletions)
-	router.POST("/openai/v1/videos/generations", h.GrokVideoGeneration)
-	router.GET("/openai/v1/videos/:request_id", h.GrokVideoStatus)
 	handlerRefresherStarted.Store(router, refresher.started)
 	cleanup := func() {
 		handlerRefresherStarted.Delete(router)
-		billingCache.Stop()
 	}
 	return h, repo, upstream, router, cleanup
 }

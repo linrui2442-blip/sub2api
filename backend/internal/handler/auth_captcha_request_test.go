@@ -50,33 +50,9 @@ func TestAuthRequestsBindTencentCaptchaProof(t *testing.T) {
 			},
 		},
 		{
-			name: "OAuth启动",
-			decode: func(raw []byte) service.CaptchaProof {
-				var req oauthStartCaptchaRequest
-				require.NoError(t, json.Unmarshal(raw, &req))
-				return captchaProof(req.TurnstileToken, req.TencentCaptchaTicket, req.TencentCaptchaRandstr)
-			},
-		},
-		{
 			name: "Passkey登录",
 			decode: func(raw []byte) service.CaptchaProof {
 				var req passkeyBeginLoginRequest
-				require.NoError(t, json.Unmarshal(raw, &req))
-				return captchaProof(req.TurnstileToken, req.TencentCaptchaTicket, req.TencentCaptchaRandstr)
-			},
-		},
-		{
-			name: "OAuth待处理账号发送邮箱验证码",
-			decode: func(raw []byte) service.CaptchaProof {
-				var req sendPendingOAuthVerifyCodeRequest
-				require.NoError(t, json.Unmarshal(raw, &req))
-				return captchaProof(req.TurnstileToken, req.TencentCaptchaTicket, req.TencentCaptchaRandstr)
-			},
-		},
-		{
-			name: "OAuth待处理账号创建",
-			decode: func(raw []byte) service.CaptchaProof {
-				var req createPendingOAuthAccountRequest
 				require.NoError(t, json.Unmarshal(raw, &req))
 				return captchaProof(req.TurnstileToken, req.TencentCaptchaTicket, req.TencentCaptchaRandstr)
 			},

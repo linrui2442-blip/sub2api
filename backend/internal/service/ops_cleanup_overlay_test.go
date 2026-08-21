@@ -53,11 +53,9 @@ func TestComputeEffective_FallbackToCfgWhenSettingsAbsent(t *testing.T) {
 func TestComputeEffective_SettingsOverridesAll(t *testing.T) {
 	repo := newRuntimeSettingRepoStub()
 	writeAdvancedSettings(t, repo, OpsDataRetentionSettings{
-		CleanupEnabled:             true,
-		CleanupSchedule:            "0 * * * *",
-		ErrorLogRetentionDays:      0,
-		MinuteMetricsRetentionDays: 7,
-		HourlyMetricsRetentionDays: 14,
+		CleanupEnabled:        true,
+		CleanupSchedule:       "0 * * * *",
+		ErrorLogRetentionDays: 0,
 	})
 	base := config.OpsCleanupConfig{
 		Enabled:                    false,
@@ -85,11 +83,9 @@ func TestComputeEffective_SettingsOverridesAll(t *testing.T) {
 func TestComputeEffective_EmptyScheduleFallbackToCfg(t *testing.T) {
 	repo := newRuntimeSettingRepoStub()
 	writeAdvancedSettings(t, repo, OpsDataRetentionSettings{
-		CleanupEnabled:             true,
-		CleanupSchedule:            "   ", // 空白被 trim 后视为空
-		ErrorLogRetentionDays:      5,
-		MinuteMetricsRetentionDays: 5,
-		HourlyMetricsRetentionDays: 5,
+		CleanupEnabled:        true,
+		CleanupSchedule:       "   ", // 空白被 trim 后视为空
+		ErrorLogRetentionDays: 5,
 	})
 	base := config.OpsCleanupConfig{
 		Enabled:                    false,
@@ -116,11 +112,9 @@ func TestComputeEffective_EmptyScheduleFallbackToCfg(t *testing.T) {
 func TestComputeEffective_NegativeRetentionFallsBackToCfg(t *testing.T) {
 	repo := newRuntimeSettingRepoStub()
 	writeAdvancedSettings(t, repo, OpsDataRetentionSettings{
-		CleanupEnabled:             true,
-		CleanupSchedule:            "0 * * * *",
-		ErrorLogRetentionDays:      -1,
-		MinuteMetricsRetentionDays: -1,
-		HourlyMetricsRetentionDays: -1,
+		CleanupEnabled:        true,
+		CleanupSchedule:       "0 * * * *",
+		ErrorLogRetentionDays: -1,
 	})
 	base := config.OpsCleanupConfig{
 		Enabled:                    false,
@@ -133,9 +127,7 @@ func TestComputeEffective_NegativeRetentionFallsBackToCfg(t *testing.T) {
 
 	svc.computeEffectiveLocked(context.Background())
 
-	if svc.effective.ErrorLogRetentionDays != 30 ||
-		svc.effective.MinuteMetricsRetentionDays != 60 ||
-		svc.effective.HourlyMetricsRetentionDays != 90 {
+	if svc.effective.ErrorLogRetentionDays != 30 {
 		t.Fatalf("expected retention fallback to cfg, got %#v", svc.effective)
 	}
 }
@@ -184,8 +176,6 @@ func TestUpdateOpsAdvancedSettings_TriggersReload(t *testing.T) {
 	cfg.DataRetention.CleanupEnabled = true
 	cfg.DataRetention.CleanupSchedule = "0 * * * *"
 	cfg.DataRetention.ErrorLogRetentionDays = 3
-	cfg.DataRetention.MinuteMetricsRetentionDays = 3
-	cfg.DataRetention.HourlyMetricsRetentionDays = 3
 
 	if _, err := svc.UpdateOpsAdvancedSettings(context.Background(), cfg); err != nil {
 		t.Fatalf("update: %v", err)

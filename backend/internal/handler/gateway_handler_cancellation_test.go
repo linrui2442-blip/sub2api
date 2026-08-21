@@ -39,19 +39,13 @@ func TestGatewayHandlerPreCancelledCompatibleRequestsDoNotSelectAccount(t *testi
 	}
 	schedulerCache := &countingGatewaySchedulerCache{fakeSchedulerCache: &fakeSchedulerCache{accounts: []*service.Account{account}}}
 	schedulerSnapshot := service.NewSchedulerSnapshotService(schedulerCache, nil, nil, nil, nil)
-	gatewayService := service.NewGatewayService(
-		nil, &fakeGroupRepo{group: group}, nil, nil, nil, nil, nil, nil, nil,
-		schedulerSnapshot, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
-	)
+	gatewayService := service.NewGatewayService(nil, &fakeGroupRepo{group: group}, nil, nil, nil, nil, nil, schedulerSnapshot, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	cfg := &config.Config{RunMode: config.RunModeSimple}
-	billingCacheService := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
-	t.Cleanup(billingCacheService.Stop)
 	h := &GatewayHandler{
-		gatewayService:      gatewayService,
-		billingCacheService: billingCacheService,
-		concurrencyHelper:   NewConcurrencyHelper(service.NewConcurrencyService(&fakeConcurrencyCache{}), SSEPingFormatClaude, 0),
-		maxAccountSwitches:  1,
-		cfg:                 cfg,
+		gatewayService:     gatewayService,
+		concurrencyHelper:  NewConcurrencyHelper(service.NewConcurrencyService(&fakeConcurrencyCache{}), SSEPingFormatClaude, 0),
+		maxAccountSwitches: 1,
+		cfg:                cfg,
 	}
 	apiKey := &service.APIKey{
 		ID: 9102, UserID: 9103, GroupID: &groupID, Group: group, Status: service.StatusActive,

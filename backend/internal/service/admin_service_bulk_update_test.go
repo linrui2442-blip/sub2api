@@ -5,7 +5,6 @@ package service
 import (
 	"context"
 	"errors"
-	"net/http"
 	"reflect"
 	"testing"
 

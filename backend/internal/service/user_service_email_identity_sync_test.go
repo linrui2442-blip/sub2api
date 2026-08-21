@@ -19,7 +19,7 @@ func TestUpdateProfile_DoesNotReturnPartialSuccessFromEmailIdentityResync(t *tes
 		},
 		replaceErr: context.DeadlineExceeded,
 	}
-	svc := NewUserService(repo, nil, nil, nil)
+	svc := NewUserService(repo, nil, nil)
 
 	newEmail := "profile-after@example.com"
 	updated, err := svc.UpdateProfile(context.Background(), 19, UpdateProfileRequest{

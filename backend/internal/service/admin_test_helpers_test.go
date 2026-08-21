@@ -6,6 +6,12 @@ import "context"
 
 func int64Ptr(value int64) *int64 { return &value }
 
+func ptrInt64(value int64) *int64 { return &value }
+
+func boolPtr(value bool) *bool { return &value }
+
+func float64Ptr(value float64) *float64 { return &value }
+
 // authCacheInvalidatorStub records only the Personal API-key cache invalidation
 // contract used by administrative account and group tests.
 type authCacheInvalidatorStub struct {

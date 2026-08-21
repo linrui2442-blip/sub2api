@@ -69,7 +69,6 @@ func duplicateGroupHandlerFixture() *service.Group {
 		Name:                 "primary (Copy)",
 		Platform:             service.PlatformAnthropic,
 		Status:               "inactive",
-		RateMultiplier:       1,
 		AccountCount:         3,
 		ActiveAccountCount:   2,
 		DuplicateOperationID: "internal-operation-must-not-leak",

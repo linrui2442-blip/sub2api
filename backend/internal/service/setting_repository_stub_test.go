@@ -7,8 +7,10 @@ import "context"
 // settingRepoStub provides deterministic settings reads for authentication and
 // owner-management unit tests without restoring any backup or billing fixture.
 type settingRepoStub struct {
-	values map[string]string
-	err    error
+	values           map[string]string
+	err              error
+	getValueCalls    int
+	getMultipleCalls int
 }
 
 func (s *settingRepoStub) Get(_ context.Context, key string) (*Setting, error) {
@@ -23,6 +25,7 @@ func (s *settingRepoStub) Get(_ context.Context, key string) (*Setting, error) {
 }
 
 func (s *settingRepoStub) GetValue(_ context.Context, key string) (string, error) {
+	s.getValueCalls++
 	if s.err != nil {
 		return "", s.err
 	}
@@ -41,6 +44,7 @@ func (s *settingRepoStub) Set(_ context.Context, key, value string) error {
 }
 
 func (s *settingRepoStub) GetMultiple(_ context.Context, keys []string) (map[string]string, error) {
+	s.getMultipleCalls++
 	if s.err != nil {
 		return nil, s.err
 	}

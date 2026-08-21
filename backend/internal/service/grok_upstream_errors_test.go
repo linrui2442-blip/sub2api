@@ -208,38 +208,6 @@ func TestGrokContentPolicy403SharedErrorFallbackDoesNotMutate(t *testing.T) {
 	require.Zero(t, repo.updateCalls)
 }
 
-func TestGrokContentPolicy403MediaResponseBypassesCustomErrorCodes(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	body := `{"error":{"code":"new_sensitive","message":"image is sensitive"}}`
-	repo := &grokQuotaAccountRepo{}
-	svc := &OpenAIGatewayService{accountRepo: repo}
-	account := &Account{
-		ID:       4720,
-		Platform: PlatformGrok,
-		Type:     AccountTypeOAuth,
-		Credentials: map[string]any{
-			"custom_error_codes_enabled": true,
-			"custom_error_codes":         []any{float64(http.StatusTooManyRequests)},
-		},
-	}
-	recorder := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(recorder)
-	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
-	resp := &http.Response{
-		StatusCode: http.StatusForbidden,
-		Header:     http.Header{"Content-Type": []string{"application/json"}},
-		Body:       io.NopCloser(strings.NewReader(body)),
-	}
-
-	_, err := svc.handleGrokMediaErrorResponse(context.Background(), resp, c, account, "request-id", "grok-imagine")
-	require.Error(t, err)
-	require.Equal(t, http.StatusForbidden, recorder.Code)
-	require.Contains(t, recorder.Body.String(), "invalid_request_error")
-	require.Zero(t, repo.tempUnschedCalls)
-	require.Zero(t, repo.rateLimitedCalls)
-	require.Zero(t, repo.updateCalls)
-}
-
 func TestGrokContentPolicySSEErrorDoesNotMutateOrFailover(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := &grokQuotaAccountRepo{}

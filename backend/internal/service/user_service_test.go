@@ -12,7 +12,6 @@ import (
 	"image"
 	"image/png"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -330,7 +329,7 @@ func TestGetProfileIdentitySummaries_AllowsUnbindWhenAnotherLoginMethodRemains(t
 			},
 		},
 	}
-	svc := NewUserService(repo, nil, nil, nil)
+	svc := NewUserService(repo, nil, nil)
 
 	summaries, err := svc.GetProfileIdentitySummaries(context.Background(), 7, repo.getByIDUser)
 
@@ -355,7 +354,7 @@ func TestUnbindUserAuthProviderRejectsLastRemainingLoginMethod(t *testing.T) {
 			},
 		},
 	}
-	svc := NewUserService(repo, nil, nil, nil)
+	svc := NewUserService(repo, nil, nil)
 
 	_, err := svc.UnbindUserAuthProvider(context.Background(), 9, "linuxdo")
 
@@ -378,7 +377,7 @@ func TestGetProfileIdentitySummaries_DoesNotTreatOAuthOnlyCompatEmailAsAlternati
 			},
 		},
 	}
-	svc := NewUserService(repo, nil, nil, nil)
+	svc := NewUserService(repo, nil, nil)
 
 	summaries, err := svc.GetProfileIdentitySummaries(context.Background(), 10, repo.getByIDUser)
 
@@ -414,7 +413,7 @@ func TestGetProfileIdentitySummaries_DoesNotTreatCompatBackfilledEmailIdentityAs
 			},
 		},
 	}
-	svc := NewUserService(repo, nil, nil, nil)
+	svc := NewUserService(repo, nil, nil)
 
 	summaries, err := svc.GetProfileIdentitySummaries(context.Background(), 11, repo.getByIDUser)
 
@@ -447,7 +446,7 @@ func TestUnbindUserAuthProviderRemovesProviderAndReturnsUpdatedProfile(t *testin
 		},
 	}
 	invalidator := &mockAuthCacheInvalidator{}
-	svc := NewUserService(repo, nil, invalidator, nil)
+	svc := NewUserService(repo, nil, invalidator)
 
 	user, err := svc.UnbindUserAuthProvider(context.Background(), 12, "linuxdo")
 
@@ -481,7 +480,7 @@ func TestGetProfileIdentitySummaries_HidesBindActionWhenProviderExplicitlyDisabl
 			SettingKeyLinuxDoConnectEnabled: "false",
 		},
 	}
-	svc := NewUserService(repo, settingRepo, nil, nil)
+	svc := NewUserService(repo, settingRepo, nil)
 
 	summaries, err := svc.GetProfileIdentitySummaries(context.Background(), 15, repo.getByIDUser)
 
@@ -505,7 +504,7 @@ func TestGetProfileIdentitySummaries_UsesBindStartRoute(t *testing.T) {
 			},
 		},
 	}
-	svc := NewUserService(repo, nil, nil, nil)
+	svc := NewUserService(repo, nil, nil)
 
 	summaries, err := svc.GetProfileIdentitySummaries(context.Background(), 16, repo.getByIDUser)
 
@@ -535,7 +534,7 @@ func TestTouchLastActive_UpdatesWhenStale(t *testing.T) {
 			LastActiveAt: &stale,
 		},
 	}
-	svc := NewUserService(repo, nil, nil, nil)
+	svc := NewUserService(repo, nil, nil)
 
 	svc.TouchLastActive(context.Background(), 42)
 
@@ -552,7 +551,7 @@ func TestTouchLastActive_SkipsWhenRecent(t *testing.T) {
 			LastActiveAt: &recent,
 		},
 	}
-	svc := NewUserService(repo, nil, nil, nil)
+	svc := NewUserService(repo, nil, nil)
 
 	svc.TouchLastActive(context.Background(), 42)
 
@@ -571,7 +570,7 @@ func TestUpdateProfile_StoresInlineAvatarWithinLimit(t *testing.T) {
 			Username: "avatar-user",
 		},
 	}
-	svc := NewUserService(repo, nil, nil, nil)
+	svc := NewUserService(repo, nil, nil)
 
 	updated, err := svc.UpdateProfile(context.Background(), 7, UpdateProfileRequest{
 		AvatarURL: &dataURL,
@@ -622,7 +621,7 @@ func TestUpdateProfile_CompressesInlineAvatarToTwentyKilobytes(t *testing.T) {
 			Username: "avatar-compress",
 		},
 	}
-	svc := NewUserService(repo, nil, nil, nil)
+	svc := NewUserService(repo, nil, nil)
 
 	updated, err := svc.UpdateProfile(context.Background(), 17, UpdateProfileRequest{
 		AvatarURL: &dataURL,
@@ -650,7 +649,7 @@ func TestUpdateProfile_RejectsInlineAvatarOverLimit(t *testing.T) {
 			Username: "too-large",
 		},
 	}
-	svc := NewUserService(repo, nil, nil, nil)
+	svc := NewUserService(repo, nil, nil)
 
 	_, err := svc.UpdateProfile(context.Background(), 8, UpdateProfileRequest{
 		AvatarURL: &dataURL,
@@ -670,7 +669,7 @@ func TestUpdateProfile_StoresRemoteAvatarURL(t *testing.T) {
 			Username: "remote-avatar",
 		},
 	}
-	svc := NewUserService(repo, nil, nil, nil)
+	svc := NewUserService(repo, nil, nil)
 
 	updated, err := svc.UpdateProfile(context.Background(), 9, UpdateProfileRequest{
 		AvatarURL: &remoteURL,
@@ -695,7 +694,7 @@ func TestUpdateProfile_DeletesAvatarOnEmptyString(t *testing.T) {
 			AvatarSource: "remote_url",
 		},
 	}
-	svc := NewUserService(repo, nil, nil, nil)
+	svc := NewUserService(repo, nil, nil)
 
 	updated, err := svc.UpdateProfile(context.Background(), 10, UpdateProfileRequest{
 		AvatarURL: &empty,
@@ -719,7 +718,7 @@ func TestUpdateProfile_RollsBackAvatarMutationWhenUserUpdateFails(t *testing.T) 
 			return errors.New("write user failed")
 		},
 	}
-	svc := NewUserService(repo, nil, nil, nil)
+	svc := NewUserService(repo, nil, nil)
 
 	remoteURL := "https://cdn.example.com/new.png"
 	_, err := svc.UpdateProfile(context.Background(), 11, UpdateProfileRequest{
@@ -748,7 +747,7 @@ func TestGetProfile_HydratesAvatarFromRepository(t *testing.T) {
 			}, nil
 		},
 	}
-	svc := NewUserService(repo, nil, nil, nil)
+	svc := NewUserService(repo, nil, nil)
 
 	user, err := svc.GetProfile(context.Background(), 12)
 	require.NoError(t, err)

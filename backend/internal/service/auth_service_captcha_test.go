@@ -11,6 +11,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type turnstileVerifierSpy struct {
+	called int
+	err    error
+}
+
+func (s *turnstileVerifierSpy) VerifyToken(_ context.Context, _, _, _ string) (*TurnstileVerifyResponse, error) {
+	s.called++
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &TurnstileVerifyResponse{Success: true}, nil
+}
+
 func newAuthServiceForCaptchaRepoTest(repo *settingRepoStub, required bool, turnstileVerifier TurnstileVerifier, tencentVerifier TencentCaptchaVerifier) *AuthService {
 	cfg := &config.Config{
 		Server:    config.ServerConfig{Mode: "release"},
@@ -19,7 +32,7 @@ func newAuthServiceForCaptchaRepoTest(repo *settingRepoStub, required bool, turn
 	settingService := NewSettingService(repo, cfg)
 	turnstileService := NewTurnstileService(settingService, turnstileVerifier)
 	tencentService := NewTencentCaptchaService(settingService, tencentVerifier)
-	svc := NewAuthService(nil, &userRepoStub{}, nil, nil, cfg, settingService, nil, turnstileService, nil, nil, nil, nil, nil)
+	svc := NewAuthService(nil, &userRepoStub{}, nil, cfg, settingService, turnstileService)
 	svc.SetTencentCaptchaService(tencentService)
 	return svc
 }
@@ -34,7 +47,7 @@ func newAuthServiceForCaptchaTest(settings map[string]string, required bool, tur
 	if turnstileVerifier != nil {
 		turnstileService = NewTurnstileService(settingService, turnstileVerifier)
 	}
-	svc := NewAuthService(nil, &userRepoStub{}, nil, nil, cfg, settingService, nil, turnstileService, nil, nil, nil, nil, nil)
+	svc := NewAuthService(nil, &userRepoStub{}, nil, cfg, settingService, turnstileService)
 	if tencentVerifier != nil {
 		svc.SetTencentCaptchaService(NewTencentCaptchaService(settingService, tencentVerifier))
 	}
@@ -93,18 +106,6 @@ func TestVerifyCaptchaRequiredModeAcceptsCompleteTencentProvider(t *testing.T) {
 	}, "203.0.113.10")
 
 	require.NoError(t, err)
-}
-
-func TestVerifyCaptchaForRegisterSkipsDuplicateTencentTicketAfterEmailCode(t *testing.T) {
-	settings := tencentCaptchaSettings()
-	settings[SettingKeyEmailVerifyEnabled] = "true"
-	verifier := &tencentCaptchaVerifierStub{response: &TencentCaptchaVerifyResponse{CaptchaCode: 1}}
-	svc := newAuthServiceForCaptchaTest(settings, true, nil, verifier)
-
-	err := svc.VerifyCaptchaForRegister(context.Background(), CaptchaProof{}, "203.0.113.10", "123456")
-
-	require.NoError(t, err)
-	require.Zero(t, verifier.calls)
 }
 
 func TestVerifyCaptchaFailsClosedWhenProviderSettingsCannotBeRead(t *testing.T) {

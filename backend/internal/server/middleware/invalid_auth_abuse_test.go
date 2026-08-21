@@ -32,11 +32,11 @@ func TestAPIKeyAuthInvalidAbuseReturns429BeforeRepository(t *testing.T) {
 		return nil, service.ErrAPIKeyNotFound
 	}}
 	cfg := invalidAuthAbuseTestConfig(3)
-	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
+	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, cfg)
 	r := gin.New()
 	var reason IngressRejectReason
 	r.Use(func(c *gin.Context) { c.Next(); reason, _ = GetIngressRejectReason(c) })
-	r.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(svc, nil, cfg)))
+	r.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(svc, cfg)))
 	r.POST("/v1/messages", func(c *gin.Context) { c.Status(http.StatusOK) })
 
 	requests := []*http.Request{
@@ -62,12 +62,12 @@ func TestAPIKeyAuthInvalidAbuseReturns429BeforeRepository(t *testing.T) {
 func TestGoogleAPIKeyAuthInvalidAbuseReturnsProtocol429(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repoCalls := 0
-	repo := fakeAPIKeyRepo{getByKey: func(context.Context, string) (*service.APIKey, error) {
+	repo := &fakeAPIKeyRepo{getByKey: func(context.Context, string) (*service.APIKey, error) {
 		repoCalls++
 		return nil, service.ErrAPIKeyNotFound
 	}}
 	cfg := invalidAuthAbuseTestConfig(2)
-	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
+	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, cfg)
 	r := gin.New()
 	var reason IngressRejectReason
 	r.Use(func(c *gin.Context) { c.Next(); reason, _ = GetIngressRejectReason(c) })
@@ -107,9 +107,9 @@ func TestInvalidAuthAbuseDoesNotCountValidOrOperationalFailures(t *testing.T) {
 		}
 	}}
 	cfg := invalidAuthAbuseTestConfig(10)
-	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, nil, cfg)
+	svc := service.NewAPIKeyService(repo, nil, nil, nil, nil, cfg)
 	r := gin.New()
-	r.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(svc, nil, cfg)))
+	r.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(svc, cfg)))
 	r.POST("/t", func(c *gin.Context) { c.Status(http.StatusOK) })
 
 	for _, tc := range []struct {
