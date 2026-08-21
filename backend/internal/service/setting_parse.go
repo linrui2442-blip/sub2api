@@ -18,8 +18,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 )
 
-const maxLegacySubscriptionValidityDays = 36500
-
 // InitializeDefaultSettings 初始化默认设置
 func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 	// 检查是否已有设置

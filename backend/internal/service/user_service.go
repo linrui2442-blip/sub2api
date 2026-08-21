@@ -637,40 +637,6 @@ func (s *UserService) buildEmailIdentitySummary(user *User, records []UserAuthId
 	return summary
 }
 
-func (s *UserService) buildProviderIdentitySummary(provider string, user *User, records []UserAuthIdentityRecord) UserIdentitySummary {
-	summary := UserIdentitySummary{
-		Provider:  provider,
-		CanUnbind: false,
-	}
-	filtered := filterUserAuthIdentities(records, provider)
-	if len(filtered) == 0 {
-		summary.CanBind = true
-		bindStartPath, err := buildUserIdentityBindAuthorizeURL(provider, "")
-		if err == nil {
-			summary.BindStartPath = bindStartPath
-		}
-		return summary
-	}
-
-	primary := selectPrimaryUserAuthIdentity(filtered)
-	summary.Bound = true
-	summary.BoundCount = len(filtered)
-	summary.DisplayName = userAuthIdentityDisplayName(primary)
-	summary.AvatarURL = strings.TrimSpace(firstStringIdentityValue(primary.Metadata, "avatar_url", "suggested_avatar_url", "headimgurl"))
-	summary.SubjectHint = maskOpaqueIdentity(primary.ProviderSubject)
-	summary.ProviderKey = strings.TrimSpace(primary.ProviderKey)
-	summary.VerifiedAt = primary.VerifiedAt
-	summary.CanUnbind = s.canUnbindProvider(provider, user, records)
-	if summary.CanUnbind {
-		summary.NoteKey = userIdentityNoteCanUnbind
-		summary.Note = "You can unbind this sign-in method."
-	} else {
-		summary.NoteKey = userIdentityNoteBindAnotherBeforeUnbind
-		summary.Note = "Bind another sign-in method before unbinding."
-	}
-	return summary
-}
-
 func (s *UserService) canUnbindProvider(provider string, user *User, records []UserAuthIdentityRecord) bool {
 	if provider == "" || provider == "email" || len(filterUserAuthIdentities(records, provider)) == 0 {
 		return false
@@ -835,23 +801,6 @@ func userAuthIdentitySortTime(record UserAuthIdentityRecord) time.Time {
 		return record.CreatedAt.UTC()
 	}
 	return time.Time{}
-}
-
-func userAuthIdentityDisplayName(record UserAuthIdentityRecord) string {
-	if displayName := firstStringIdentityValue(record.Metadata,
-		"display_name",
-		"suggested_display_name",
-		"username",
-		"name",
-		"nickname",
-		"email",
-	); displayName != "" {
-		return displayName
-	}
-	if subject := strings.TrimSpace(record.ProviderSubject); subject != "" {
-		return subject
-	}
-	return strings.TrimSpace(record.ProviderType)
 }
 
 func firstStringIdentityValue(values map[string]any, keys ...string) string {

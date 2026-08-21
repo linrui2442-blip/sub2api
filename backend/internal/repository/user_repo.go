@@ -1137,11 +1137,6 @@ func userSignupSourceOrDefault(signupSource string) string {
 	}
 }
 
-// marshalExtraEmails serializes notify email entries to JSON for storage.
-func marshalExtraEmails(entries []service.NotifyEmailEntry) string {
-	return service.MarshalNotifyEmails(entries)
-}
-
 // UpdateTotpSecret 更新用户的 TOTP 加密密钥
 func (r *userRepository) UpdateTotpSecret(ctx context.Context, userID int64, encryptedSecret *string) error {
 	client := clientFromContext(ctx, r.client)
