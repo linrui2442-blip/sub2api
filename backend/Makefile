@@ -21,7 +21,7 @@ test-personal:
 	go test ./...
 	go test ./internal/repository -run '^TestPersonal' -count=1
 	go test ./internal/setup -run '^TestPersonal' -count=1 -timeout=3m
-	go test ./cmd/server -run '^TestPersonalApplicationBootSmoke$' -count=1 -timeout=5m
+	go test ./cmd/server -run '^TestPersonalApplicationBootSmoke$$' -count=1 -timeout=5m
 
 test-e2e:
 	./scripts/e2e-test.sh
