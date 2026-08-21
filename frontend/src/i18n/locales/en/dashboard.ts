@@ -42,8 +42,6 @@ export default {
     quickActions: 'Quick Actions',
     createApiKey: 'Create API Key',
     generateNewKey: 'Generate a new API key',
-    batchImageAgent: 'Batch Image Assistant',
-    batchImageAgentDesc: 'Copy instructions for an agent',
     viewUsage: 'View Usage',
     checkDetailedLogs: 'Check detailed usage logs',
   },
@@ -406,7 +404,6 @@ export default {
     },
   },
 
-  // Shared keys for channel monitor (admin + user views)
   monitorCommon: {
     status: {
       operational: 'Operational',
@@ -431,7 +428,6 @@ export default {
       quota: 'Quota',
       quota_probe: 'Probe + Quota'
     },
-    // Quota snapshot rendering (MonitorQuotaView, shared by admin + user views)
     quota: {
       unavailable: 'Quota unavailable',
       resetSoon: 'resetting',

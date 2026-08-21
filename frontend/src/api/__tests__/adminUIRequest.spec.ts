@@ -82,8 +82,6 @@ describe('User UI request marker', () => {
     '/redeem/history',
     '/subscriptions',
     '/subscriptions/active',
-    '/channel-monitors',
-    '/channel-monitors/9/status',
     '/payment/config',
     '/payment/plans',
     '/payment/orders',

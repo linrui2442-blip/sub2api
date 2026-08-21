@@ -71,10 +71,6 @@ export default {
       viewUserAccounts: '查看和管理用户账户',
       manageAccounts: '管理账号',
       configureAiAccounts: '配置 AI 平台账号',
-      batchImage: '批量生图',
-      batchImageDesc: '提交任务、复制 Agent 调用说明',
-      groupPricing: '分组定价',
-      groupPricingDesc: '设置批量折扣和冻结比例',
       systemSettings: '系统设置',
       configureSystem: '配置系统设置',
       failedToLoad: '加载仪表盘数据失败'
@@ -577,96 +573,6 @@ export default {
       unsavedChanges: '有未保存的修改',
       revertChanges: '撤销修改',
       userInfo: '用户信息',
-      subscription: {
-        title: '订阅设置',
-        type: '计费类型',
-        typeHint: '标准计费从用户余额扣除。订阅模式使用配额限制。',
-        typeNotEditable: '分组创建后无法修改计费类型。',
-        standard: '标准（余额）',
-        subscription: '订阅（配额）',
-        dailyLimit: '每日限额（USD）',
-        weeklyLimit: '每周限额（USD）',
-        monthlyLimit: '每月限额（USD）',
-        defaultValidityDays: '默认有效期（天）',
-        validityHint: '分配给用户时订阅的有效天数',
-        noLimit: '无限制'
-      },
-      imagePricing: {
-        title: '图片生成计费',
-        description: '配置图片生成能力和图片基础单价，留空则使用默认价格',
-        allowImageGeneration: '允许当前分组生图',
-        allowBatchImageGeneration: '允许当前分组批量生图',
-        independentMultiplier: '生图倍率独立',
-        imageMultiplier: '生图独立倍率',
-        batchDiscountMultiplier: '批量生图折扣倍率',
-        batchHoldMultiplier: '批量冻结价格比例',
-        batchSectionHint: '批量生图仅影响批量任务：结算价格会叠加批量折扣倍率，提交时冻结金额按普通生图原价 × 批量冻结价格比例计算。参考图也会产生上游输入 token 消耗，建议批量生图折扣倍率设置大于 0.5。',
-        batchDisabledHint: '请先开启当前分组生图，才能开启批量生图。',
-        batchGeminiOnlyHint: '批量生图当前仅支持 Gemini 分组。',
-        modeHint: '默认关闭独立倍率时，图片费用 = 图片价格 × 当前分组有效倍率；开启独立倍率后，图片费用 = 图片价格 × 生图独立倍率。',
-        finalPricePreview: '最终单张价格预览',
-        notConfigured: '未配置'
-      },
-      videoPricing: {
-        title: '视频生成计费',
-        description:
-          '配置 Grok 视频生成的每秒单价（USD/秒），留空则使用默认每秒价（grok-imagine-video：480p $0.05/s、720p $0.07/s；video-1.5：480p $0.08/s、720p $0.14/s、1080p $0.25/s）',
-        modelOverridesTitle: '按模型覆盖视频价格',
-        modelOverridesDescription: '已填写的单元格会覆盖该模型族的平面分辨率价格。video-1.5 的 preview 与 legacy 别名共用同一模型族；留空则回退到平面分辨率价格。',
-        independentMultiplier: '视频倍率独立',
-        videoMultiplier: '视频独立倍率',
-        modeHint:
-          '视频按秒计费：费用 = 每秒价格 × 时长（1-15 秒，未指定默认 8 秒）。默认叠加当前分组有效倍率；开启独立倍率后改用视频独立倍率。',
-        finalPricePreview: '最终每秒价格预览',
-        notConfigured: '未配置'
-      },
-      explicitPricing: {
-        title: 'Grok 搜索与 Voice 定价',
-        description: '分组级 web_search（每千次）与 Voice realtime / TTS / STT 单价（USD）。留空表示未配置。',
-        searchPricePer1k: '搜索每千次价格（USD）',
-        pricePlaceholder: '可选'
-      },
-      modelPricing: {
-        title: '分组逐模型定价',
-        description: '匹配模型后覆盖渠道和内置价格。长上下文阶梯沿用官方/预设价卡，无需再手填区间。音频可用按次层级配置 realtime、tts、stt。',
-        longContext: '启用长上下文阶梯定价',
-        longContextHint: '勾选后按官方/预设阶梯计费；关闭则始终按第一档基础价。',
-        add: '添加模型价格'
-      },
-      voicePricing: {
-        title: 'Grok Voice 定价',
-        description: '分组级 Voice realtime / TTS / STT 单价（USD）。留空表示未配置。',
-        audioRealtimePerMin: 'Realtime 每分钟价格（USD）',
-        audioTtsPerMillionChars: 'TTS 每百万字符价格（USD）',
-        audioSttPerHour: 'STT 每小时价格（USD）',
-        pricePlaceholder: '可选'
-      },
-      webSearchPricing: {
-        title: 'Codex 网页搜索计费',
-        pricePerCall: '搜索单次价格（USD/次）',
-        pricePerCallHint:
-          '留空使用默认价 $0.01/次（官方定价 $10/1000 次）；填 0 表示免费。实际扣费会叠加分组费率倍数。',
-        finalPricePreview: '应用当前倍率后的单次价格：{price}'
-      },
-      peakRate: {
-        enable: '启用高峰倍率',
-        peakStart: '高峰开始',
-        peakEnd: '高峰结束',
-        peakMultiplier: '高峰倍率',
-        multiplierHint: '作用于 token 计费倍率；token 计费的图片 token 同样适用，0 表示高峰 token 请求按 0 倍计费'
-      },
-      profitControl: {
-        enable: '启用利润控制',
-        enabledHint: '调度时仅允许"账号倍率 ≤ 请求实际下游倍率 ×（1 − 最低毛利率 − 安全缓冲）"的账号进入候选池；账号倍率可手工维护或由探测同步，既有排序、粘性与熔断在合格账号间照常工作。图片/视频调度暂不参与。',
-        disabledHint: '关闭后调度不做利润过滤，账号倍率高于下游倍率的账号也会被选中，可能产生亏损请求。',
-        minMargin: '最低毛利率（%）',
-        minMarginHint: '百分比输入，如 30 表示 30%；后端按小数存储',
-        safetyBuffer: '安全缓冲（%）',
-        safetyBufferHint: '与最低毛利率相加后从下游倍率中扣除，默认 0',
-        marginRangeError: '最低毛利率应在 0 到 99.99 之间',
-        bufferRangeError: '安全缓冲应在 0 到 99.99 之间',
-        sumTooHigh: '最低毛利率与安全缓冲之和必须小于 100%，否则将排除全部账号'
-      },
       modelsList: {
         title: '自定义 /v1/models 模型列表',
         hint: '仅影响 /v1/models 展示结果，不影响白名单模型调用和账号调度。',

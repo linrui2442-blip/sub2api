@@ -42,8 +42,6 @@ export default {
     quickActions: '快捷操作',
     createApiKey: '创建 API 密钥',
     generateNewKey: '生成新的 API 密钥',
-    batchImageAgent: '批量生图助手',
-    batchImageAgentDesc: '复制给 Agent 的任务说明',
     viewUsage: '查看使用记录',
     checkDetailedLogs: '查看详细的使用日志',
   },
@@ -411,7 +409,6 @@ export default {
     },
   },
 
-  // Shared keys for channel monitor (admin + user views)
   monitorCommon: {
     status: {
       operational: '正常',
@@ -436,7 +433,6 @@ export default {
       quota: '配额',
       quota_probe: '探活 + 配额'
     },
-    // 配额快照展示（MonitorQuotaView，管理端与用户端共用）
     quota: {
       unavailable: '配额信息不可用',
       resetSoon: '即将重置',

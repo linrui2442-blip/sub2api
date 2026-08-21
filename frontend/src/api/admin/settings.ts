@@ -654,12 +654,6 @@ export interface SystemSettings {
   account_quota_notify_enabled: boolean;
   account_quota_notify_emails: NotifyEmailEntry[];
 
-  // Channel Monitor feature switch
-  channel_monitor_enabled: boolean;
-  channel_monitor_mode?: 'v1' | 'v2';
-  channel_monitor_default_interval_seconds: number;
-  channel_monitor_hide_throughput?: boolean;
-  channel_monitor_show_quota?: boolean;
 
   // OpenAI fast/flex policy
   openai_fast_policy_settings?: OpenAIFastPolicySettings;
@@ -928,12 +922,6 @@ export interface UpdateSettingsRequest {
   account_quota_notify_enabled?: boolean;
   account_quota_notify_emails?: NotifyEmailEntry[];
 
-  // Channel Monitor feature switch
-  channel_monitor_enabled?: boolean;
-  channel_monitor_mode?: 'v1' | 'v2';
-  channel_monitor_default_interval_seconds?: number;
-  channel_monitor_hide_throughput?: boolean;
-  channel_monitor_show_quota?: boolean;
 
   // OpenAI fast/flex policy
   openai_fast_policy_settings?: OpenAIFastPolicySettings;

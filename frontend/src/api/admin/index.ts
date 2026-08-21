@@ -22,8 +22,6 @@ import apiKeysAPI from './apiKeys'
 import scheduledTestsAPI from './scheduledTests'
 import tlsFingerprintProfileAPI from './tlsFingerprintProfile'
 import channelsAPI from './channels'
-import channelMonitorAPI from './channelMonitor'
-import channelMonitorTemplateAPI from './channelMonitorTemplate'
 import riskControlAPI from './riskControl'
 import adminComplianceAPI from './compliance'
 import auditAPI from './audit'
@@ -51,8 +49,6 @@ export const adminAPI = {
   scheduledTests: scheduledTestsAPI,
   tlsFingerprintProfiles: tlsFingerprintProfileAPI,
   channels: channelsAPI,
-  channelMonitor: channelMonitorAPI,
-  channelMonitorTemplate: channelMonitorTemplateAPI,
   riskControl: riskControlAPI,
   compliance: adminComplianceAPI,
   audit: auditAPI
@@ -78,8 +74,6 @@ export {
   scheduledTestsAPI,
   tlsFingerprintProfileAPI,
   channelsAPI,
-  channelMonitorAPI,
-  channelMonitorTemplateAPI,
   riskControlAPI,
   adminComplianceAPI,
   auditAPI
