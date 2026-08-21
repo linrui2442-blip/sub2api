@@ -286,7 +286,7 @@ type APIKeyService struct {
 	apiKeyRepo                APIKeyRepository
 	userRepo                  UserRepository
 	groupRepo                 GroupRepository
-	userGroupRateRepo         UserGroupRateRepository
+	userGroupRPMOverrideRepo  UserGroupRPMOverrideRepository
 	cache                     APIKeyCache
 	rateLimitCacheInvalid     RateLimitCacheInvalidator // optional: invalidate Redis rate limit cache
 	concurrencyService        *ConcurrencyService
@@ -334,17 +334,17 @@ func NewAPIKeyService(
 	apiKeyRepo APIKeyRepository,
 	userRepo UserRepository,
 	groupRepo GroupRepository,
-	userGroupRateRepo UserGroupRateRepository,
+	userGroupRPMOverrideRepo UserGroupRPMOverrideRepository,
 	cache APIKeyCache,
 	cfg *config.Config,
 ) *APIKeyService {
 	svc := &APIKeyService{
-		apiKeyRepo:        apiKeyRepo,
-		userRepo:          userRepo,
-		groupRepo:         groupRepo,
-		userGroupRateRepo: userGroupRateRepo,
-		cache:             cache,
-		cfg:               cfg,
+		apiKeyRepo:               apiKeyRepo,
+		userRepo:                 userRepo,
+		groupRepo:                groupRepo,
+		userGroupRPMOverrideRepo: userGroupRPMOverrideRepo,
+		cache:                    cache,
+		cfg:                      cfg,
 	}
 	svc.initAuthCache(cfg)
 	lookupConcurrency := defaultAuthLookupConcurrency
@@ -363,11 +363,11 @@ func NewPersonalAPIKeyService(
 	apiKeyRepo APIKeyRepository,
 	userRepo UserRepository,
 	groupRepo GroupRepository,
-	userGroupRateRepo UserGroupRateRepository,
+	userGroupRPMOverrideRepo UserGroupRPMOverrideRepository,
 	cache APIKeyCache,
 	cfg *config.Config,
 ) *APIKeyService {
-	return NewAPIKeyService(apiKeyRepo, userRepo, groupRepo, userGroupRateRepo, cache, cfg)
+	return NewAPIKeyService(apiKeyRepo, userRepo, groupRepo, userGroupRPMOverrideRepo, cache, cfg)
 }
 
 // SetRateLimitCacheInvalidator sets the optional rate limit cache invalidator.
@@ -1072,19 +1072,6 @@ func (s *APIKeyService) GetUserAllowedGroupIDSet(ctx context.Context, userID int
 		allowed[id] = struct{}{}
 	}
 	return allowed, nil
-}
-
-// GetUserGroupRates 获取用户的专属分组倍率配置
-// 返回 map[groupID]rateMultiplier
-func (s *APIKeyService) GetUserGroupRates(ctx context.Context, userID int64) (map[int64]float64, error) {
-	if s.userGroupRateRepo == nil {
-		return nil, nil
-	}
-	rates, err := s.userGroupRateRepo.GetByUserID(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("get user group rates: %w", err)
-	}
-	return rates, nil
 }
 
 // CheckAPIKeyQuotaAndExpiry checks if the API key is valid for use (not expired, quota not exhausted)

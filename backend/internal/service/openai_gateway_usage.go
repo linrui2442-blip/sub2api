@@ -81,17 +81,6 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	return s.recordPersonalUsage(ctx, input, tokens)
 }
 
-func (s *OpenAIGatewayService) ResolveUserGroupRateMultiplier(ctx context.Context, userID, groupID int64, groupDefaultMultiplier float64) float64 {
-	if s == nil {
-		return groupDefaultMultiplier
-	}
-	resolver := s.userGroupRateResolver
-	if resolver == nil {
-		resolver = newUserGroupRateResolver(nil, nil, resolveUserGroupRateCacheTTL(s.cfg), nil, "service.openai_gateway")
-	}
-	return resolver.Resolve(ctx, userID, groupID, groupDefaultMultiplier)
-}
-
 // openAIUsagePricingAt 返回本次用量记录使用的定价时刻：优先请求级 PricingAt
 // （与利润门 D 同源同刻），未装配时回退记录时刻（既有行为）。
 

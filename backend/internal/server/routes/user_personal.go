@@ -65,7 +65,6 @@ func RegisterPersonalUserRoutes(
 	groups := authenticated.Group("/groups")
 	{
 		groups.GET("/available", h.APIKey.GetAvailableGroups)
-		groups.GET("/rates", h.APIKey.GetUserGroupRates)
 	}
 
 	usage := authenticated.Group("/usage")

@@ -87,29 +87,6 @@ type AccountQuotaState struct {
 	WeeklyLimit float64
 }
 
-func (s *GatewayService) getUserGroupRateMultiplier(ctx context.Context, userID, groupID int64, groupDefaultMultiplier float64) float64 {
-	if s == nil {
-		return groupDefaultMultiplier
-	}
-	resolver := s.userGroupRateResolver
-	if resolver == nil {
-		resolver = newUserGroupRateResolver(
-			s.userGroupRateRepo,
-			s.userGroupRateCache,
-			resolveUserGroupRateCacheTTL(s.cfg),
-			&s.userGroupRateSF,
-			"service.gateway",
-		)
-	}
-	return resolver.Resolve(ctx, userID, groupID, groupDefaultMultiplier)
-}
-
-// ResolveUserGroupRateMultiplier resolves the same cached multiplier used by usage billing.
-
-func (s *GatewayService) ResolveUserGroupRateMultiplier(ctx context.Context, userID, groupID int64, groupDefaultMultiplier float64) float64 {
-	return s.getUserGroupRateMultiplier(ctx, userID, groupID, groupDefaultMultiplier)
-}
-
 type usageLogBestEffortWriter interface {
 	CreateBestEffort(ctx context.Context, log *UsageLog) error
 }

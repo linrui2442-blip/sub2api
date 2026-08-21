@@ -618,7 +618,11 @@ func (s *adminServiceImpl) DeleteGroup(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	// 注意：user_group_rate_multipliers 表通过外键 ON DELETE CASCADE 自动清理
+	if s.userGroupRPMOverrideRepo != nil {
+		if err := s.userGroupRPMOverrideRepo.DeleteByGroupID(ctx, id); err != nil {
+			return err
+		}
+	}
 
 	if s.authCacheInvalidator != nil {
 		for _, key := range groupKeys {
@@ -639,10 +643,10 @@ func (s *adminServiceImpl) GetGroupAPIKeys(ctx context.Context, groupID int64, p
 }
 
 func (s *adminServiceImpl) ClearGroupRPMOverrides(ctx context.Context, groupID int64) error {
-	if s.userGroupRateRepo == nil {
+	if s.userGroupRPMOverrideRepo == nil {
 		return nil
 	}
-	if err := s.userGroupRateRepo.ClearGroupRPMOverrides(ctx, groupID); err != nil {
+	if err := s.userGroupRPMOverrideRepo.ClearGroupRPMOverrides(ctx, groupID); err != nil {
 		return err
 	}
 	// RPM override 已嵌入 auth cache snapshot (v7)，变更后必须失效相关缓存。
@@ -653,7 +657,7 @@ func (s *adminServiceImpl) ClearGroupRPMOverrides(ctx context.Context, groupID i
 }
 
 func (s *adminServiceImpl) BatchSetGroupRPMOverrides(ctx context.Context, groupID int64, entries []GroupRPMOverrideInput) error {
-	if s.userGroupRateRepo == nil {
+	if s.userGroupRPMOverrideRepo == nil {
 		return nil
 	}
 	for _, e := range entries {
@@ -661,7 +665,7 @@ func (s *adminServiceImpl) BatchSetGroupRPMOverrides(ctx context.Context, groupI
 			return infraerrors.BadRequest("INVALID_RPM_OVERRIDE", fmt.Sprintf("rpm_override must be >= 0 (user_id=%d)", e.UserID))
 		}
 	}
-	if err := s.userGroupRateRepo.SyncGroupRPMOverrides(ctx, groupID, entries); err != nil {
+	if err := s.userGroupRPMOverrideRepo.SyncGroupRPMOverrides(ctx, groupID, entries); err != nil {
 		return err
 	}
 	// RPM override 已嵌入 auth cache snapshot (v7)，变更后必须失效相关缓存。
@@ -672,28 +676,14 @@ func (s *adminServiceImpl) BatchSetGroupRPMOverrides(ctx context.Context, groupI
 }
 
 func (s *adminServiceImpl) GetGroupRPMOverrides(ctx context.Context, groupID int64) ([]UserGroupRPMOverrideEntry, error) {
-	if s.userGroupRateRepo == nil {
+	if s.userGroupRPMOverrideRepo == nil {
 		return []UserGroupRPMOverrideEntry{}, nil
 	}
-	entries, err := s.userGroupRateRepo.GetByGroupID(ctx, groupID)
+	entries, err := s.userGroupRPMOverrideRepo.ListByGroupID(ctx, groupID)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]UserGroupRPMOverrideEntry, 0, len(entries))
-	for _, entry := range entries {
-		if entry.RPMOverride == nil {
-			continue
-		}
-		result = append(result, UserGroupRPMOverrideEntry{
-			UserID:      entry.UserID,
-			UserName:    entry.UserName,
-			UserEmail:   entry.UserEmail,
-			UserNotes:   entry.UserNotes,
-			UserStatus:  entry.UserStatus,
-			RPMOverride: *entry.RPMOverride,
-		})
-	}
-	return result, nil
+	return entries, nil
 }
 
 func (s *adminServiceImpl) UpdateGroupSortOrders(ctx context.Context, updates []GroupSortOrderUpdate) error {

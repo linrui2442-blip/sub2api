@@ -61,7 +61,6 @@ func ProvideOpenAIGatewayService(
 	accountRepo AccountRepository,
 	usageLogRepo UsageLogRepository,
 	userRepo UserRepository,
-	userGroupRateRepo UserGroupRateRepository,
 	cache GatewayCache,
 	cfg *config.Config,
 	schedulerSnapshot *SchedulerSnapshotService,
@@ -76,7 +75,7 @@ func ProvideOpenAIGatewayService(
 	privacyClientFactory PrivacyClientFactory,
 ) *OpenAIGatewayService {
 	svc := NewOpenAIGatewayService(
-		accountRepo, usageLogRepo, userRepo, userGroupRateRepo, cache, cfg,
+		accountRepo, usageLogRepo, userRepo, cache, cfg,
 		schedulerSnapshot, concurrencyService, rateLimitService, httpUpstream,
 		deferredService, openAITokenProvider, grokTokenProvider, channelService, settingService,
 	)
@@ -614,12 +613,12 @@ func ProvidePersonalAPIKeyService(
 	apiKeyRepo APIKeyRepository,
 	userRepo UserRepository,
 	groupRepo GroupRepository,
-	userGroupRateRepo UserGroupRateRepository,
+	userGroupRPMOverrideRepo UserGroupRPMOverrideRepository,
 	cache APIKeyCache,
 	cfg *config.Config,
 	concurrencyService *ConcurrencyService,
 ) *APIKeyService {
-	svc := NewPersonalAPIKeyService(apiKeyRepo, userRepo, groupRepo, userGroupRateRepo, cache, cfg)
+	svc := NewPersonalAPIKeyService(apiKeyRepo, userRepo, groupRepo, userGroupRPMOverrideRepo, cache, cfg)
 	svc.SetConcurrencyService(concurrencyService)
 	return svc
 }

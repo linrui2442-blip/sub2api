@@ -146,9 +146,6 @@ type UpdateUserInput struct {
 	RPMLimit      *int   // 使用指针区分"未提供"和"设置为0"
 	Status        string
 	AllowedGroups *[]int64 // 使用指针区分"未提供"和"设置为空数组"
-	// GroupRates 用户专属分组倍率配置
-	// map[groupID]*rate，nil 表示删除该分组的专属倍率
-	GroupRates map[int64]*float64
 	// ActorAdminID 执行本次操作的管理员ID(来自JWT)，仅用于权限敏感操作的审计日志。
 	ActorAdminID int64
 }
@@ -528,24 +525,24 @@ var ErrRPMStatusUnavailable = infraerrors.New(http.StatusNotImplemented, "RPM_ST
 
 // adminServiceImpl implements AdminService
 type adminServiceImpl struct {
-	userRepo             UserRepository
-	groupRepo            GroupRepository
-	groupDuplicateRepo   GroupDuplicateRepository
-	accountRepo          AccountRepository
-	accountDuplicateRepo AccountDuplicateRepository
-	proxyRepo            ProxyRepository
-	apiKeyRepo           APIKeyRepository
-	userGroupRateRepo    UserGroupRateRepository
-	userRPMCache         UserRPMCache
-	proxyProber          ProxyExitInfoProber
-	proxyLatencyCache    ProxyLatencyCache
-	authCacheInvalidator APIKeyAuthCacheInvalidator
-	entClient            *dbent.Client // 用于开启数据库事务
-	settingService       *SettingService
-	privacyClientFactory PrivacyClientFactory
-	runtimeBlocker       AccountRuntimeBlocker
-	compositeRouteRepo   CompositeModelRouteRepository
-	compositeResolver    *CompositeRouteResolver
+	userRepo                 UserRepository
+	groupRepo                GroupRepository
+	groupDuplicateRepo       GroupDuplicateRepository
+	accountRepo              AccountRepository
+	accountDuplicateRepo     AccountDuplicateRepository
+	proxyRepo                ProxyRepository
+	apiKeyRepo               APIKeyRepository
+	userGroupRPMOverrideRepo UserGroupRPMOverrideRepository
+	userRPMCache             UserRPMCache
+	proxyProber              ProxyExitInfoProber
+	proxyLatencyCache        ProxyLatencyCache
+	authCacheInvalidator     APIKeyAuthCacheInvalidator
+	entClient                *dbent.Client // 用于开启数据库事务
+	settingService           *SettingService
+	privacyClientFactory     PrivacyClientFactory
+	runtimeBlocker           AccountRuntimeBlocker
+	compositeRouteRepo       CompositeModelRouteRepository
+	compositeResolver        *CompositeRouteResolver
 	// 分组平台变更后用来失效渠道缓存；可为 nil（缓存会在 TTL 到期后自然重建）
 	channelCacheInvalidator ChannelCacheInvalidator
 }
@@ -554,10 +551,6 @@ type adminServiceImpl struct {
 // 窄接口，避免 admin 服务依赖整个 ChannelService——与 APIKeyAuthCacheInvalidator 同一思路。
 type ChannelCacheInvalidator interface {
 	InvalidateCache()
-}
-
-type userGroupRateBatchReader interface {
-	GetByUserIDs(ctx context.Context, userIDs []int64) (map[int64]map[int64]float64, error)
 }
 
 // NewPersonalAdminService builds the private control-plane service without
@@ -570,7 +563,7 @@ func NewPersonalAdminService(
 	accountRepo AdminAccountRepository,
 	proxyRepo ProxyRepository,
 	apiKeyRepo APIKeyRepository,
-	userGroupRateRepo UserGroupRateRepository,
+	userGroupRPMOverrideRepo UserGroupRPMOverrideRepository,
 	userRPMCache UserRPMCache,
 	proxyProber ProxyExitInfoProber,
 	proxyLatencyCache ProxyLatencyCache,
@@ -584,24 +577,24 @@ func NewPersonalAdminService(
 	channelCacheInvalidator ChannelCacheInvalidator,
 ) AdminService {
 	return &adminServiceImpl{
-		userRepo:                userRepo,
-		groupRepo:               groupRepo,
-		groupDuplicateRepo:      groupRepo,
-		accountRepo:             accountRepo,
-		accountDuplicateRepo:    accountRepo,
-		proxyRepo:               proxyRepo,
-		apiKeyRepo:              apiKeyRepo,
-		userGroupRateRepo:       userGroupRateRepo,
-		userRPMCache:            userRPMCache,
-		proxyProber:             proxyProber,
-		proxyLatencyCache:       proxyLatencyCache,
-		authCacheInvalidator:    authCacheInvalidator,
-		entClient:               entClient,
-		settingService:          settingService,
-		privacyClientFactory:    privacyClientFactory,
-		runtimeBlocker:          runtimeBlocker,
-		compositeRouteRepo:      compositeRouteRepo,
-		compositeResolver:       compositeResolver,
-		channelCacheInvalidator: channelCacheInvalidator,
+		userRepo:                 userRepo,
+		groupRepo:                groupRepo,
+		groupDuplicateRepo:       groupRepo,
+		accountRepo:              accountRepo,
+		accountDuplicateRepo:     accountRepo,
+		proxyRepo:                proxyRepo,
+		apiKeyRepo:               apiKeyRepo,
+		userGroupRPMOverrideRepo: userGroupRPMOverrideRepo,
+		userRPMCache:             userRPMCache,
+		proxyProber:              proxyProber,
+		proxyLatencyCache:        proxyLatencyCache,
+		authCacheInvalidator:     authCacheInvalidator,
+		entClient:                entClient,
+		settingService:           settingService,
+		privacyClientFactory:     privacyClientFactory,
+		runtimeBlocker:           runtimeBlocker,
+		compositeRouteRepo:       compositeRouteRepo,
+		compositeResolver:        compositeResolver,
+		channelCacheInvalidator:  channelCacheInvalidator,
 	}
 }

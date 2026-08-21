@@ -38,43 +38,7 @@ func (s *adminServiceImpl) ListUsers(ctx context.Context, page, pageSize int, fi
 			}
 		}
 	}
-	// 批量加载用户专属分组倍率
-	if s.userGroupRateRepo != nil && len(users) > 0 {
-		if batchRepo, ok := s.userGroupRateRepo.(userGroupRateBatchReader); ok {
-			userIDs := make([]int64, 0, len(users))
-			for i := range users {
-				userIDs = append(userIDs, users[i].ID)
-			}
-			ratesByUser, err := batchRepo.GetByUserIDs(ctx, userIDs)
-			if err != nil {
-				logger.LegacyPrintf("service.admin", "failed to load user group rates in batch: err=%v", err)
-				s.loadUserGroupRatesOneByOne(ctx, users)
-			} else {
-				for i := range users {
-					if rates, ok := ratesByUser[users[i].ID]; ok {
-						users[i].GroupRates = rates
-					}
-				}
-			}
-		} else {
-			s.loadUserGroupRatesOneByOne(ctx, users)
-		}
-	}
 	return users, result.Total, nil
-}
-
-func (s *adminServiceImpl) loadUserGroupRatesOneByOne(ctx context.Context, users []User) {
-	if s.userGroupRateRepo == nil {
-		return
-	}
-	for i := range users {
-		rates, err := s.userGroupRateRepo.GetByUserID(ctx, users[i].ID)
-		if err != nil {
-			logger.LegacyPrintf("service.admin", "failed to load user group rates: user_id=%d err=%v", users[i].ID, err)
-			continue
-		}
-		users[i].GroupRates = rates
-	}
 }
 
 func (s *adminServiceImpl) GetUser(ctx context.Context, id int64) (*User, error) {
@@ -87,15 +51,6 @@ func (s *adminServiceImpl) GetUser(ctx context.Context, id int64) (*User, error)
 		logger.LegacyPrintf("service.admin", "failed to load user last_used_at: user_id=%d err=%v", id, latestErr)
 	} else {
 		user.LastUsedAt = lastUsedAt
-	}
-	// 加载用户专属分组倍率
-	if s.userGroupRateRepo != nil {
-		rates, err := s.userGroupRateRepo.GetByUserID(ctx, id)
-		if err != nil {
-			logger.LegacyPrintf("service.admin", "failed to load user group rates: user_id=%d err=%v", id, err)
-		} else {
-			user.GroupRates = rates
-		}
 	}
 	return user, nil
 }
@@ -166,15 +121,6 @@ func (s *adminServiceImpl) ensureNotLastAdmin(ctx context.Context) error {
 }
 
 func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *UpdateUserInput) (*User, error) {
-	// 校验用户专属分组倍率：必须 > 0（nil 合法，表示清除专属倍率）
-	if input.GroupRates != nil {
-		for groupID, rate := range input.GroupRates {
-			if rate != nil && *rate <= 0 {
-				return nil, fmt.Errorf("rate_multiplier must be > 0 (group_id=%d)", groupID)
-			}
-		}
-	}
-
 	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -262,13 +208,6 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 			input.ActorAdminID, user.ID, oldRole, user.Role)
 	}
 
-	// 同步用户专属分组倍率
-	if input.GroupRates != nil && s.userGroupRateRepo != nil {
-		if err := s.userGroupRateRepo.SyncUserGroupRates(ctx, user.ID, input.GroupRates); err != nil {
-			logger.LegacyPrintf("service.admin", "failed to sync user group rates: user_id=%d err=%v", user.ID, err)
-		}
-	}
-
 	if s.authCacheInvalidator != nil {
 		// RPMLimit 直接参与 billing_cache_service.checkRPM 的三级级联，
 		// allowed_groups 参与 API Key 专属分组授权判断；不失效缓存会让修改在一个 L2 TTL 内失去效果。
@@ -331,6 +270,11 @@ func (s *adminServiceImpl) DeleteUser(ctx context.Context, id int64) error {
 		}
 	} else {
 		if err := s.deleteUserWithAPIKeys(ctx, id, apiKeys); err != nil {
+			return err
+		}
+	}
+	if s.userGroupRPMOverrideRepo != nil {
+		if err := s.userGroupRPMOverrideRepo.DeleteByUserID(ctx, id); err != nil {
 			return err
 		}
 	}
@@ -521,8 +465,8 @@ func (s *adminServiceImpl) GetUserRPMStatus(ctx context.Context, userID int64) (
 			}
 		}
 
-		if s.userGroupRateRepo != nil {
-			override, overrideErr := s.userGroupRateRepo.GetRPMOverrideByUserAndGroup(ctx, userID, groupID)
+		if s.userGroupRPMOverrideRepo != nil {
+			override, overrideErr := s.userGroupRPMOverrideRepo.GetRPMOverrideByUserAndGroup(ctx, userID, groupID)
 			if overrideErr != nil {
 				logger.LegacyPrintf("service.admin", "failed to get rpm override: user_id=%d group_id=%d err=%v", userID, groupID, overrideErr)
 			} else if override != nil {

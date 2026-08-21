@@ -404,25 +404,24 @@ var ErrNoAvailableCompactAccounts = errors.New("no available accounts support /r
 
 // OpenAIGatewayService handles OpenAI API gateway operations
 type OpenAIGatewayService struct {
-	accountRepo           AccountRepository
-	usageLogRepo          UsageLogRepository
-	userRepo              UserRepository
-	cache                 GatewayCache
-	cfg                   *config.Config
-	codexDetector         CodexClientRestrictionDetector
-	schedulerSnapshot     *SchedulerSnapshotService
-	concurrencyService    *ConcurrencyService
-	rateLimitService      *RateLimitService
-	userGroupRateResolver *userGroupRateResolver
-	httpUpstream          HTTPUpstream
-	deferredService       *DeferredService
-	openAITokenProvider   *OpenAITokenProvider
-	grokTokenProvider     *GrokTokenProvider
-	toolCorrector         *CodexToolCorrector
-	openaiWSResolver      OpenAIWSProtocolResolver
-	channelService        *ChannelService
-	settingService        *SettingService
-	privacyClientFactory  PrivacyClientFactory
+	accountRepo          AccountRepository
+	usageLogRepo         UsageLogRepository
+	userRepo             UserRepository
+	cache                GatewayCache
+	cfg                  *config.Config
+	codexDetector        CodexClientRestrictionDetector
+	schedulerSnapshot    *SchedulerSnapshotService
+	concurrencyService   *ConcurrencyService
+	rateLimitService     *RateLimitService
+	httpUpstream         HTTPUpstream
+	deferredService      *DeferredService
+	openAITokenProvider  *OpenAITokenProvider
+	grokTokenProvider    *GrokTokenProvider
+	toolCorrector        *CodexToolCorrector
+	openaiWSResolver     OpenAIWSProtocolResolver
+	channelService       *ChannelService
+	settingService       *SettingService
+	privacyClientFactory PrivacyClientFactory
 
 	openaiWSPoolOnce               sync.Once
 	openaiWSStateStoreOnce         sync.Once
@@ -474,7 +473,6 @@ func NewOpenAIGatewayService(
 	accountRepo AccountRepository,
 	usageLogRepo UsageLogRepository,
 	userRepo UserRepository,
-	userGroupRateRepo UserGroupRateRepository,
 	cache GatewayCache,
 	cfg *config.Config,
 	schedulerSnapshot *SchedulerSnapshotService,
@@ -493,22 +491,15 @@ func NewOpenAIGatewayService(
 		SetCodexIdentityEnforcementEnabled(!cfg.Gateway.DisableCodexIdentityEnforcement)
 	}
 	svc := &OpenAIGatewayService{
-		accountRepo:        accountRepo,
-		usageLogRepo:       usageLogRepo,
-		userRepo:           userRepo,
-		cache:              cache,
-		cfg:                cfg,
-		codexDetector:      NewOpenAICodexClientRestrictionDetector(cfg),
-		schedulerSnapshot:  schedulerSnapshot,
-		concurrencyService: concurrencyService,
-		rateLimitService:   rateLimitService,
-		userGroupRateResolver: newUserGroupRateResolver(
-			userGroupRateRepo,
-			nil,
-			resolveUserGroupRateCacheTTL(cfg),
-			nil,
-			"service.openai_gateway",
-		),
+		accountRepo:           accountRepo,
+		usageLogRepo:          usageLogRepo,
+		userRepo:              userRepo,
+		cache:                 cache,
+		cfg:                   cfg,
+		codexDetector:         NewOpenAICodexClientRestrictionDetector(cfg),
+		schedulerSnapshot:     schedulerSnapshot,
+		concurrencyService:    concurrencyService,
+		rateLimitService:      rateLimitService,
 		httpUpstream:          httpUpstream,
 		deferredService:       deferredService,
 		openAITokenProvider:   openAITokenProvider,

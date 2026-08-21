@@ -33,7 +33,7 @@ func newLegacyOpenAIGatewayServiceForTest(
 	_ any,
 	userRepo service.UserRepository,
 	_ any,
-	userGroupRateRepo service.UserGroupRateRepository,
+	_ service.UserGroupRPMOverrideRepository,
 	cache service.GatewayCache,
 	cfg *config.Config,
 	schedulerSnapshot *service.SchedulerSnapshotService,
@@ -52,7 +52,7 @@ func newLegacyOpenAIGatewayServiceForTest(
 	_ any,
 ) *service.OpenAIGatewayService {
 	return service.NewOpenAIGatewayService(
-		accountRepo, usageLogRepo, userRepo, userGroupRateRepo, cache, cfg,
+		accountRepo, usageLogRepo, userRepo, cache, cfg,
 		schedulerSnapshot, concurrencyService, rateLimitService, httpUpstream,
 		deferredService, openAITokenProvider, grokTokenProvider, channelService, settingService,
 	)

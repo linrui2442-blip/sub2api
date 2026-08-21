@@ -51,7 +51,6 @@ vi.mock('@/api/keys', () => ({
 }))
 
 vi.mock('@/api/groups', () => ({
-  userGroupsAPI: { getUserGroupRates: vi.fn() },
 }))
 
 vi.mock('@/stores/app', () => ({

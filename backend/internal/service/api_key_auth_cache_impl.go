@@ -369,8 +369,8 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 	}
 
 	// 填充 (user, group) RPM override —— snapshot 构建时查一次 DB，后续请求零 DB 往返。
-	if apiKey.GroupID != nil && *apiKey.GroupID > 0 && s.userGroupRateRepo != nil {
-		override, err := s.userGroupRateRepo.GetRPMOverrideByUserAndGroup(ctx, apiKey.UserID, *apiKey.GroupID)
+	if apiKey.GroupID != nil && *apiKey.GroupID > 0 && s.userGroupRPMOverrideRepo != nil {
+		override, err := s.userGroupRPMOverrideRepo.GetRPMOverrideByUserAndGroup(ctx, apiKey.UserID, *apiKey.GroupID)
 		if err == nil && override != nil {
 			snapshot.User.UserGroupRPMOverride = override
 		}
