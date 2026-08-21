@@ -90,8 +90,6 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 		BalanceLowNotifyThreshold:           settings.BalanceLowNotifyThreshold,
 		BalanceLowNotifyRechargeURL:         settings.BalanceLowNotifyRechargeURL,
 
-		AffiliateEnabled: settings.AffiliateEnabled,
-
 		RiskControlEnabled: settings.RiskControlEnabled,
 
 		AllowUserViewErrorRequests: settings.AllowUserViewErrorRequests,

@@ -225,7 +225,6 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyBalanceLowNotifyThreshold,
 		SettingKeyBalanceLowNotifyRechargeURL,
 		SettingKeyAccountQuotaNotifyEnabled,
-		SettingKeyAffiliateEnabled,
 		SettingKeyRiskControlEnabled,
 		SettingKeyAllowUserViewErrorRequests,
 	}
@@ -340,8 +339,6 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		BalanceLowNotifyThreshold:           balanceLowNotifyThreshold,
 		BalanceLowNotifyRechargeURL:         settings[SettingKeyBalanceLowNotifyRechargeURL],
 
-		AffiliateEnabled: settings[SettingKeyAffiliateEnabled] == "true",
-
 		RiskControlEnabled: settings[SettingKeyRiskControlEnabled] == "true",
 
 		AllowUserViewErrorRequests: settings[SettingKeyAllowUserViewErrorRequests] == "true",
@@ -430,7 +427,6 @@ type PublicSettingsInjectionPayload struct {
 	BalanceLowNotifyThreshold   float64 `json:"balance_low_notify_threshold"`
 	BalanceLowNotifyRechargeURL string  `json:"balance_low_notify_recharge_url"`
 
-	AffiliateEnabled           bool `json:"affiliate_enabled"`
 	RiskControlEnabled         bool `json:"risk_control_enabled"`
 	AllowUserViewErrorRequests bool `json:"allow_user_view_error_requests"`
 }
@@ -500,7 +496,6 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		BalanceLowNotifyThreshold:           settings.BalanceLowNotifyThreshold,
 		BalanceLowNotifyRechargeURL:         settings.BalanceLowNotifyRechargeURL,
 
-		AffiliateEnabled:           settings.AffiliateEnabled,
 		RiskControlEnabled:         settings.RiskControlEnabled,
 		AllowUserViewErrorRequests: settings.AllowUserViewErrorRequests,
 	}, nil

@@ -163,15 +163,10 @@ type SystemSettings struct {
 	CustomMenuItems             []CustomMenuItem `json:"custom_menu_items"`
 	CustomEndpoints             []CustomEndpoint `json:"custom_endpoints"`
 
-	DefaultConcurrency           int                          `json:"default_concurrency"`
-	DefaultBalance               float64                      `json:"default_balance"`
-	AffiliateRebateRate          float64                      `json:"affiliate_rebate_rate"`
-	AffiliateRebateFreezeHours   int                          `json:"affiliate_rebate_freeze_hours"`
-	AffiliateRebateDurationDays  int                          `json:"affiliate_rebate_duration_days"`
-	AffiliateRebatePerInviteeCap float64                      `json:"affiliate_rebate_per_invitee_cap"`
-	AdminRechargeRebateEnabled   bool                         `json:"affiliate_admin_recharge_enabled"`
-	DefaultUserRPMLimit          int                          `json:"default_user_rpm_limit"`
-	DefaultSubscriptions         []DefaultSubscriptionSetting `json:"default_subscriptions"`
+	DefaultConcurrency   int                          `json:"default_concurrency"`
+	DefaultBalance       float64                      `json:"default_balance"`
+	DefaultUserRPMLimit  int                          `json:"default_user_rpm_limit"`
+	DefaultSubscriptions []DefaultSubscriptionSetting `json:"default_subscriptions"`
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`
@@ -304,7 +299,6 @@ type SystemSettings struct {
 	CyberSessionBlockTTLSeconds int  `json:"cyber_session_block_ttl_seconds"`
 
 	// Affiliate (邀请返利) feature switch
-	AffiliateEnabled bool `json:"affiliate_enabled"`
 
 	// OpenAI fast/flex policy
 	OpenAIFastPolicySettings *OpenAIFastPolicySettings `json:"openai_fast_policy_settings,omitempty"`
@@ -383,8 +377,6 @@ type PublicSettings struct {
 	AccountQuotaNotifyEnabled   bool    `json:"account_quota_notify_enabled"`
 	BalanceLowNotifyThreshold   float64 `json:"balance_low_notify_threshold"`
 	BalanceLowNotifyRechargeURL string  `json:"balance_low_notify_recharge_url"`
-
-	AffiliateEnabled bool `json:"affiliate_enabled"`
 
 	RiskControlEnabled bool `json:"risk_control_enabled"`
 

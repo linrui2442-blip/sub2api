@@ -164,19 +164,13 @@ type SystemSettings struct {
 	CustomMenuItems             string // JSON array of custom menu items
 	CustomEndpoints             string // JSON array of custom endpoints
 
-	DefaultConcurrency           int
-	DefaultBalance               float64
-	RiskControlEnabled           bool
-	CyberSessionBlockEnabled     bool
-	CyberSessionBlockTTLSeconds  int
-	AffiliateEnabled             bool
-	AffiliateRebateRate          float64
-	AffiliateRebateFreezeHours   int
-	AffiliateRebateDurationDays  int
-	AffiliateRebatePerInviteeCap float64
-	AdminRechargeRebateEnabled   bool
-	DefaultUserRPMLimit          int
-	DefaultSubscriptions         []DefaultSubscriptionSetting
+	DefaultConcurrency          int
+	DefaultBalance              float64
+	RiskControlEnabled          bool
+	CyberSessionBlockEnabled    bool
+	CyberSessionBlockTTLSeconds int
+	DefaultUserRPMLimit         int
+	DefaultSubscriptions        []DefaultSubscriptionSetting
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`
@@ -354,7 +348,6 @@ type PublicSettings struct {
 	GrokDefaultBaseURLMode         string `json:"grok_default_base_url_mode"`
 
 	// Affiliate (邀请返利) feature toggle
-	AffiliateEnabled bool `json:"affiliate_enabled"`
 
 	// 风控中心功能开关
 	RiskControlEnabled bool `json:"risk_control_enabled"`
