@@ -671,6 +671,31 @@ func (s *adminServiceImpl) BatchSetGroupRPMOverrides(ctx context.Context, groupI
 	return nil
 }
 
+func (s *adminServiceImpl) GetGroupRPMOverrides(ctx context.Context, groupID int64) ([]UserGroupRPMOverrideEntry, error) {
+	if s.userGroupRateRepo == nil {
+		return []UserGroupRPMOverrideEntry{}, nil
+	}
+	entries, err := s.userGroupRateRepo.GetByGroupID(ctx, groupID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]UserGroupRPMOverrideEntry, 0, len(entries))
+	for _, entry := range entries {
+		if entry.RPMOverride == nil {
+			continue
+		}
+		result = append(result, UserGroupRPMOverrideEntry{
+			UserID:      entry.UserID,
+			UserName:    entry.UserName,
+			UserEmail:   entry.UserEmail,
+			UserNotes:   entry.UserNotes,
+			UserStatus:  entry.UserStatus,
+			RPMOverride: *entry.RPMOverride,
+		})
+	}
+	return result, nil
+}
+
 func (s *adminServiceImpl) UpdateGroupSortOrders(ctx context.Context, updates []GroupSortOrderUpdate) error {
 	return s.groupRepo.UpdateSortOrders(ctx, updates)
 }

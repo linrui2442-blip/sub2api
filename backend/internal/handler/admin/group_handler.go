@@ -615,6 +615,29 @@ func (h *GroupHandler) ClearGroupRPMOverrides(c *gin.Context) {
 	response.Success(c, gin.H{"message": "RPM overrides cleared successfully"})
 }
 
+// GetGroupRPMOverrides lists the private-member RPM policy for a group.
+// GET /api/v1/admin/groups/:id/rpm-overrides
+func (h *GroupHandler) GetGroupRPMOverrides(c *gin.Context) {
+	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid group ID")
+		return
+	}
+	reader, ok := h.adminService.(interface {
+		GetGroupRPMOverrides(context.Context, int64) ([]service.UserGroupRPMOverrideEntry, error)
+	})
+	if !ok {
+		response.Success(c, []service.UserGroupRPMOverrideEntry{})
+		return
+	}
+	entries, err := reader.GetGroupRPMOverrides(c.Request.Context(), groupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, entries)
+}
+
 // UpdateSortOrderRequest represents the request to update group sort orders
 type UpdateSortOrderRequest struct {
 	Updates []struct {

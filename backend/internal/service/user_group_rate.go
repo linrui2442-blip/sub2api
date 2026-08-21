@@ -14,6 +14,17 @@ type UserGroupRateEntry struct {
 	RPMOverride    *int     `json:"rpm_override,omitempty"`
 }
 
+// UserGroupRPMOverrideEntry is the private-member RPM policy exposed by the
+// Personal control plane. It deliberately has no commercial rate fields.
+type UserGroupRPMOverrideEntry struct {
+	UserID      int64  `json:"user_id"`
+	UserName    string `json:"user_name"`
+	UserEmail   string `json:"user_email"`
+	UserNotes   string `json:"user_notes"`
+	UserStatus  string `json:"user_status"`
+	RPMOverride int    `json:"rpm_override"`
+}
+
 // GroupRateMultiplierInput 批量设置分组倍率的输入条目
 type GroupRateMultiplierInput struct {
 	UserID         int64   `json:"user_id"`
