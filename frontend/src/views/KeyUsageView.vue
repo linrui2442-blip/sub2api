@@ -1,6 +1,6 @@
 <template>
   <div class="relative flex min-h-screen flex-col bg-gray-50 dark:bg-dark-950">
-    <!-- Header (same pattern as HomeView) -->
+    <!-- Public key-usage header -->
     <header class="relative z-20 px-6 py-4">
       <nav class="mx-auto flex max-w-6xl items-center justify-between">
         <router-link to="/home" class="flex items-center gap-3">
@@ -390,7 +390,7 @@
       </div>
     </main>
 
-    <!-- Footer (same pattern as HomeView) -->
+    <!-- Public key-usage footer -->
     <footer class="relative z-10 border-t border-gray-200/50 px-6 py-8 dark:border-dark-800/50">
       <div class="mx-auto flex max-w-6xl flex-col items-center justify-center gap-4 text-center sm:flex-row sm:text-left">
         <p class="text-sm text-gray-500 dark:text-dark-400">
@@ -429,14 +429,14 @@ import { sanitizeUrl } from '@/utils/url'
 const { t, locale } = useI18n()
 const appStore = useAppStore()
 
-// ==================== Site Settings (same as HomeView) ====================
+// ==================== Site Settings ====================
 
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
 const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
 const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
 const githubUrl = 'https://github.com/Wei-Shaw/sub2api'
 
-// ==================== Theme (same as HomeView) ====================
+// ==================== Theme ====================
 
 const isDark = ref(document.documentElement.classList.contains('dark'))
 
