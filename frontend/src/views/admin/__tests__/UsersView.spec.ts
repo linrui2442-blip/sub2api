@@ -169,8 +169,6 @@ describe('admin UsersView', () => {
           UserPlatformQuotaModal: true,
           UserApiKeysModal: true,
           UserAllowedGroupsModal: true,
-          UserBalanceModal: true,
-          UserBalanceHistoryModal: true,
           GroupReplaceModal: true,
           Icon: true,
           Teleport: true
@@ -255,8 +253,6 @@ describe('admin UsersView', () => {
           UserPlatformQuotaModal: true,
           UserApiKeysModal: true,
           UserAllowedGroupsModal: true,
-          UserBalanceModal: true,
-          UserBalanceHistoryModal: true,
           GroupReplaceModal: true,
           Icon: true,
           Teleport: true
@@ -333,8 +329,6 @@ describe('admin UsersView', () => {
           UserPlatformQuotaModal: true,
           UserApiKeysModal: true,
           UserAllowedGroupsModal: true,
-          UserBalanceModal: true,
-          UserBalanceHistoryModal: true,
           GroupReplaceModal: true,
           Icon: true,
           Teleport: true

@@ -167,7 +167,7 @@ const mountRouteFilteredUsageView = () => mount(UsageView, {
   global: { stubs: {
     AppLayout: AppLayoutStub, UsageStatsCards: true, UsageFilters: UsageFiltersStub,
     UsageTable: true, UsageExportProgress: true, UsageCleanupDialog: true,
-    UserBalanceHistoryModal: true, Pagination: true, Select: true,
+    Pagination: true, Select: true,
     DateRangePicker: true, Icon: true, TokenUsageTrend: true,
     ModelDistributionChart: true, GroupDistributionChart: true,
     EndpointDistributionChart: true, UserTokenRanking: true,
@@ -315,7 +315,7 @@ describe('admin UsageView distribution metric toggles', () => {
       global: { stubs: {
         AppLayout: AppLayoutStub, UsageStatsCards: true, UsageFilters: UsageFiltersStub,
         UsageTable: true, UsageExportProgress: true, UsageCleanupDialog: true,
-        UserBalanceHistoryModal: true, AuditLogModal: true, Pagination: true, Select: true,
+        AuditLogModal: true, Pagination: true, Select: true,
         DateRangePicker: true, Icon: true, TokenUsageTrend: true,
         ModelDistributionChart: ModelDistributionChartStub, GroupDistributionChart: GroupDistributionChartStub,
         EndpointDistributionChart: true, UserTokenRanking: true,
@@ -348,7 +348,6 @@ describe('admin UsageView distribution metric toggles', () => {
           UsageTable: true,
           UsageExportProgress: true,
           UsageCleanupDialog: true,
-          UserBalanceHistoryModal: true,
           Pagination: true,
           Select: true,
           DateRangePicker: true,
@@ -423,7 +422,6 @@ describe('admin UsageView request ID column visibility', () => {
           UsageTable: UsageTableStub,
           UsageExportProgress: true,
           UsageCleanupDialog: true,
-          UserBalanceHistoryModal: true,
           AuditLogModal: true,
           Pagination: true,
           Select: true,
@@ -459,7 +457,7 @@ describe('admin UsageView request ID column visibility', () => {
   })
 })
 
-describe('admin UsageView handleUserClick', () => {
+describe('admin UsageView usage-row user drill-down', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     list.mockReset()
@@ -479,7 +477,7 @@ describe('admin UsageView handleUserClick', () => {
     vi.useRealTimers()
   })
 
-  it('opens user via include_deleted when clicking a usage row user', async () => {
+  it('loads deleted users before drilling their usage down', async () => {
     getById.mockResolvedValue({ id: 2, email: 'd@test.com', deleted_at: '2026-05-28T00:00:00Z' })
 
     const wrapper = mount(UsageView, {
@@ -491,7 +489,6 @@ describe('admin UsageView handleUserClick', () => {
           UsageTable: UsageTableStub,
           UsageExportProgress: true,
           UsageCleanupDialog: true,
-          UserBalanceHistoryModal: true,
           AuditLogModal: true,
           Pagination: true,
           Select: true,
@@ -544,7 +541,7 @@ describe('admin UsageView errors tab filter forwarding', () => {
       global: { stubs: {
         AppLayout: AppLayoutStub, UsageStatsCards: true, UsageFilters: UsageFiltersStub,
         UsageTable: true, UsageExportProgress: true, UsageCleanupDialog: true,
-        UserBalanceHistoryModal: true, AuditLogModal: true, Pagination: true, Select: true,
+        AuditLogModal: true, Pagination: true, Select: true,
         DateRangePicker: true, Icon: true, TokenUsageTrend: true,
         ModelDistributionChart: true, GroupDistributionChart: true, EndpointDistributionChart: true,
         UserTokenRanking: true, OpsErrorLogTable: true, OpsErrorDetailModal: true,
@@ -600,7 +597,7 @@ describe('admin UsageView ranking tab', () => {
       global: { stubs: {
         AppLayout: AppLayoutStub, UsageStatsCards: true, UsageFilters: UsageFiltersStub,
         UsageTable: true, UsageExportProgress: true, UsageCleanupDialog: true,
-        UserBalanceHistoryModal: true, Pagination: true, Select: true,
+        Pagination: true, Select: true,
         DateRangePicker: true, Icon: true, TokenUsageTrend: true,
         ModelDistributionChart: true, GroupDistributionChart: true, EndpointDistributionChart: true,
         UserTokenRanking: UserTokenRankingStub, OpsErrorLogTable: true, OpsErrorDetailModal: true,
