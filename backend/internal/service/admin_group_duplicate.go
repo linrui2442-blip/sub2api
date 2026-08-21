@@ -67,21 +67,6 @@ func cloneGroupModelRouting(value map[string][]int64) map[string][]int64 {
 	return cloned
 }
 
-func cloneGroupVideoModelPrices(value map[string]map[string]float64) map[string]map[string]float64 {
-	if value == nil {
-		return nil
-	}
-	cloned := make(map[string]map[string]float64, len(value))
-	for model, prices := range value {
-		clonedPrices := make(map[string]float64, len(prices))
-		for resolution, price := range prices {
-			clonedPrices[resolution] = price
-		}
-		cloned[model] = clonedPrices
-	}
-	return cloned
-}
-
 func cloneGroupMessagesDispatchModelConfig(value OpenAIMessagesDispatchModelConfig) OpenAIMessagesDispatchModelConfig {
 	cloned := value
 	if value.ExactModelMappings != nil {

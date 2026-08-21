@@ -207,21 +207,6 @@ func StableGrokRealtimeBillingRequestID(sessionID string) string {
 	return "grok_realtime:" + sessionID
 }
 
-func resolveUsageBillingPayloadFingerprint(ctx context.Context, requestPayloadHash string) string {
-	if payloadHash := strings.TrimSpace(requestPayloadHash); payloadHash != "" {
-		return payloadHash
-	}
-	if ctx != nil {
-		if clientRequestID, _ := ctx.Value(ctxkey.ClientRequestID).(string); strings.TrimSpace(clientRequestID) != "" {
-			return "client:" + strings.TrimSpace(clientRequestID)
-		}
-		if requestID, _ := ctx.Value(ctxkey.RequestID).(string); strings.TrimSpace(requestID) != "" {
-			return "local:" + strings.TrimSpace(requestID)
-		}
-	}
-	return ""
-}
-
 func detachedBillingContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	base := context.Background()
 	if ctx != nil {

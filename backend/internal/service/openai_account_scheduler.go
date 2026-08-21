@@ -1896,11 +1896,6 @@ func (s *OpenAIGatewayService) isOpenAIAdvancedSchedulerEnabled(ctx context.Cont
 	return s.openAIAdvancedSchedulerRuntimeSettings(ctx).enabled
 }
 
-func (s *OpenAIGatewayService) isOpenAILowUpstreamRatePriorityEnabled(ctx context.Context) bool {
-	settings := s.openAIAdvancedSchedulerRuntimeSettings(ctx)
-	return !settings.enabled && settings.lowUpstreamRatePriorityEnabled
-}
-
 func (s *OpenAIGatewayService) openAIOAuthSchedulingRateMultiplier(ctx context.Context) float64 {
 	return s.openAIAdvancedSchedulerRuntimeSettings(ctx).oauthSchedulingRateMultiplier
 }

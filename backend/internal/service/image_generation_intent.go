@@ -459,14 +459,6 @@ func resolveOpenAIResponsesImageBillingConfigDetailed(reqBody map[string]any, fa
 	}, nil
 }
 
-func resolveOpenAIResponsesImageBillingConfigFromBody(body []byte, fallbackModel string) (string, string, error) {
-	cfg, err := resolveOpenAIResponsesImageBillingConfigDetailedFromBody(body, fallbackModel)
-	if err != nil {
-		return "", "", err
-	}
-	return cfg.Model, cfg.SizeTier, nil
-}
-
 func resolveOpenAIResponsesImageBillingConfigDetailedFromBody(body []byte, fallbackModel string) (OpenAIResponsesImageBillingConfig, error) {
 	imageModel := ""
 	imageSize := ""
