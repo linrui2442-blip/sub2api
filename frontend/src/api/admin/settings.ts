@@ -11,11 +11,6 @@ import type {
   NotifyEmailEntry,
 } from "@/types";
 
-export interface DefaultSubscriptionSetting {
-  group_id: number;
-  validity_days: number;
-}
-
 export type SchedulingThresholdPlatformType =
   | "openai"
   | "anthropic"
@@ -54,27 +49,6 @@ export function sanitizeAccountSchedulingThresholdsMap(
   return normalizeAccountSchedulingThresholdsMap(input)
 }
 
-export type AuthSourceType =
-  | "email"
-  | "linuxdo"
-  | "oidc"
-  | "wechat"
-  | "github"
-  | "google"
-  | "dingtalk";
-
-export interface AuthSourceDefaultsValue {
-  balance: number;
-  concurrency: number;
-  subscriptions: DefaultSubscriptionSetting[];
-  grant_on_signup: boolean;
-  grant_on_first_bind: boolean;
-}
-
-export type AuthSourceDefaultsState = Record<
-  AuthSourceType,
-  AuthSourceDefaultsValue
->;
 export type PaymentVisibleMethod = "alipay" | "wxpay";
 export type PaymentVisibleMethodSource =
   | ""
@@ -96,17 +70,6 @@ export interface WeChatConnectModeOption {
   labelEn: string;
 }
 
-const AUTH_SOURCE_TYPES: AuthSourceType[] = [
-  "email",
-  "linuxdo",
-  "oidc",
-  "wechat",
-  "github",
-  "google",
-  "dingtalk",
-];
-const AUTH_SOURCE_DEFAULT_BALANCE = 0;
-const AUTH_SOURCE_DEFAULT_CONCURRENCY = 5;
 const PAYMENT_VISIBLE_METHOD_SOURCE_OPTIONS: Record<
   PaymentVisibleMethod,
   PaymentVisibleMethodSourceOption[]
@@ -186,82 +149,6 @@ const WECHAT_CONNECT_MODE_ALIASES: Record<string, WeChatConnectMode> = {
   mobile_app: "mobile",
   native_app: "mobile",
 };
-
-export function normalizeDefaultSubscriptionSettings(
-  subscriptions: DefaultSubscriptionSetting[] | null | undefined,
-): DefaultSubscriptionSetting[] {
-  if (!Array.isArray(subscriptions)) return [];
-
-  return subscriptions
-    .filter((item) => item.group_id > 0 && item.validity_days > 0)
-    .map((item) => ({
-      group_id: Math.floor(item.group_id),
-      validity_days: Math.min(
-        36500,
-        Math.max(1, Math.floor(item.validity_days)),
-      ),
-    }));
-}
-
-export function buildAuthSourceDefaultsState(
-  settings: Partial<SystemSettings>,
-): AuthSourceDefaultsState {
-  const raw = settings as Record<string, unknown>;
-
-  return AUTH_SOURCE_TYPES.reduce((acc, source) => {
-    const subscriptions = raw[`auth_source_default_${source}_subscriptions`];
-    acc[source] = {
-      balance: Number(
-        raw[`auth_source_default_${source}_balance`] ??
-          AUTH_SOURCE_DEFAULT_BALANCE,
-      ),
-      concurrency: Math.max(
-        1,
-        Number(
-          raw[`auth_source_default_${source}_concurrency`] ??
-            AUTH_SOURCE_DEFAULT_CONCURRENCY,
-        ),
-      ),
-      subscriptions: normalizeDefaultSubscriptionSettings(
-        Array.isArray(subscriptions)
-          ? (subscriptions as DefaultSubscriptionSetting[])
-          : [],
-      ),
-      grant_on_signup:
-        raw[`auth_source_default_${source}_grant_on_signup`] === true,
-      grant_on_first_bind:
-        raw[`auth_source_default_${source}_grant_on_first_bind`] === true,
-    };
-    return acc;
-  }, {} as AuthSourceDefaultsState);
-}
-
-export function appendAuthSourceDefaultsToUpdateRequest(
-  payload: UpdateSettingsRequest,
-  authSourceDefaults: AuthSourceDefaultsState,
-): UpdateSettingsRequest {
-  const target = payload as Record<string, unknown>;
-
-  for (const source of AUTH_SOURCE_TYPES) {
-    const current = authSourceDefaults[source];
-    target[`auth_source_default_${source}_balance`] =
-      Number(current.balance) || 0;
-    target[`auth_source_default_${source}_concurrency`] = Math.max(
-      1,
-      Math.floor(
-        Number(current.concurrency) || AUTH_SOURCE_DEFAULT_CONCURRENCY,
-      ),
-    );
-    target[`auth_source_default_${source}_subscriptions`] =
-      normalizeDefaultSubscriptionSettings(current.subscriptions);
-    target[`auth_source_default_${source}_grant_on_signup`] =
-      current.grant_on_signup;
-    target[`auth_source_default_${source}_grant_on_first_bind`] =
-      current.grant_on_first_bind;
-  }
-
-  return payload;
-}
 
 export function getPaymentVisibleMethodSourceOptions(
   method: PaymentVisibleMethod,
@@ -372,46 +259,8 @@ export interface SystemSettings {
   login_agreement_updated_at: string;
   login_agreement_documents: LoginAgreementDocument[];
   // Default settings
-  default_balance: number;
   default_concurrency: number;
   default_user_rpm_limit: number;
-  default_subscriptions: DefaultSubscriptionSetting[];
-  auth_source_default_email_balance?: number;
-  auth_source_default_email_concurrency?: number;
-  auth_source_default_email_subscriptions?: DefaultSubscriptionSetting[];
-  auth_source_default_email_grant_on_signup?: boolean;
-  auth_source_default_email_grant_on_first_bind?: boolean;
-  auth_source_default_linuxdo_balance?: number;
-  auth_source_default_linuxdo_concurrency?: number;
-  auth_source_default_linuxdo_subscriptions?: DefaultSubscriptionSetting[];
-  auth_source_default_linuxdo_grant_on_signup?: boolean;
-  auth_source_default_linuxdo_grant_on_first_bind?: boolean;
-  auth_source_default_oidc_balance?: number;
-  auth_source_default_oidc_concurrency?: number;
-  auth_source_default_oidc_subscriptions?: DefaultSubscriptionSetting[];
-  auth_source_default_oidc_grant_on_signup?: boolean;
-  auth_source_default_oidc_grant_on_first_bind?: boolean;
-  auth_source_default_wechat_balance?: number;
-  auth_source_default_wechat_concurrency?: number;
-  auth_source_default_wechat_subscriptions?: DefaultSubscriptionSetting[];
-  auth_source_default_wechat_grant_on_signup?: boolean;
-  auth_source_default_wechat_grant_on_first_bind?: boolean;
-  auth_source_default_dingtalk_balance?: number;
-  auth_source_default_dingtalk_concurrency?: number;
-  auth_source_default_dingtalk_subscriptions?: DefaultSubscriptionSetting[];
-  auth_source_default_dingtalk_grant_on_signup?: boolean;
-  auth_source_default_dingtalk_grant_on_first_bind?: boolean;
-  auth_source_default_github_balance?: number;
-  auth_source_default_github_concurrency?: number;
-  auth_source_default_github_subscriptions?: DefaultSubscriptionSetting[];
-  auth_source_default_github_grant_on_signup?: boolean;
-  auth_source_default_github_grant_on_first_bind?: boolean;
-  auth_source_default_google_balance?: number;
-  auth_source_default_google_concurrency?: number;
-  auth_source_default_google_subscriptions?: DefaultSubscriptionSetting[];
-  auth_source_default_google_grant_on_signup?: boolean;
-  auth_source_default_google_grant_on_first_bind?: boolean;
-  force_email_on_third_party_signup?: boolean;
   // OEM settings
   site_name: string;
   site_logo: string;
@@ -618,11 +467,7 @@ export interface SystemSettings {
   openai_advanced_scheduler_effective_weight_previous_response?: string;
   openai_advanced_scheduler_effective_weight_session_sticky?: string;
 
-  // 余额、订阅到期与账号限额通知
-  balance_low_notify_enabled: boolean;
-  balance_low_notify_threshold: number;
-  balance_low_notify_recharge_url: string;
-  subscription_expiry_notify_enabled: boolean;
+  // Provider 账号限额通知
   account_quota_notify_enabled: boolean;
   account_quota_notify_emails: NotifyEmailEntry[];
 
@@ -652,46 +497,8 @@ export interface UpdateSettingsRequest {
   login_agreement_mode?: "modal" | "checkbox" | string;
   login_agreement_updated_at?: string;
   login_agreement_documents?: LoginAgreementDocument[];
-  default_balance?: number;
   default_concurrency?: number;
   default_user_rpm_limit?: number;
-  default_subscriptions?: DefaultSubscriptionSetting[];
-  auth_source_default_email_balance?: number;
-  auth_source_default_email_concurrency?: number;
-  auth_source_default_email_subscriptions?: DefaultSubscriptionSetting[];
-  auth_source_default_email_grant_on_signup?: boolean;
-  auth_source_default_email_grant_on_first_bind?: boolean;
-  auth_source_default_linuxdo_balance?: number;
-  auth_source_default_linuxdo_concurrency?: number;
-  auth_source_default_linuxdo_subscriptions?: DefaultSubscriptionSetting[];
-  auth_source_default_linuxdo_grant_on_signup?: boolean;
-  auth_source_default_linuxdo_grant_on_first_bind?: boolean;
-  auth_source_default_oidc_balance?: number;
-  auth_source_default_oidc_concurrency?: number;
-  auth_source_default_oidc_subscriptions?: DefaultSubscriptionSetting[];
-  auth_source_default_oidc_grant_on_signup?: boolean;
-  auth_source_default_oidc_grant_on_first_bind?: boolean;
-  auth_source_default_wechat_balance?: number;
-  auth_source_default_wechat_concurrency?: number;
-  auth_source_default_wechat_subscriptions?: DefaultSubscriptionSetting[];
-  auth_source_default_wechat_grant_on_signup?: boolean;
-  auth_source_default_wechat_grant_on_first_bind?: boolean;
-  auth_source_default_dingtalk_balance?: number;
-  auth_source_default_dingtalk_concurrency?: number;
-  auth_source_default_dingtalk_subscriptions?: DefaultSubscriptionSetting[];
-  auth_source_default_dingtalk_grant_on_signup?: boolean;
-  auth_source_default_dingtalk_grant_on_first_bind?: boolean;
-  auth_source_default_github_balance?: number;
-  auth_source_default_github_concurrency?: number;
-  auth_source_default_github_subscriptions?: DefaultSubscriptionSetting[];
-  auth_source_default_github_grant_on_signup?: boolean;
-  auth_source_default_github_grant_on_first_bind?: boolean;
-  auth_source_default_google_balance?: number;
-  auth_source_default_google_concurrency?: number;
-  auth_source_default_google_subscriptions?: DefaultSubscriptionSetting[];
-  auth_source_default_google_grant_on_signup?: boolean;
-  auth_source_default_google_grant_on_first_bind?: boolean;
-  force_email_on_third_party_signup?: boolean;
   site_name?: string;
   site_logo?: string;
   site_subtitle?: string;
@@ -858,11 +665,7 @@ export interface UpdateSettingsRequest {
   openai_advanced_scheduler_weight_upstream_cost?: string;
   openai_advanced_scheduler_weight_previous_response?: string;
   openai_advanced_scheduler_weight_session_sticky?: string;
-  // 余额、订阅到期与账号限额通知
-  balance_low_notify_enabled?: boolean;
-  balance_low_notify_threshold?: number;
-  balance_low_notify_recharge_url?: string;
-  subscription_expiry_notify_enabled?: boolean;
+  // Provider 账号限额通知
   account_quota_notify_enabled?: boolean;
   account_quota_notify_emails?: NotifyEmailEntry[];
 

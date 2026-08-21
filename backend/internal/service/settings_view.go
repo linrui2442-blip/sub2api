@@ -165,12 +165,10 @@ type SystemSettings struct {
 	CustomEndpoints             string // JSON array of custom endpoints
 
 	DefaultConcurrency          int
-	DefaultBalance              float64
 	RiskControlEnabled          bool
 	CyberSessionBlockEnabled    bool
 	CyberSessionBlockTTLSeconds int
 	DefaultUserRPMLimit         int
-	DefaultSubscriptions        []DefaultSubscriptionSetting
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`
@@ -256,14 +254,6 @@ type SystemSettings struct {
 	OpenAIAdvancedSchedulerEffectiveWeightPreviousResponse string
 	OpenAIAdvancedSchedulerEffectiveWeightSessionSticky    string
 
-	// 余额不足提醒
-	BalanceLowNotifyEnabled     bool
-	BalanceLowNotifyThreshold   float64
-	BalanceLowNotifyRechargeURL string
-
-	// 订阅到期提醒
-	SubscriptionExpiryNotifyEnabled bool
-
 	// 账号限额通知
 	AccountQuotaNotifyEnabled bool
 	AccountQuotaNotifyEmails  []NotifyEmailEntry
@@ -275,15 +265,9 @@ type SystemSettings struct {
 	AllowUserViewErrorRequests bool
 }
 
-type DefaultSubscriptionSetting struct {
-	GroupID      int64 `json:"group_id"`
-	ValidityDays int   `json:"validity_days"`
-}
-
 type PublicSettings struct {
 	RegistrationEnabled                 bool
 	EmailVerifyEnabled                  bool
-	ForceEmailOnThirdPartySignup        bool
 	RegistrationEmailSuffixWhitelist    []string
 	RegistrationEmailDomainQuotaEnabled bool
 	PasswordResetEnabled                bool
@@ -334,10 +318,7 @@ type PublicSettings struct {
 	GoogleOAuthEnabled       bool
 	Version                  string
 
-	BalanceLowNotifyEnabled     bool
-	AccountQuotaNotifyEnabled   bool
-	BalanceLowNotifyThreshold   float64
-	BalanceLowNotifyRechargeURL string
+	AccountQuotaNotifyEnabled bool
 
 	// Grok model mapping policy (admin settings).
 	GrokDefaultTextModel           string `json:"grok_default_text_model"`

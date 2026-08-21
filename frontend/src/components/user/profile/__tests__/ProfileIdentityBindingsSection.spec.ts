@@ -233,7 +233,6 @@ describe('ProfileIdentityBindingsSection', () => {
     appStore.cachedPublicSettings = {
       registration_enabled: false,
       email_verify_enabled: false,
-      force_email_on_third_party_signup: false,
       registration_email_suffix_whitelist: [],
       promo_code_enabled: true,
       password_reset_enabled: false,
@@ -261,9 +260,7 @@ describe('ProfileIdentityBindingsSection', () => {
       oidc_oauth_provider_name: 'OIDC',
       backend_mode_enabled: false,
       version: 'test',
-      balance_low_notify_enabled: false,
       account_quota_notify_enabled: false,
-      balance_low_notify_threshold: 0,
     }
     appStore.publicSettingsLoaded = true
 

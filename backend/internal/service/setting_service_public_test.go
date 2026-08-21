@@ -103,9 +103,7 @@ func TestSettingService_GetPublicSettings_ExposesCompactHomeEnabled(t *testing.T
 
 func TestSettingService_GetPublicSettings_ExposesForceEmailOnThirdPartySignup(t *testing.T) {
 	repo := &settingPublicRepoStub{
-		values: map[string]string{
-			SettingKeyForceEmailOnThirdPartySignup: "true",
-		},
+		values: map[string]string{},
 	}
 	svc := NewSettingService(repo, &config.Config{})
 

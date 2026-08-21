@@ -57,115 +57,77 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 
 	// 初始化默认设置
 	defaults := map[string]string{
-		SettingKeyRegistrationEnabled:                       "true",
-		SettingKeyEmailVerifyEnabled:                        "false",
-		SettingKeyRegistrationEmailSuffixWhitelist:          "[]",
-		SettingKeyRegistrationEmailDomainQuotaEnabled:       "false",
-		SettingKeyLoginAgreementEnabled:                     "false",
-		SettingKeyLoginAgreementMode:                        defaultLoginAgreementMode,
-		SettingKeyLoginAgreementUpdatedAt:                   defaultLoginAgreementDate,
-		SettingKeyLoginAgreementDocuments:                   loginAgreementDocumentsJSON,
-		SettingKeyAPIKeyACLTrustForwardedIP:                 "true",
-		SettingKeyForwardedClientIPHeaders:                  string(forwardedClientIPHeadersJSON),
-		settingKeyForwardedClientIPModeV2:                   "true",
-		SettingKeySiteName:                                  "Sub2API",
-		SettingKeySiteLogo:                                  "",
-		SettingKeyPurchaseSubscriptionEnabled:               "false",
-		SettingKeyPurchaseSubscriptionURL:                   "",
-		SettingKeyTableDefaultPageSize:                      "20",
-		SettingKeyTablePageSizeOptions:                      "[10,20,50,100]",
-		SettingKeyCustomMenuItems:                           "[]",
-		SettingKeyCustomEndpoints:                           "[]",
-		SettingKeyWeChatConnectEnabled:                      "false",
-		SettingKeyWeChatConnectAppID:                        "",
-		SettingKeyWeChatConnectAppSecret:                    "",
-		SettingKeyWeChatConnectOpenAppID:                    "",
-		SettingKeyWeChatConnectOpenAppSecret:                "",
-		SettingKeyWeChatConnectMPAppID:                      "",
-		SettingKeyWeChatConnectMPAppSecret:                  "",
-		SettingKeyWeChatConnectMobileAppID:                  "",
-		SettingKeyWeChatConnectMobileAppSecret:              "",
-		SettingKeyWeChatConnectOpenEnabled:                  "false",
-		SettingKeyWeChatConnectMPEnabled:                    "false",
-		SettingKeyWeChatConnectMobileEnabled:                "false",
-		SettingKeyWeChatConnectMode:                         "open",
-		SettingKeyWeChatConnectScopes:                       "snsapi_login",
-		SettingKeyWeChatConnectRedirectURL:                  "",
-		SettingKeyWeChatConnectFrontendRedirectURL:          defaultWeChatConnectFrontend,
-		SettingKeyGitHubOAuthEnabled:                        "false",
-		SettingKeyGitHubOAuthClientID:                       "",
-		SettingKeyGitHubOAuthClientSecret:                   "",
-		SettingKeyGitHubOAuthRedirectURL:                    "",
-		SettingKeyGitHubOAuthFrontendRedirectURL:            defaultGitHubOAuthFrontend,
-		SettingKeyGoogleOAuthEnabled:                        "false",
-		SettingKeyGoogleOAuthClientID:                       "",
-		SettingKeyGoogleOAuthClientSecret:                   "",
-		SettingKeyGoogleOAuthRedirectURL:                    "",
-		SettingKeyGoogleOAuthFrontendRedirectURL:            defaultGoogleOAuthFrontend,
-		SettingKeyOIDCConnectEnabled:                        "false",
-		SettingKeyOIDCConnectProviderName:                   "OIDC",
-		SettingKeyOIDCConnectClientID:                       "",
-		SettingKeyOIDCConnectClientSecret:                   "",
-		SettingKeyOIDCConnectIssuerURL:                      "",
-		SettingKeyOIDCConnectDiscoveryURL:                   "",
-		SettingKeyOIDCConnectAuthorizeURL:                   "",
-		SettingKeyOIDCConnectTokenURL:                       "",
-		SettingKeyOIDCConnectUserInfoURL:                    "",
-		SettingKeyOIDCConnectJWKSURL:                        "",
-		SettingKeyOIDCConnectScopes:                         "openid email profile",
-		SettingKeyOIDCConnectRedirectURL:                    "",
-		SettingKeyOIDCConnectFrontendRedirectURL:            "/auth/oidc/callback",
-		SettingKeyOIDCConnectTokenAuthMethod:                "client_secret_post",
-		SettingKeyOIDCConnectUsePKCE:                        strconv.FormatBool(oidcUsePKCEDefault),
-		SettingKeyOIDCConnectValidateIDToken:                strconv.FormatBool(oidcValidateIDTokenDefault),
-		SettingKeyOIDCConnectAllowedSigningAlgs:             "RS256,ES256,PS256",
-		SettingKeyOIDCConnectClockSkewSeconds:               "120",
-		SettingKeyOIDCConnectRequireEmailVerified:           "false",
-		SettingKeyOIDCConnectUserInfoEmailPath:              "",
-		SettingKeyOIDCConnectUserInfoIDPath:                 "",
-		SettingKeyOIDCConnectUserInfoUsernamePath:           "",
-		SettingKeyDefaultConcurrency:                        strconv.Itoa(s.cfg.Default.UserConcurrency),
-		SettingKeyDefaultBalance:                            strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
-		SettingKeyDefaultUserRPMLimit:                       "0",
-		SettingKeyDefaultSubscriptions:                      "[]",
-		SettingKeyAuthSourceDefaultEmailBalance:             "0",
-		SettingKeyAuthSourceDefaultEmailConcurrency:         "5",
-		SettingKeyAuthSourceDefaultEmailSubscriptions:       "[]",
-		SettingKeyAuthSourceDefaultEmailGrantOnSignup:       "false",
-		SettingKeyAuthSourceDefaultEmailGrantOnFirstBind:    "false",
-		SettingKeyAuthSourceDefaultLinuxDoBalance:           "0",
-		SettingKeyAuthSourceDefaultLinuxDoConcurrency:       "5",
-		SettingKeyAuthSourceDefaultLinuxDoSubscriptions:     "[]",
-		SettingKeyAuthSourceDefaultLinuxDoGrantOnSignup:     "false",
-		SettingKeyAuthSourceDefaultLinuxDoGrantOnFirstBind:  "false",
-		SettingKeyAuthSourceDefaultOIDCBalance:              "0",
-		SettingKeyAuthSourceDefaultOIDCConcurrency:          "5",
-		SettingKeyAuthSourceDefaultOIDCSubscriptions:        "[]",
-		SettingKeyAuthSourceDefaultOIDCGrantOnSignup:        "false",
-		SettingKeyAuthSourceDefaultOIDCGrantOnFirstBind:     "false",
-		SettingKeyAuthSourceDefaultWeChatBalance:            "0",
-		SettingKeyAuthSourceDefaultWeChatConcurrency:        "5",
-		SettingKeyAuthSourceDefaultWeChatSubscriptions:      "[]",
-		SettingKeyAuthSourceDefaultWeChatGrantOnSignup:      "false",
-		SettingKeyAuthSourceDefaultWeChatGrantOnFirstBind:   "false",
-		SettingKeyAuthSourceDefaultGitHubBalance:            "0",
-		SettingKeyAuthSourceDefaultGitHubConcurrency:        "5",
-		SettingKeyAuthSourceDefaultGitHubSubscriptions:      "[]",
-		SettingKeyAuthSourceDefaultGitHubGrantOnSignup:      "false",
-		SettingKeyAuthSourceDefaultGitHubGrantOnFirstBind:   "false",
-		SettingKeyAuthSourceDefaultGoogleBalance:            "0",
-		SettingKeyAuthSourceDefaultGoogleConcurrency:        "5",
-		SettingKeyAuthSourceDefaultGoogleSubscriptions:      "[]",
-		SettingKeyAuthSourceDefaultGoogleGrantOnSignup:      "false",
-		SettingKeyAuthSourceDefaultGoogleGrantOnFirstBind:   "false",
-		SettingKeyAuthSourceDefaultDingTalkBalance:          "0",
-		SettingKeyAuthSourceDefaultDingTalkConcurrency:      "5",
-		SettingKeyAuthSourceDefaultDingTalkSubscriptions:    "[]",
-		SettingKeyAuthSourceDefaultDingTalkGrantOnSignup:    "false",
-		SettingKeyAuthSourceDefaultDingTalkGrantOnFirstBind: "false",
-		SettingKeyForceEmailOnThirdPartySignup:              "false",
-		SettingKeySMTPPort:                                  "587",
-		SettingKeySMTPUseTLS:                                "false",
+		SettingKeyRegistrationEnabled:                 "true",
+		SettingKeyEmailVerifyEnabled:                  "false",
+		SettingKeyRegistrationEmailSuffixWhitelist:    "[]",
+		SettingKeyRegistrationEmailDomainQuotaEnabled: "false",
+		SettingKeyLoginAgreementEnabled:               "false",
+		SettingKeyLoginAgreementMode:                  defaultLoginAgreementMode,
+		SettingKeyLoginAgreementUpdatedAt:             defaultLoginAgreementDate,
+		SettingKeyLoginAgreementDocuments:             loginAgreementDocumentsJSON,
+		SettingKeyAPIKeyACLTrustForwardedIP:           "true",
+		SettingKeyForwardedClientIPHeaders:            string(forwardedClientIPHeadersJSON),
+		settingKeyForwardedClientIPModeV2:             "true",
+		SettingKeySiteName:                            "Sub2API",
+		SettingKeySiteLogo:                            "",
+		SettingKeyPurchaseSubscriptionEnabled:         "false",
+		SettingKeyPurchaseSubscriptionURL:             "",
+		SettingKeyTableDefaultPageSize:                "20",
+		SettingKeyTablePageSizeOptions:                "[10,20,50,100]",
+		SettingKeyCustomMenuItems:                     "[]",
+		SettingKeyCustomEndpoints:                     "[]",
+		SettingKeyWeChatConnectEnabled:                "false",
+		SettingKeyWeChatConnectAppID:                  "",
+		SettingKeyWeChatConnectAppSecret:              "",
+		SettingKeyWeChatConnectOpenAppID:              "",
+		SettingKeyWeChatConnectOpenAppSecret:          "",
+		SettingKeyWeChatConnectMPAppID:                "",
+		SettingKeyWeChatConnectMPAppSecret:            "",
+		SettingKeyWeChatConnectMobileAppID:            "",
+		SettingKeyWeChatConnectMobileAppSecret:        "",
+		SettingKeyWeChatConnectOpenEnabled:            "false",
+		SettingKeyWeChatConnectMPEnabled:              "false",
+		SettingKeyWeChatConnectMobileEnabled:          "false",
+		SettingKeyWeChatConnectMode:                   "open",
+		SettingKeyWeChatConnectScopes:                 "snsapi_login",
+		SettingKeyWeChatConnectRedirectURL:            "",
+		SettingKeyWeChatConnectFrontendRedirectURL:    defaultWeChatConnectFrontend,
+		SettingKeyGitHubOAuthEnabled:                  "false",
+		SettingKeyGitHubOAuthClientID:                 "",
+		SettingKeyGitHubOAuthClientSecret:             "",
+		SettingKeyGitHubOAuthRedirectURL:              "",
+		SettingKeyGitHubOAuthFrontendRedirectURL:      defaultGitHubOAuthFrontend,
+		SettingKeyGoogleOAuthEnabled:                  "false",
+		SettingKeyGoogleOAuthClientID:                 "",
+		SettingKeyGoogleOAuthClientSecret:             "",
+		SettingKeyGoogleOAuthRedirectURL:              "",
+		SettingKeyGoogleOAuthFrontendRedirectURL:      defaultGoogleOAuthFrontend,
+		SettingKeyOIDCConnectEnabled:                  "false",
+		SettingKeyOIDCConnectProviderName:             "OIDC",
+		SettingKeyOIDCConnectClientID:                 "",
+		SettingKeyOIDCConnectClientSecret:             "",
+		SettingKeyOIDCConnectIssuerURL:                "",
+		SettingKeyOIDCConnectDiscoveryURL:             "",
+		SettingKeyOIDCConnectAuthorizeURL:             "",
+		SettingKeyOIDCConnectTokenURL:                 "",
+		SettingKeyOIDCConnectUserInfoURL:              "",
+		SettingKeyOIDCConnectJWKSURL:                  "",
+		SettingKeyOIDCConnectScopes:                   "openid email profile",
+		SettingKeyOIDCConnectRedirectURL:              "",
+		SettingKeyOIDCConnectFrontendRedirectURL:      "/auth/oidc/callback",
+		SettingKeyOIDCConnectTokenAuthMethod:          "client_secret_post",
+		SettingKeyOIDCConnectUsePKCE:                  strconv.FormatBool(oidcUsePKCEDefault),
+		SettingKeyOIDCConnectValidateIDToken:          strconv.FormatBool(oidcValidateIDTokenDefault),
+		SettingKeyOIDCConnectAllowedSigningAlgs:       "RS256,ES256,PS256",
+		SettingKeyOIDCConnectClockSkewSeconds:         "120",
+		SettingKeyOIDCConnectRequireEmailVerified:     "false",
+		SettingKeyOIDCConnectUserInfoEmailPath:        "",
+		SettingKeyOIDCConnectUserInfoIDPath:           "",
+		SettingKeyOIDCConnectUserInfoUsernamePath:     "",
+		SettingKeyDefaultConcurrency:                  strconv.Itoa(s.cfg.Default.UserConcurrency),
+		SettingKeyDefaultUserRPMLimit:                 "0",
+		SettingKeySMTPPort:                            "587",
+		SettingKeySMTPUseTLS:                          "false",
 		// Model fallback defaults
 		SettingKeyEnableModelFallback:      "false",
 		SettingKeyFallbackModelAnthropic:   "claude-3-5-sonnet-20241022",
@@ -357,14 +319,6 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	if rpm, err := strconv.Atoi(settings[SettingKeyDefaultUserRPMLimit]); err == nil && rpm >= 0 {
 		result.DefaultUserRPMLimit = rpm
 	}
-
-	// 解析浮点数类型
-	if balance, err := strconv.ParseFloat(settings[SettingKeyDefaultBalance], 64); err == nil {
-		result.DefaultBalance = balance
-	} else {
-		result.DefaultBalance = s.cfg.Default.UserBalance
-	}
-	result.DefaultSubscriptions = parseDefaultSubscriptions(settings[SettingKeyDefaultSubscriptions])
 
 	// 敏感信息直接返回，方便测试连接时使用
 	result.SMTPPassword = settings[SettingKeySMTPPassword]
@@ -833,14 +787,6 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	result.OpenAIAdvancedSchedulerEffectiveWeightPreviousResponse = formatOpenAIAdvancedSchedulerFloat(effectiveWeights.PreviousResponse)
 	result.OpenAIAdvancedSchedulerEffectiveWeightSessionSticky = formatOpenAIAdvancedSchedulerFloat(effectiveWeights.SessionSticky)
 
-	// 余额、订阅到期与账号限额通知
-	result.BalanceLowNotifyEnabled = settings[SettingKeyBalanceLowNotifyEnabled] == "true"
-	if v, err := strconv.ParseFloat(settings[SettingKeyBalanceLowNotifyThreshold], 64); err == nil && v >= 0 {
-		result.BalanceLowNotifyThreshold = v
-	}
-	result.BalanceLowNotifyRechargeURL = settings[SettingKeyBalanceLowNotifyRechargeURL]
-	result.SubscriptionExpiryNotifyEnabled = !isFalseSettingValue(settings[SettingKeySubscriptionExpiryNotifyEnabled])
-
 	// 账号限额通知
 	result.AccountQuotaNotifyEnabled = settings[SettingKeyAccountQuotaNotifyEnabled] == "true"
 	if raw := strings.TrimSpace(settings[SettingKeyAccountQuotaNotifyEmails]); raw != "" {
@@ -1009,103 +955,6 @@ func normalizeOptionalNonNegativeFloatString(raw string) (string, error) {
 		return "", fmt.Errorf("invalid non-negative float")
 	}
 	return strconv.FormatFloat(value, 'f', -1, 64), nil
-}
-
-func parseDefaultSubscriptions(raw string) []DefaultSubscriptionSetting {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return nil
-	}
-
-	var items []DefaultSubscriptionSetting
-	if err := json.Unmarshal([]byte(raw), &items); err != nil {
-		return nil
-	}
-
-	normalized := make([]DefaultSubscriptionSetting, 0, len(items))
-	for _, item := range items {
-		if item.GroupID <= 0 || item.ValidityDays <= 0 {
-			continue
-		}
-		if item.ValidityDays > maxLegacySubscriptionValidityDays {
-			item.ValidityDays = maxLegacySubscriptionValidityDays
-		}
-		normalized = append(normalized, item)
-	}
-
-	return normalized
-}
-
-func parseProviderDefaultGrantSettings(settings map[string]string, keys authSourceDefaultKeySet) ProviderDefaultGrantSettings {
-	result := ProviderDefaultGrantSettings{
-		Balance:          defaultAuthSourceBalance,
-		Concurrency:      defaultAuthSourceConcurrency,
-		Subscriptions:    []DefaultSubscriptionSetting{},
-		GrantOnSignup:    false,
-		GrantOnFirstBind: false,
-	}
-
-	if v, err := strconv.ParseFloat(strings.TrimSpace(settings[keys.balance]), 64); err == nil {
-		result.Balance = v
-	}
-	if v, err := strconv.Atoi(strings.TrimSpace(settings[keys.concurrency])); err == nil {
-		result.Concurrency = v
-	}
-	if items := parseDefaultSubscriptions(settings[keys.subscriptions]); items != nil {
-		result.Subscriptions = items
-	}
-	if raw, ok := settings[keys.grantOnSignup]; ok {
-		result.GrantOnSignup = raw == "true"
-	}
-	if raw, ok := settings[keys.grantOnFirstBind]; ok {
-		result.GrantOnFirstBind = raw == "true"
-	}
-
-	return result
-}
-
-func writeProviderDefaultGrantUpdates(updates map[string]string, keys authSourceDefaultKeySet, settings ProviderDefaultGrantSettings) {
-	updates[keys.balance] = strconv.FormatFloat(settings.Balance, 'f', 8, 64)
-	updates[keys.concurrency] = strconv.Itoa(settings.Concurrency)
-
-	subscriptions := settings.Subscriptions
-	if subscriptions == nil {
-		subscriptions = []DefaultSubscriptionSetting{}
-	}
-	raw, err := json.Marshal(subscriptions)
-	if err != nil {
-		raw = []byte("[]")
-	}
-	updates[keys.subscriptions] = string(raw)
-	updates[keys.grantOnSignup] = strconv.FormatBool(settings.GrantOnSignup)
-	updates[keys.grantOnFirstBind] = strconv.FormatBool(settings.GrantOnFirstBind)
-
-}
-
-func mergeProviderDefaultGrantSettings(globalDefaults ProviderDefaultGrantSettings, providerDefaults ProviderDefaultGrantSettings) ProviderDefaultGrantSettings {
-	result := ProviderDefaultGrantSettings{
-		Balance:          globalDefaults.Balance,
-		Concurrency:      globalDefaults.Concurrency,
-		Subscriptions:    append([]DefaultSubscriptionSetting(nil), globalDefaults.Subscriptions...),
-		GrantOnSignup:    providerDefaults.GrantOnSignup,
-		GrantOnFirstBind: providerDefaults.GrantOnFirstBind,
-	}
-
-	// 注意：不能把 parse 默认值 (defaultAuthSourceBalance / defaultAuthSourceConcurrency)
-	// 当作"未配置"哨兵——admin 完全有权显式设成相同的值，那时仍应覆盖 globalDefaults。
-	// 旧实现的 `!= defaultAuthSourceConcurrency` 会把 admin 设的 5 与 fallback 5 混淆，
-	// 导致渠道发放退回到全局默认（如 1），表现为"管理员设 5、新用户实际拿 1"。
-	if providerDefaults.Balance >= 0 {
-		result.Balance = providerDefaults.Balance
-	}
-	if providerDefaults.Concurrency > 0 {
-		result.Concurrency = providerDefaults.Concurrency
-	}
-	if len(providerDefaults.Subscriptions) > 0 {
-		result.Subscriptions = append([]DefaultSubscriptionSetting(nil), providerDefaults.Subscriptions...)
-	}
-
-	return result
 }
 
 func parseTablePreferences(defaultPageSizeRaw, optionsRaw string) (int, []int) {

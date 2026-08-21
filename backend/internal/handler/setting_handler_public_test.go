@@ -57,9 +57,7 @@ func TestSettingHandler_GetPublicSettings_ExposesForceEmailOnThirdPartySignup(t 
 	gin.SetMode(gin.TestMode)
 
 	repo := &settingHandlerPublicRepoStub{
-		values: map[string]string{
-			service.SettingKeyForceEmailOnThirdPartySignup: "true",
-		},
+		values: map[string]string{},
 	}
 	h := NewSettingHandler(service.NewSettingService(repo, &config.Config{}), "test-version")
 

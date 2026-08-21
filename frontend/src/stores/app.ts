@@ -328,7 +328,6 @@ export const useAppStore = defineStore('app', () => {
       return Promise.resolve({
         registration_enabled: false,
         email_verify_enabled: false,
-        force_email_on_third_party_signup: false,
         registration_email_suffix_whitelist: [],
         promo_code_enabled: true,
         password_reset_enabled: false,
@@ -364,9 +363,7 @@ export const useAppStore = defineStore('app', () => {
         backend_mode_enabled: false,
         passkey_enabled: false,
         version: siteVersion.value,
-        balance_low_notify_enabled: false,
         account_quota_notify_enabled: false,
-        balance_low_notify_threshold: 0,
         risk_control_enabled: false,
         service_quota_enabled: false,
         allow_user_view_error_requests: false,

@@ -188,7 +188,6 @@ export interface LoginAgreementDocument {
 export interface PublicSettings {
   registration_enabled: boolean
   email_verify_enabled: boolean
-  force_email_on_third_party_signup: boolean
   registration_email_suffix_whitelist: string[]
   registration_email_domain_quota_enabled?: boolean
   promo_code_enabled: boolean
@@ -239,9 +238,7 @@ export interface PublicSettings {
   // 可选：注入的 __APP_CONFIG__ 旧缓存可能缺失
   server_timezone?: string
   server_utc_offset?: string
-  balance_low_notify_enabled: boolean
   account_quota_notify_enabled: boolean
-  balance_low_notify_threshold: number
   service_quota_enabled: boolean
   allow_user_view_error_requests?: boolean
 }
