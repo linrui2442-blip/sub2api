@@ -32,17 +32,16 @@ type AdminHandlers struct {
 
 // Handlers contains all HTTP handlers
 type Handlers struct {
-	Auth             *AuthHandler
-	User             *UserHandler
-	APIKey           *APIKeyHandler
-	Usage            *UsageHandler
-	Admin            *AdminHandlers
-	Gateway          *GatewayHandler
-	OpenAIGateway    *OpenAIGatewayHandler
-	Setting          *SettingHandler
-	Totp             *TotpHandler
-	Passkey          *PasskeyHandler
-	AvailableChannel *AvailableChannelHandler
+	Auth          *AuthHandler
+	User          *UserHandler
+	APIKey        *APIKeyHandler
+	Usage         *UsageHandler
+	Admin         *AdminHandlers
+	Gateway       *GatewayHandler
+	OpenAIGateway *OpenAIGatewayHandler
+	Setting       *SettingHandler
+	Totp          *TotpHandler
+	Passkey       *PasskeyHandler
 }
 
 // BuildInfo contains build-time information
