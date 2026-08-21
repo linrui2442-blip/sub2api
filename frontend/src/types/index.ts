@@ -2175,11 +2175,3 @@ export interface UpdateScheduledTestPlanRequest {
 }
 
 // Payment types
-
-export type {
-  PlatformQuotaItem,
-  PlatformQuotaUpdateItem,
-  PlatformQuotaPlatform,
-  PlatformQuotaWindow,
-  PlatformQuotasResponse,
-} from '@/api/admin/users'
