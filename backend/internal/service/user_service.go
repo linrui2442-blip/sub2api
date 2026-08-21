@@ -35,7 +35,6 @@ var (
 	ErrAvatarTooLarge           = infraerrors.BadRequest("AVATAR_TOO_LARGE", "avatar image must be 100KB or smaller")
 	ErrAvatarNotImage           = infraerrors.BadRequest("AVATAR_NOT_IMAGE", "avatar content must be an image")
 	ErrIdentityProviderInvalid  = infraerrors.BadRequest("IDENTITY_PROVIDER_INVALID", "identity provider is invalid")
-	ErrIdentityRedirectInvalid  = infraerrors.BadRequest("IDENTITY_REDIRECT_INVALID", "identity redirect path is invalid")
 	ErrIdentityUnbindLastMethod = infraerrors.Conflict(
 		"IDENTITY_UNBIND_LAST_METHOD",
 		"bind another sign-in method before unbinding this provider",
@@ -46,9 +45,8 @@ const (
 	maxInlineAvatarBytes = 100 * 1024
 	targetAvatarBytes    = 20 * 1024
 
-	defaultUserIdentityRedirect = "/settings/profile"
-	userLastActiveMinTouch      = 10 * time.Minute
-	userLastActiveFailBackoff   = 30 * time.Second
+	userLastActiveMinTouch    = 10 * time.Minute
+	userLastActiveFailBackoff = 30 * time.Second
 )
 
 var (
@@ -710,17 +708,6 @@ func normalizeUserIdentityProvider(provider string) string {
 	default:
 		return ""
 	}
-}
-
-func normalizeUserIdentityRedirect(raw string) (string, error) {
-	redirect := strings.TrimSpace(raw)
-	if redirect == "" {
-		return defaultUserIdentityRedirect, nil
-	}
-	if len(redirect) > 2048 || !strings.HasPrefix(redirect, "/") || strings.HasPrefix(redirect, "//") {
-		return "", ErrIdentityRedirectInvalid
-	}
-	return redirect, nil
 }
 
 func filterUserAuthIdentities(records []UserAuthIdentityRecord, provider string) []UserAuthIdentityRecord {
