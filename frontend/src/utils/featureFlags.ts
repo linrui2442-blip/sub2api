@@ -85,11 +85,6 @@ function defineFlag<K extends keyof PublicSettings>(
  * public-settings-driven switch; see the "Adding a new flag" checklist above.
  */
 export const FeatureFlags = {
-  payment: defineFlag({
-    key: 'payment_enabled',
-    mode: 'opt-out',
-    label: 'Payment',
-  }),
   riskControl: defineFlag({
     key: 'risk_control_enabled',
     mode: 'opt-in',
