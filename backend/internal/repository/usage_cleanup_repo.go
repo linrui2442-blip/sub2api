@@ -423,11 +423,9 @@ func buildUsageCleanupWhere(filters service.UsageCleanupFilters) (string, []any)
 		condition, conditionArgs := buildRequestTypeFilterCondition(idx, *filters.RequestType)
 		conditions = append(conditions, condition)
 		args = append(args, conditionArgs...)
-		idx += len(conditionArgs)
 	} else if filters.Stream != nil {
 		conditions = append(conditions, fmt.Sprintf("stream = $%d", idx))
 		args = append(args, *filters.Stream)
-		idx++
 	}
 	return strings.Join(conditions, " AND "), args
 }

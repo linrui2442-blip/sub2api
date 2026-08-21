@@ -327,6 +327,7 @@ func (r *usageLogRepository) getUsageTrendWithFilters(ctx context.Context, start
 	return results, nil
 }
 
+//nolint:unused // Removed with the remaining PostgreSQL aggregate compatibility layer.
 func shouldUsePreaggregatedTrend(granularity string, userID, apiKeyID, accountID, groupID int64, model string, requestType *int16, stream *bool, billingType *int8, billingMode string, upstreamModelMismatch *bool) bool {
 	if granularity != "day" && granularity != "hour" {
 		return false
@@ -343,6 +344,7 @@ func shouldUsePreaggregatedTrend(granularity string, userID, apiKeyID, accountID
 		upstreamModelMismatch == nil
 }
 
+//nolint:unused // Removed with the remaining PostgreSQL aggregate compatibility layer.
 func (r *usageLogRepository) getUsageTrendFromAggregates(ctx context.Context, startTime, endTime time.Time, granularity string) (results []TrendDataPoint, err error) {
 	dateFormat := safeDateFormat(granularity)
 	query := ""

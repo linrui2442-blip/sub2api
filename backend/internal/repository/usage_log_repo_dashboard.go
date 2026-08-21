@@ -36,11 +36,11 @@ func (r *usageLogRepository) getPerformanceStats(ctx context.Context, userID int
 
 // UserStats 用户使用统计
 type UserStats struct {
-	TotalRequests   int64   `json:"total_requests"`
-	TotalTokens     int64   `json:"total_tokens"`
-	InputTokens     int64   `json:"input_tokens"`
-	OutputTokens    int64   `json:"output_tokens"`
-	CacheReadTokens int64   `json:"cache_read_tokens"`
+	TotalRequests   int64 `json:"total_requests"`
+	TotalTokens     int64 `json:"total_tokens"`
+	InputTokens     int64 `json:"input_tokens"`
+	OutputTokens    int64 `json:"output_tokens"`
+	CacheReadTokens int64 `json:"cache_read_tokens"`
 }
 
 func (r *usageLogRepository) GetUserStats(ctx context.Context, userID int64, startTime, endTime time.Time) (*UserStats, error) {
@@ -189,6 +189,7 @@ func (r *usageLogRepository) fillDashboardEntityStats(ctx context.Context, stats
 	return nil
 }
 
+//nolint:unused // Removed with the remaining PostgreSQL aggregate compatibility layer.
 func (r *usageLogRepository) fillDashboardUsageStatsAggregated(ctx context.Context, stats *DashboardStats, todayUTC, now time.Time) error {
 	totalStatsQuery := `
 		SELECT

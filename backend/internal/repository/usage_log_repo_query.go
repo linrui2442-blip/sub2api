@@ -612,14 +612,6 @@ func nullInt(v *int) sql.NullInt64 {
 	return sql.NullInt64{Int64: int64(*v), Valid: true}
 }
 
-func nullFloat64Ptr(v sql.NullFloat64) *float64 {
-	if !v.Valid {
-		return nil
-	}
-	out := v.Float64
-	return &out
-}
-
 func nullString(v *string) sql.NullString {
 	if v == nil || *v == "" {
 		return sql.NullString{}

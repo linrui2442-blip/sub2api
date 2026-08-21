@@ -107,7 +107,7 @@ func (r *userRepository) UpdateUserLastActiveAt(ctx context.Context, userID int6
 	return err
 }
 
-func (r *userRepository) GetUserAvatar(ctx context.Context, userID int64) (*service.UserAvatar, error) {
+func (r *userRepository) GetUserAvatar(ctx context.Context, userID int64) (avatar *service.UserAvatar, err error) {
 	exec, err := r.userProfileIdentitySQL(ctx)
 	if err != nil {
 		return nil, err
@@ -116,11 +116,16 @@ func (r *userRepository) GetUserAvatar(ctx context.Context, userID int64) (*serv
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = closeErr
+			avatar = nil
+		}
+	}()
 	if !rows.Next() {
 		return nil, rows.Err()
 	}
-	avatar := &service.UserAvatar{}
+	avatar = &service.UserAvatar{}
 	if err := rows.Scan(&avatar.StorageProvider, &avatar.StorageKey, &avatar.URL, &avatar.ContentType, &avatar.ByteSize, &avatar.SHA256); err != nil {
 		return nil, err
 	}

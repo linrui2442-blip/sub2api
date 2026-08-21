@@ -30,7 +30,12 @@ func (r *usageLogRepository) getAllGroupUsageSummaryFromRollups(ctx context.Cont
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = closeErr
+			results = nil
+		}
+	}()
 	for rows.Next() {
 		var row usagestats.GroupUsageSummary
 		if err := rows.Scan(&row.GroupID, &row.TodayRequests, &row.TodayTokens, &row.YesterdayRequests, &row.YesterdayTokens, &row.TotalRequests, &row.TotalTokens); err != nil {

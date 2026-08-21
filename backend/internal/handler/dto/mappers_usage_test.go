@@ -231,7 +231,3 @@ func TestUsageLogFromService_PreservesHistoricalMissingImageSize(t *testing.T) {
 	require.Contains(t, string(body), `"image_size":null`)
 	require.NotContains(t, string(body), `"image_size":"2K"`)
 }
-
-func f64Ptr(value float64) *float64 {
-	return &value
-}

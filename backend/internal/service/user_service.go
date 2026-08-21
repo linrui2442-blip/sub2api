@@ -700,11 +700,6 @@ func buildUserIdentityBindAuthorizeURL(provider, redirectTo string) (string, err
 		return "", ErrIdentityProviderInvalid
 	}
 
-	redirectTo, err := normalizeUserIdentityRedirect(redirectTo)
-	if err != nil {
-		return "", err
-	}
-
 	return "", ErrIdentityProviderInvalid
 }
 
