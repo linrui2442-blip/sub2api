@@ -32,7 +32,6 @@ const (
 const (
 	AuditActionLogin                  = "auth.login"
 	AuditActionLogin2FA               = "auth.login.2fa"
-	AuditActionRegister               = "auth.register"
 	AuditActionTokenRefresh           = "auth.token.refresh"
 	AuditActionSessionBindingMismatch = "auth.session_binding.mismatch"
 	AuditActionStepUpVerify           = "auth.step_up.verify"
