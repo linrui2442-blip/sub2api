@@ -26,30 +26,6 @@ func TestAuthRequestsBindTencentCaptchaProof(t *testing.T) {
 			},
 		},
 		{
-			name: "注册",
-			decode: func(raw []byte) service.CaptchaProof {
-				var req RegisterRequest
-				require.NoError(t, json.Unmarshal(raw, &req))
-				return captchaProof(req.TurnstileToken, req.TencentCaptchaTicket, req.TencentCaptchaRandstr)
-			},
-		},
-		{
-			name: "发送邮箱验证码",
-			decode: func(raw []byte) service.CaptchaProof {
-				var req SendVerifyCodeRequest
-				require.NoError(t, json.Unmarshal(raw, &req))
-				return captchaProof(req.TurnstileToken, req.TencentCaptchaTicket, req.TencentCaptchaRandstr)
-			},
-		},
-		{
-			name: "忘记密码",
-			decode: func(raw []byte) service.CaptchaProof {
-				var req ForgotPasswordRequest
-				require.NoError(t, json.Unmarshal(raw, &req))
-				return captchaProof(req.TurnstileToken, req.TencentCaptchaTicket, req.TencentCaptchaRandstr)
-			},
-		},
-		{
 			name: "Passkey登录",
 			decode: func(raw []byte) service.CaptchaProof {
 				var req passkeyBeginLoginRequest

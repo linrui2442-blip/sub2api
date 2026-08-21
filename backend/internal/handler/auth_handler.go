@@ -24,33 +24,6 @@ type AuthHandler struct {
 	totpService *service.TotpService
 }
 
-// RegisterRequest represents the registration request payload
-type RegisterRequest struct {
-	Email                 string `json:"email" binding:"required,email"`
-	Password              string `json:"password" binding:"required,min=6"`
-	VerifyCode            string `json:"verify_code"`
-	TurnstileToken        string `json:"turnstile_token"`
-	TencentCaptchaTicket  string `json:"tencent_captcha_ticket"`
-	TencentCaptchaRandstr string `json:"tencent_captcha_randstr"`
-	PromoCode             string `json:"promo_code"`      // 注册优惠码
-	InvitationCode        string `json:"invitation_code"` // 邀请码
-	AffCode               string `json:"aff_code"`        // 邀请返利码
-}
-
-// SendVerifyCodeRequest 发送验证码请求
-type SendVerifyCodeRequest struct {
-	Email                 string `json:"email" binding:"required,email"`
-	TurnstileToken        string `json:"turnstile_token"`
-	TencentCaptchaTicket  string `json:"tencent_captcha_ticket"`
-	TencentCaptchaRandstr string `json:"tencent_captcha_randstr"`
-}
-
-// SendVerifyCodeResponse 发送验证码响应
-type SendVerifyCodeResponse struct {
-	Message   string `json:"message"`
-	Countdown int    `json:"countdown"` // 倒计时秒数
-}
-
 // LoginRequest represents the login request payload
 type LoginRequest struct {
 	Email                 string `json:"email" binding:"required,email"`
@@ -305,55 +278,6 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 		userProfileResponse: userProfileResponseFromService(user, identities),
 		RunMode:             runMode,
 	})
-}
-
-// ValidatePromoCodeRequest 验证优惠码请求
-type ValidatePromoCodeRequest struct {
-	Code string `json:"code" binding:"required"`
-}
-
-// ValidatePromoCodeResponse 验证优惠码响应
-type ValidatePromoCodeResponse struct {
-	Valid       bool    `json:"valid"`
-	BonusAmount float64 `json:"bonus_amount,omitempty"`
-	ErrorCode   string  `json:"error_code,omitempty"`
-	Message     string  `json:"message,omitempty"`
-}
-
-// ValidateInvitationCodeRequest 验证邀请码请求
-type ValidateInvitationCodeRequest struct {
-	Code string `json:"code" binding:"required"`
-}
-
-// ValidateInvitationCodeResponse 验证邀请码响应
-type ValidateInvitationCodeResponse struct {
-	Valid     bool   `json:"valid"`
-	ErrorCode string `json:"error_code,omitempty"`
-}
-
-// ForgotPasswordRequest 忘记密码请求
-type ForgotPasswordRequest struct {
-	Email                 string `json:"email" binding:"required,email"`
-	TurnstileToken        string `json:"turnstile_token"`
-	TencentCaptchaTicket  string `json:"tencent_captcha_ticket"`
-	TencentCaptchaRandstr string `json:"tencent_captcha_randstr"`
-}
-
-// ForgotPasswordResponse 忘记密码响应
-type ForgotPasswordResponse struct {
-	Message string `json:"message"`
-}
-
-// ResetPasswordRequest 重置密码请求
-type ResetPasswordRequest struct {
-	Email       string `json:"email" binding:"required,email"`
-	Token       string `json:"token" binding:"required"`
-	NewPassword string `json:"new_password" binding:"required,min=6"`
-}
-
-// ResetPasswordResponse 重置密码响应
-type ResetPasswordResponse struct {
-	Message string `json:"message"`
 }
 
 // ==================== Token Refresh Endpoints ====================
