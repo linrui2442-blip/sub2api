@@ -15,7 +15,7 @@ type PersonalAuthService struct {
 
 // ProvidePersonalAuthService deliberately leaves public-account provisioning
 // dependencies nil: redeem/invitation, registration email delivery, promo,
-// default subscription assignment, affiliate and signup platform quotas.
+// default subscription assignment and affiliate flows.
 // Personal routes never expose those flows. Captcha services remain available
 // so an existing local configuration cannot turn login/passkey checks into a
 // nil dependency after an upgrade.

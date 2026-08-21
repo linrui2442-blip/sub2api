@@ -1,10 +1,6 @@
 package service
 
-import (
-	"fmt"
-
-	"github.com/Wei-Shaw/sub2api/internal/domain"
-)
+import "github.com/Wei-Shaw/sub2api/internal/domain"
 
 // Status constants
 const (
@@ -84,20 +80,6 @@ func IsCNProvider(platform string) bool {
 	}
 }
 
-// AllowedQuotaPlatforms 是允许设置 user × platform quota 的平台列表（单一权威来源）。
-// ent/schema/user_platform_quota.go 的 Validate 函数独立维护（构建期约束），
-// 若新增平台需同步修改该 schema。
-var AllowedQuotaPlatforms = []string{
-	PlatformAnthropic,
-	PlatformOpenAI,
-	PlatformGemini,
-	PlatformAntigravity,
-	PlatformGrok,
-	PlatformKimi,
-	PlatformZhipu,
-	PlatformDeepseek,
-}
-
 // AllowedSchedulingThresholdPlatforms 是允许设置账号自动停调阈值的平台列表。
 // openai/anthropic/grok 有原生用量窗口；kimi/zhipu 的 Coding Plan 同样暴露 5h/weekly
 // 滚动窗口，纳入阈值评估。deepseek 为余额型，走余额检测而非阈值。
@@ -107,16 +89,6 @@ var AllowedSchedulingThresholdPlatforms = []string{
 	PlatformGrok,
 	PlatformKimi,
 	PlatformZhipu,
-}
-
-// IsAllowedQuotaPlatform 报告 s 是否为合法的 quota platform 标识。
-func IsAllowedQuotaPlatform(s string) bool {
-	for _, p := range AllowedQuotaPlatforms {
-		if p == s {
-			return true
-		}
-	}
-	return false
 }
 
 // Account type constants
@@ -570,19 +542,9 @@ const (
 	// Web Search Emulation
 )
 
-// SettingKeyDefaultPlatformQuotas —— 系统全局：每用户 × 平台日/周/月 USD 上限（JSON）。
-// 值为 map[platform]{daily,weekly,monthly}，null/缺省 = 不限制；0 = 禁用；>0 = USD 上限。
-const SettingKeyDefaultPlatformQuotas = "default_platform_quotas"
-
 // SettingKeyAccountSchedulingThresholds —— 系统全局：按平台自动停调阈值（JSON map）。
 // 值为 map[platform]percent，1..100；100 = 禁用该平台自动停调。
 const SettingKeyAccountSchedulingThresholds = "account_scheduling_thresholds"
-
-// SettingKeyAuthSourcePlatformQuotas 返回某 auth source 的 platform quota JSON key。
-// 形如 auth_source_default_{source}_platform_quotas
-func SettingKeyAuthSourcePlatformQuotas(source string) string {
-	return fmt.Sprintf("auth_source_default_%s_platform_quotas", source)
-}
 
 // QuotaDimension constants for spark shadow accounts.
 const (

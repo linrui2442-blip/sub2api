@@ -392,16 +392,6 @@ export default {
         defaultSubscriptionsDuplicate: '默认订阅存在重复分组：{groupId}。每个分组只能出现一次。',
         subscriptionGroup: '订阅分组',
         subscriptionValidityDays: '有效期（天）',
-        defaultPlatformQuotas: '默认平台限额（注册时分配）',
-        defaultPlatformQuotasHint: '新用户注册时自动写入平台限额记录；已有用户不受影响。留空 = 该平台该窗口不限制。',
-        platformQuotaNotice: '月限额为 30 天滚动窗口，非自然月',
-      },
-      platformQuota: {
-        platform:    '平台',
-        daily:       '日限额 (USD)',
-        weekly:      '周限额 (USD)',
-        monthly:     '月限额 (USD, 30天滚动)',
-        placeholder: '不限',
       },
       claudeCode: {
         title: 'Claude Code 设置',
@@ -1166,8 +1156,6 @@ export default {
         defaultSubscriptionsLabel: '默认订阅',
         defaultSubscriptionsHint: '仅对当前认证来源生效，未配置时不追加来源专属订阅。',
         noSourceSubscriptions: '当前来源未配置专属默认订阅。',
-        platformQuotasOverride: '平台限额覆盖',
-        platformQuotasOverrideHint: '留空的字段继承「系统默认平台限额」；填 0 表示禁止该窗口使用。',
       },
       paymentVisibleMethods: {
         methodLabel: '{title} 可见方式',

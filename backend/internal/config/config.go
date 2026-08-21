@@ -1362,13 +1362,6 @@ type DatabaseConfig struct {
 	ConnMaxLifetimeMinutes int `mapstructure:"conn_max_lifetime_minutes"`
 	// ConnMaxIdleTimeMinutes: 空闲连接最大存活时间，及时释放不活跃连接
 	ConnMaxIdleTimeMinutes int `mapstructure:"conn_max_idle_time_minutes"`
-	// UserPlatformQuotaFlusherEnabled: 是否启用 user×platform 配额写聚合 flusher
-	UserPlatformQuotaFlusherEnabled bool `mapstructure:"user_platform_quota_flusher_enabled"`
-	// UserPlatformQuotaFlushIntervalMs: flusher 刷写间隔（毫秒）
-	UserPlatformQuotaFlushIntervalMs int `mapstructure:"user_platform_quota_flush_interval_ms"`
-	// UserPlatformQuotaFlushBatchSize: flusher 单批最大条数
-	// 建议 ≤ 6000（单条 UPSERT 原子上限）
-	UserPlatformQuotaFlushBatchSize int `mapstructure:"user_platform_quota_flush_batch_size"`
 }
 
 func (d *DatabaseConfig) DSN() string {

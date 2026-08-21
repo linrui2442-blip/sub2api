@@ -547,11 +547,3 @@ func (h *UserHandler) BatchUpdateLimits(c *gin.Context) {
 	}
 	response.Success(c, gin.H{"affected": affected})
 }
-
-// PlatformQuotaInput 单平台限额输入；limit 字段为 nil 表示不限制。
-type PlatformQuotaInput struct {
-	Platform        string   `json:"platform" binding:"required"`
-	DailyLimitUSD   *float64 `json:"daily_limit_usd"`
-	WeeklyLimitUSD  *float64 `json:"weekly_limit_usd"`
-	MonthlyLimitUSD *float64 `json:"monthly_limit_usd"`
-}

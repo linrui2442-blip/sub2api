@@ -1400,7 +1400,7 @@ const loadUsers = async () => {
         group_name: filters.group || undefined,
         api_key_group_id: filters.apiKeyGroup ?? undefined,
         attributes: Object.keys(attrFilters).length > 0 ? attrFilters : undefined,
-        // 始终请求 subscriptions：列隐藏时仍需用于 UserPlatformQuotaModal 的 active-subscription 警示 banner
+        // Subscription metadata remains available to the trusted-member management view.
         include_subscriptions: true,
         sort_by: sortState.sort_by,
         sort_order: sortState.sort_order

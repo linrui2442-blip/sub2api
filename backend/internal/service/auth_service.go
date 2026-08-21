@@ -630,9 +630,6 @@ func resolvedTokenVersion(user *User) int64 {
 	return user.TokenVersion ^ fingerprint
 }
 
-// snapshotPlatformQuotaDefaults 把 plan.PlatformQuotas（platform × 3 window）以
-// BulkInsertInitial 形式写入 user_platform_quotas 表。失败 fail-open（仅 warn log）。
-
 func (s *AuthService) RecordSuccessfulLogin(ctx context.Context, userID int64) {
 	if s == nil || s.userRepo == nil || userID <= 0 {
 		return

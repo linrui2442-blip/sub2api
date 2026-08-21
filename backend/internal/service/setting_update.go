@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -448,17 +447,6 @@ func (s *SettingService) buildSystemSettingsUpdates(ctx context.Context, setting
 	updates[SettingKeyAccountQuotaNotifyEnabled] = strconv.FormatBool(settings.AccountQuotaNotifyEnabled)
 	updates[SettingKeyAccountQuotaNotifyEmails] = MarshalNotifyEmails(settings.AccountQuotaNotifyEmails)
 
-	// 系统全局 platform quota：整体替换语义（null/缺省 = 不限制）。
-	if settings.DefaultPlatformQuotas != nil {
-		if err := validateDefaultPlatformQuotaMap(settings.DefaultPlatformQuotas); err != nil {
-			return nil, err
-		}
-		blob, err := json.Marshal(settings.DefaultPlatformQuotas)
-		if err != nil {
-			return nil, fmt.Errorf("marshal default platform quotas: %w", err)
-		}
-		updates[SettingKeyDefaultPlatformQuotas] = string(blob)
-	}
 	if settings.AccountSchedulingThresholds != nil {
 		normalized, err := validateAndNormalizeAccountSchedulingThresholds(settings.AccountSchedulingThresholds)
 		if err != nil {
@@ -541,49 +529,9 @@ func cloneAccountSchedulingThresholds(input map[string]int) map[string]int {
 	return cloned
 }
 
-// validateDefaultPlatformQuotaMap 校验 platform quota map 的合法性：
-// 平台名须在 AllowedQuotaPlatforms 白名单内，每个非 nil 上限须 finite 且 >= 0。
-// 系统层和 auth-source 层共用此 helper。
-func validateDefaultPlatformQuotaMap(m map[string]*DefaultPlatformQuotaSetting) error {
-	for platform, pq := range m {
-		if !IsAllowedQuotaPlatform(platform) {
-			return infraerrors.BadRequest("INVALID_DEFAULT_PLATFORM_QUOTA", fmt.Sprintf("unknown platform %q", platform))
-		}
-		if pq == nil {
-			continue
-		}
-		for _, v := range []*float64{pq.DailyLimitUSD, pq.WeeklyLimitUSD, pq.MonthlyLimitUSD} {
-			if v != nil && (*v < 0 || math.IsNaN(*v) || math.IsInf(*v, 0)) {
-				return infraerrors.BadRequest("INVALID_DEFAULT_PLATFORM_QUOTA", "platform quota limit must be a finite non-negative number")
-			}
-		}
-	}
-	return nil
-}
-
 func (s *SettingService) buildAuthSourceDefaultUpdates(ctx context.Context, settings *AuthSourceDefaultSettings) (map[string]string, error) {
 	if settings == nil {
 		return nil, nil
-	}
-
-	// 校验各 auth source 的 platform quota map（改动 C：对等系统层校验）
-	for _, pgs := range []struct {
-		name string
-		pq   map[string]*DefaultPlatformQuotaSetting
-	}{
-		{"email", settings.Email.PlatformQuotas},
-		{"linuxdo", settings.LinuxDo.PlatformQuotas},
-		{"oidc", settings.OIDC.PlatformQuotas},
-		{"wechat", settings.WeChat.PlatformQuotas},
-		{"github", settings.GitHub.PlatformQuotas},
-		{"google", settings.Google.PlatformQuotas},
-		{"dingtalk", settings.DingTalk.PlatformQuotas},
-	} {
-		if pgs.pq != nil {
-			if err := validateDefaultPlatformQuotaMap(pgs.pq); err != nil {
-				return nil, err
-			}
-		}
 	}
 
 	updates := make(map[string]string, 36)

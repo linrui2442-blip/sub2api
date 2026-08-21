@@ -850,15 +850,6 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		result.AccountQuotaNotifyEmails = []NotifyEmailEntry{}
 	}
 
-	// 系统层默认 platform quota（修复 Bug B：parseSettings 不填充导致回显恒为 nil）
-	if raw := settings[SettingKeyDefaultPlatformQuotas]; raw != "" {
-		parsed := map[string]*DefaultPlatformQuotaSetting{}
-		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
-			slog.Warn("[Setting] parseSettings: unmarshal default_platform_quotas failed", "error", err)
-		} else {
-			result.DefaultPlatformQuotas = parsed
-		}
-	}
 	result.AccountSchedulingThresholds = defaultAccountSchedulingThresholds()
 	if raw := strings.TrimSpace(settings[SettingKeyAccountSchedulingThresholds]); raw != "" {
 		if thresholds, err := parseAccountSchedulingThresholdsSetting(raw); err != nil {
@@ -1070,15 +1061,6 @@ func parseProviderDefaultGrantSettings(settings map[string]string, keys authSour
 		result.GrantOnFirstBind = raw == "true"
 	}
 
-	if raw := settings[keys.platformQuotas]; raw != "" {
-		parsed := map[string]*DefaultPlatformQuotaSetting{}
-		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
-			slog.Warn("[Setting] parseProviderDefaultGrantSettings: unmarshal auth source platform quotas failed", "source", keys.source, "error", err)
-		} else {
-			result.PlatformQuotas = parsed
-		}
-	}
-
 	return result
 }
 
@@ -1098,16 +1080,6 @@ func writeProviderDefaultGrantUpdates(updates map[string]string, keys authSource
 	updates[keys.grantOnSignup] = strconv.FormatBool(settings.GrantOnSignup)
 	updates[keys.grantOnFirstBind] = strconv.FormatBool(settings.GrantOnFirstBind)
 
-	// auth source platform quota：整体替换语义。
-	// nil = 请求未携带该字段，跳过写入以保留既有配置（与系统层 buildSystemSettingsUpdates 的
-	// DefaultPlatformQuotas nil 守卫一致）；非 nil（含空 map）才整体替换。二者语义不可混同。
-	if keys.platformQuotas != "" && settings.PlatformQuotas != nil {
-		blob, err := json.Marshal(settings.PlatformQuotas)
-		if err != nil {
-			blob = []byte("{}")
-		}
-		updates[keys.platformQuotas] = string(blob)
-	}
 }
 
 func mergeProviderDefaultGrantSettings(globalDefaults ProviderDefaultGrantSettings, providerDefaults ProviderDefaultGrantSettings) ProviderDefaultGrantSettings {
