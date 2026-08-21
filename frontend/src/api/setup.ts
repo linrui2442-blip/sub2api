@@ -19,40 +19,9 @@ export interface SetupStatus {
   personal?: boolean
 }
 
-export interface DatabaseConfig {
-  host: string
-  port: number
-  user: string
-  password: string
-  dbname: string
-  sslmode: string
-}
-
-export interface RedisConfig {
-  host: string
-  port: number
-  username: string
-  password: string
-  db: number
-  enable_tls: boolean
-}
-
 export interface AdminConfig {
   email: string
   password: string
-}
-
-export interface ServerConfig {
-  host: string
-  port: number
-  mode: string
-}
-
-export interface InstallRequest {
-  database: DatabaseConfig
-  redis: RedisConfig
-  admin: AdminConfig
-  server: ServerConfig
 }
 
 export interface PersonalInstallRequest {
@@ -69,28 +38,6 @@ export interface InstallResponse {
  */
 export async function getSetupStatus(): Promise<SetupStatus> {
   const response = await setupClient.get('/setup/status')
-  return response.data.data
-}
-
-/**
- * Test database connection
- */
-export async function testDatabase(config: DatabaseConfig): Promise<void> {
-  await setupClient.post('/setup/test-db', config)
-}
-
-/**
- * Test Redis connection
- */
-export async function testRedis(config: RedisConfig): Promise<void> {
-  await setupClient.post('/setup/test-redis', config)
-}
-
-/**
- * Perform upstream installation
- */
-export async function install(config: InstallRequest): Promise<InstallResponse> {
-  const response = await setupClient.post('/setup/install', config)
   return response.data.data
 }
 
