@@ -2653,7 +2653,6 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 
 	whereClause := " WHERE id = ANY($" + itoa(idx) + ") AND deleted_at IS NULL"
 	args = append(args, pq.Array(ids))
-	idx++
 	query := "UPDATE accounts SET " + joinClauses(setClauses, ", ") + whereClause
 
 	baseCtx := ctx

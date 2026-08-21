@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -2146,36 +2145,6 @@ func sendMockInterceptResponse(c *gin.Context, model string, interceptType Inter
 	}
 
 	c.JSON(http.StatusOK, response)
-}
-
-// extractQuotaResetSeconds 从 quota 错误的 metadata 中提取 window_resets_at 并计算
-// 距重置剩余秒数。fallback 路径必须返回 ≥1 秒，避免客户端立即重试无限循环。
-func extractQuotaResetSeconds(err error) int {
-	const fallback = 60
-	appErr := pkgerrors.FromError(err)
-	if appErr == nil {
-		return fallback
-	}
-	raw, ok := appErr.Metadata["window_resets_at"]
-	if !ok || raw == "" {
-		return fallback
-	}
-	resetAt, parseErr := time.Parse(time.RFC3339, raw)
-	if parseErr != nil {
-		logger.L().With(
-			zap.String("component", "handler.gateway.billing"),
-			zap.String("raw", raw),
-			zap.Error(parseErr),
-		).Warn("quota.invalid_window_resets_at_format")
-		return fallback
-	}
-	secs := time.Until(resetAt).Seconds()
-	if secs <= 0 {
-		// reset 时间已过：cache 与 DB 应该正在自愈，返回 fallback 让客户端按常规节奏退避，
-		// 避免返回 1 秒导致客户端立即重试仍触发限额的退避循环。
-		return fallback
-	}
-	return int(math.Ceil(secs))
 }
 
 func billingErrorDetails(err error) (status int, code, message string, retryAfter int) {

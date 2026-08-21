@@ -59,19 +59,6 @@ func findForeignKeyBySymbol(t *testing.T, table *entschema.Table, symbol string)
 	return nil
 }
 
-func findIndexByName(t *testing.T, table *entschema.Table, name string) *entschema.Index {
-	t.Helper()
-
-	for _, idx := range table.Indexes {
-		if idx.Name == name {
-			return idx
-		}
-	}
-
-	require.Failf(t, "missing index", "table %s should include index %s", table.Name, name)
-	return nil
-}
-
 func findForeignKeyByColumn(t *testing.T, table *entschema.Table, column string) *entschema.ForeignKey {
 	t.Helper()
 

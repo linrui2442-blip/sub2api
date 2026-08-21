@@ -97,7 +97,7 @@ func (c *personalRefreshTokenCache) tokenHashes(ctx context.Context, query strin
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var hashes []string
 	for rows.Next() {
 		var hash string
@@ -106,7 +106,13 @@ func (c *personalRefreshTokenCache) tokenHashes(ctx context.Context, query strin
 		}
 		hashes = append(hashes, hash)
 	}
-	return hashes, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	return hashes, nil
 }
 func (c *personalRefreshTokenCache) IsTokenInFamily(ctx context.Context, familyID, tokenHash string) (bool, error) {
 	var exists int

@@ -25,13 +25,6 @@ type GroupHandler struct {
 	groupCapacityService *service.GroupCapacityService
 }
 
-func float64ValueOrDefault(value *float64, fallback float64) float64 {
-	if value == nil {
-		return fallback
-	}
-	return *value
-}
-
 type optionalLimitField struct {
 	set   bool
 	value *float64

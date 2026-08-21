@@ -555,9 +555,3 @@ type PlatformQuotaInput struct {
 	WeeklyLimitUSD  *float64 `json:"weekly_limit_usd"`
 	MonthlyLimitUSD *float64 `json:"monthly_limit_usd"`
 }
-
-var allowedWindowsForQuotaReset = map[string]struct{}{
-	"daily":   {},
-	"weekly":  {},
-	"monthly": {},
-}

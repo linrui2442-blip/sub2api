@@ -69,16 +69,15 @@ type FailoverState struct {
 	LastFailoverErr       *service.UpstreamFailoverError
 	ForceCacheBilling     bool
 	hasBoundSession       bool
-
 }
 
 // NewFailoverState 创建 failover 状态
 func NewFailoverState(maxSwitches int, hasBoundSession bool) *FailoverState {
 	return &FailoverState{
-		MaxSwitches:            maxSwitches,
-		FailedAccountIDs:       make(map[int64]struct{}),
-		SameAccountRetryCount:  make(map[int64]int),
-		hasBoundSession:        hasBoundSession,
+		MaxSwitches:           maxSwitches,
+		FailedAccountIDs:      make(map[int64]struct{}),
+		SameAccountRetryCount: make(map[int64]int),
+		hasBoundSession:       hasBoundSession,
 	}
 }
 

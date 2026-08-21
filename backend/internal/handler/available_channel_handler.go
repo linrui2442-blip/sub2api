@@ -47,7 +47,6 @@ func (h *AvailableChannelHandler) featureEnabled(c *gin.Context) bool {
 }
 
 // userAvailableGroup 用户可见的分组概要（白名单字段）。
-//
 type userAvailableGroup struct {
 	ID          int64  `json:"id"`
 	Name        string `json:"name"`
@@ -236,10 +235,10 @@ func filterUserVisibleGroups(
 			continue
 		}
 		visible = append(visible, userAvailableGroup{
-			ID:                 g.ID,
-			Name:               g.Name,
-			Platform:           g.Platform,
-			IsExclusive:        g.IsExclusive,
+			ID:          g.ID,
+			Name:        g.Name,
+			Platform:    g.Platform,
+			IsExclusive: g.IsExclusive,
 		})
 	}
 	return visible
