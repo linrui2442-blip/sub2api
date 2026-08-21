@@ -60,7 +60,8 @@ Production Ready before that graph is removed would be inaccurate.
 - `git diff --check`: PASS.
 - Wire source/generated graph uses `NewSQLRepository`; local regeneration was blocked by a
   timeout downloading `github.com/google/subcommands`. CI is the clean-environment check.
-- GitHub CI / Personal Edition CI / Security Scan: pending this batch's push.
+- GitHub CI #428, Personal Edition CI #417 and Security Scan #428: PASS for
+  commit `145c286c396a72d878390f094fb196de0a719df2`.
 
 ## Windows delivery state
 
