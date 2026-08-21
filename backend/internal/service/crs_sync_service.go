@@ -368,7 +368,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 			extra = mergeMap(existing.Extra, extra)
 			credentials = mergeMap(existing.Credentials, credentials)
 		}
-		reconcileCRSUpstreamBillingProbeExtra(existing, PlatformAnthropic, targetType, credentials, extra)
+		reconcileCRSOllamaCloudUsageExtra(existing, PlatformAnthropic, targetType, credentials, extra)
 
 		if existing == nil {
 			if !shouldCreateAccount(src.ID, selectedSet) {
@@ -504,7 +504,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 			extra = mergeMap(existing.Extra, extra)
 			credentials = mergeMap(existing.Credentials, credentials)
 		}
-		reconcileCRSUpstreamBillingProbeExtra(existing, PlatformAnthropic, AccountTypeAPIKey, credentials, extra)
+		reconcileCRSOllamaCloudUsageExtra(existing, PlatformAnthropic, AccountTypeAPIKey, credentials, extra)
 
 		if existing == nil {
 			if !shouldCreateAccount(src.ID, selectedSet) {
@@ -659,7 +659,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 		if existing != nil {
 			credentials = mergeMap(existing.Credentials, credentials)
 		}
-		reconcileCRSUpstreamBillingProbeExtra(existing, PlatformOpenAI, AccountTypeOAuth, credentials, extra)
+		reconcileCRSOllamaCloudUsageExtra(existing, PlatformOpenAI, AccountTypeOAuth, credentials, extra)
 
 		if existing == nil {
 			if !shouldCreateAccount(src.ID, selectedSet) {
@@ -810,7 +810,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 		if existing != nil {
 			credentials = mergeMap(existing.Credentials, credentials)
 		}
-		reconcileCRSUpstreamBillingProbeExtra(existing, PlatformOpenAI, AccountTypeAPIKey, credentials, extra)
+		reconcileCRSOllamaCloudUsageExtra(existing, PlatformOpenAI, AccountTypeAPIKey, credentials, extra)
 
 		if existing == nil {
 			if !shouldCreateAccount(src.ID, selectedSet) {
@@ -940,7 +940,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 			extra = mergeMap(existing.Extra, extra)
 			credentials = mergeMap(existing.Credentials, credentials)
 		}
-		reconcileCRSUpstreamBillingProbeExtra(existing, PlatformGemini, AccountTypeOAuth, credentials, extra)
+		reconcileCRSOllamaCloudUsageExtra(existing, PlatformGemini, AccountTypeOAuth, credentials, extra)
 
 		if existing == nil {
 			if !shouldCreateAccount(src.ID, selectedSet) {
@@ -1070,7 +1070,7 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 			extra = mergeMap(existing.Extra, extra)
 			credentials = mergeMap(existing.Credentials, credentials)
 		}
-		reconcileCRSUpstreamBillingProbeExtra(existing, PlatformGemini, AccountTypeAPIKey, credentials, extra)
+		reconcileCRSOllamaCloudUsageExtra(existing, PlatformGemini, AccountTypeAPIKey, credentials, extra)
 
 		if existing == nil {
 			if !shouldCreateAccount(src.ID, selectedSet) {
@@ -1154,7 +1154,7 @@ func mergeMap(existing map[string]any, updates map[string]any) map[string]any {
 	return out
 }
 
-func reconcileCRSUpstreamBillingProbeExtra(
+func reconcileCRSOllamaCloudUsageExtra(
 	existing *Account,
 	targetPlatform, targetType string,
 	targetCredentials map[string]any,

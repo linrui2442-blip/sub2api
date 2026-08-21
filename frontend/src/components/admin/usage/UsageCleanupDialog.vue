@@ -320,10 +320,6 @@ const buildPayload = (): CreateUsageCleanupTaskRequest | null => {
   } else if (localFilters.value.stream !== null && localFilters.value.stream !== undefined) {
     payload.stream = localFilters.value.stream
   }
-  if (localFilters.value.billing_type !== null && localFilters.value.billing_type !== undefined) {
-    payload.billing_type = localFilters.value.billing_type
-  }
-
   return payload
 }
 

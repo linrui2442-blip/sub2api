@@ -25,7 +25,6 @@ export async function getProfile(): Promise<User> {
  */
 export async function updateProfile(profile: {
   username?: string
-  avatar_url?: string | null
 }): Promise<User> {
   const { data } = await apiClient.put<User>('/user', profile)
   return data

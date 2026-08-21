@@ -781,44 +781,6 @@
             aria-labelledby="bulk-edit-priority-label"
           />
         </div>
-        <div>
-          <div class="mb-3 flex items-center justify-between">
-            <label
-              id="bulk-edit-rate-multiplier-label"
-              class="input-label mb-0"
-              for="bulk-edit-rate-multiplier-enabled"
-            >
-              {{ t('admin.accounts.billingRateMultiplier') }}
-            </label>
-            <input
-              v-model="enableRateMultiplier"
-              id="bulk-edit-rate-multiplier-enabled"
-              type="checkbox"
-              aria-controls="bulk-edit-rate-multiplier"
-              class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-            />
-          </div>
-          <input
-            v-model.number="rateMultiplier"
-            id="bulk-edit-rate-multiplier"
-            type="number"
-            min="0"
-            step="0.01"
-            :disabled="!enableRateMultiplier"
-            class="input"
-            :class="!enableRateMultiplier && 'cursor-not-allowed opacity-50'"
-            aria-labelledby="bulk-edit-rate-multiplier-label"
-          />
-          <p class="input-hint">{{ t('admin.accounts.billingRateMultiplierHint') }}</p>
-          <p
-            v-if="enableRateMultiplier"
-            class="mt-2 flex items-start gap-1 text-xs text-amber-700 dark:text-amber-300"
-            data-testid="bulk-rate-sync-warning"
-          >
-            <Icon name="exclamationTriangle" size="xs" class="mt-0.5 flex-shrink-0" />
-            <span>{{ t('admin.accounts.bulkEdit.rateSyncWarning') }}</span>
-          </p>
-        </div>
       </div>
 
       <!-- Status -->
@@ -988,45 +950,6 @@
             {{ t('admin.accounts.openai.codexFingerprintModeDesc') }}
           </p>
           <Select v-model="codexFingerprintMode" data-testid="bulk-codex-fingerprint-mode-select" :options="codexFingerprintModeOptions" />
-        </div>
-      </div>
-
-      <!-- Upstream billing auto probe (any API-key platform) -->
-      <div v-if="allBillingProbeCapable" class="border-t border-gray-200 pt-4 dark:border-dark-600">
-        <div class="mb-3 flex items-center justify-between">
-          <div class="flex-1 pr-4">
-            <label
-              id="bulk-edit-upstream-billing-auto-probe-label"
-              class="input-label mb-0"
-              for="bulk-edit-upstream-billing-auto-probe-enabled"
-            >
-              {{ t('admin.accounts.upstreamBilling.autoProbe') }}
-            </label>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {{ t('admin.accounts.upstreamBilling.autoProbeHint') }}
-            </p>
-          </div>
-          <input
-            v-model="enableUpstreamBillingAutoProbe"
-            id="bulk-edit-upstream-billing-auto-probe-enabled"
-            type="checkbox"
-            aria-controls="bulk-edit-upstream-billing-auto-probe"
-            class="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-          />
-        </div>
-        <div
-          id="bulk-edit-upstream-billing-auto-probe"
-          :class="!enableUpstreamBillingAutoProbe && 'pointer-events-none opacity-50'"
-          role="group"
-          aria-labelledby="bulk-edit-upstream-billing-auto-probe-label"
-        >
-          <Select
-            v-model="upstreamBillingAutoProbeMode"
-            :disabled="!enableUpstreamBillingAutoProbe"
-            data-testid="bulk-edit-upstream-billing-auto-probe-select"
-            :options="upstreamBillingAutoProbeOptions"
-            aria-labelledby="bulk-edit-upstream-billing-auto-probe-label"
-          />
         </div>
       </div>
 
@@ -1590,15 +1513,6 @@ const allOpenAIAPIKey = computed(() => {
   )
 })
 
-// 上游倍率自动探测已放宽到全部 API-key 平台：只要求所选类型全为 apikey，
-// 平台不限（sub2api 上游即可应答 /v1/sub2api/billing）。
-const allBillingProbeCapable = computed(() => {
-  return (
-    targetSelectedTypes.value.length > 0 &&
-    targetSelectedTypes.value.every(t => t === 'apikey')
-  )
-})
-
 // 是否全部为支持请求头覆写的平台/账号类型
 // 所选平台 × 所选类型的全组合均需具备覆写资格（实际选中账号是该组合的子集，
 // 按交叉积判定偏保守但绝不放行不合资格的账号）
@@ -1653,7 +1567,6 @@ const enableProxy = ref(false)
 const enableConcurrency = ref(false)
 const enableLoadFactor = ref(false)
 const enablePriority = ref(false)
-const enableRateMultiplier = ref(false)
 const enableStatus = ref(false)
 const enableGroups = ref(false)
 const enableOpenAIPassthrough = ref(false)
@@ -1663,7 +1576,6 @@ const enableOpenAIEndpointCapabilities = ref(false)
 const enableOpenAIResponsesMode = ref(false)
 const enableOpenAIWSMode = ref(false)
 const enableOpenAIAPIKeyWSMode = ref(false)
-const enableUpstreamBillingAutoProbe = ref(false)
 const enableCodexCLIOnly = ref(false)
 const enableCodexCLIOnlyAppServer = ref(false)
 const enableOpenAICompactMode = ref(false)
@@ -1688,7 +1600,6 @@ const proxyId = ref<number | null>(null)
 const concurrency = ref(1)
 const loadFactor = ref<number | null>(null)
 const priority = ref(1)
-const rateMultiplier = ref(1)
 const status = ref<'active' | 'inactive'>('active')
 const groupIds = ref<number[]>([])
 const openaiPassthroughEnabled = ref(false)
@@ -1702,7 +1613,6 @@ const openAIEndpointCapabilities = ref<OpenAIEndpointCapability[]>([
 const openAIResponsesMode = ref<OpenAIResponsesMode>('auto')
 const openaiOAuthResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
 const openaiAPIKeyResponsesWebSocketV2Mode = ref<OpenAIWSMode>(OPENAI_WS_MODE_OFF)
-const upstreamBillingAutoProbeMode = ref<'enabled' | 'disabled'>('enabled')
 const codexCLIOnlyEnabled = ref(false)
 const codexCLIOnlyAppServerEnabled = ref(false)
 type CodexFingerprintMode = 'off' | 'device' | 'session' | 'full'
@@ -1741,10 +1651,6 @@ const commonErrorCodes = [
 const statusOptions = computed(() => [
   { value: 'active', label: t('common.active') },
   { value: 'inactive', label: t('common.inactive') }
-])
-const upstreamBillingAutoProbeOptions = computed(() => [
-  { value: 'enabled', label: t('common.enabled') },
-  { value: 'disabled', label: t('common.disabled') }
 ])
 const isOpenAIModelRestrictionDisabled = computed(
   () =>
@@ -1954,9 +1860,6 @@ const buildUpdatePayload = (): Record<string, unknown> | null => {
     updates.priority = priority.value
   }
 
-  if (enableRateMultiplier.value) {
-    updates.rate_multiplier = rateMultiplier.value
-  }
 
   if (enableStatus.value) {
     updates.status = status.value
@@ -2065,10 +1968,6 @@ const buildUpdatePayload = (): Record<string, unknown> | null => {
     extra.openai_apikey_responses_websockets_v2_enabled = isOpenAIWSModeEnabled(
       openaiAPIKeyResponsesWebSocketV2Mode.value
     )
-  }
-
-  if (enableUpstreamBillingAutoProbe.value) {
-    updates.upstream_billing_probe_enabled = upstreamBillingAutoProbeMode.value === 'enabled'
   }
 
   if (enableCodexCLIOnly.value) {
@@ -2202,12 +2101,10 @@ const handleSubmit = async () => {
     enableConcurrency.value ||
     enableLoadFactor.value ||
     enablePriority.value ||
-    enableRateMultiplier.value ||
     enableStatus.value ||
     enableGroups.value ||
     enableOpenAIWSMode.value ||
     enableOpenAIAPIKeyWSMode.value ||
-    enableUpstreamBillingAutoProbe.value ||
     enableCodexCLIOnly.value ||
     enableCodexCLIOnlyAppServer.value ||
     enableCodexFingerprintMode.value ||
@@ -2305,10 +2202,6 @@ const submitBulkUpdate = async (baseUpdates: Record<string, unknown>) => {
       pendingUpdatesForConfirm.value = baseUpdates
       mixedChannelWarningMessage.value = error.message
       showMixedChannelWarning.value = true
-    } else if (error.reason === 'UPSTREAM_BILLING_RATE_SYNC_BULK_CONFLICT') {
-      appStore.showError(t('admin.accounts.bulkEdit.rateSyncConflict', {
-        count: error.metadata?.count ?? 1
-      }))
     } else if (error.reason === 'OPENAI_LONG_CONTEXT_PARENT_REQUIRED') {
       appStore.showError(t('admin.accounts.bulkEdit.longContextParentRequired'))
     } else {
@@ -2348,7 +2241,6 @@ watch(
       enableConcurrency.value = false
       enableLoadFactor.value = false
       enablePriority.value = false
-      enableRateMultiplier.value = false
       enableStatus.value = false
       enableGroups.value = false
       enableOpenAIPassthrough.value = false
@@ -2358,7 +2250,6 @@ watch(
       enableOpenAIResponsesMode.value = false
       enableOpenAIWSMode.value = false
       enableOpenAIAPIKeyWSMode.value = false
-      enableUpstreamBillingAutoProbe.value = false
       enableCodexCLIOnly.value = false
       enableCodexCLIOnlyAppServer.value = false
       enableCodexFingerprintMode.value = false
@@ -2386,12 +2277,10 @@ watch(
       concurrency.value = 1
       loadFactor.value = null
       priority.value = 1
-      rateMultiplier.value = 1
       status.value = 'active'
       groupIds.value = []
       openaiOAuthResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
       openaiAPIKeyResponsesWebSocketV2Mode.value = OPENAI_WS_MODE_OFF
-      upstreamBillingAutoProbeMode.value = 'enabled'
       codexCLIOnlyEnabled.value = false
       codexCLIOnlyAppServerEnabled.value = false
       openAICompactMode.value = 'auto'

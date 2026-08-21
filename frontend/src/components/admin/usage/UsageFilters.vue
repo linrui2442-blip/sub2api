@@ -127,18 +127,6 @@
           <Select v-model="filters.request_type" :options="requestTypeOptions" @change="emitChange" />
         </div>
 
-        <!-- Billing Type Filter (usage only) -->
-        <div v-if="mode !== 'errors'" class="w-full sm:w-auto sm:min-w-[200px]">
-          <label class="input-label">{{ t('admin.usage.billingType') }}</label>
-          <Select v-model="filters.billing_type" :options="billingTypeOptions" @change="emitChange" />
-        </div>
-
-        <!-- Billing Mode Filter (usage only；用户排行的 user-breakdown 接口不支持该维度) -->
-        <div v-if="mode === 'usage'" class="w-full sm:w-auto sm:min-w-[200px]">
-          <label class="input-label">{{ t('admin.usage.billingMode') }}</label>
-          <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="emitChange" />
-        </div>
-
         <div v-if="mode === 'usage'" class="w-full sm:w-auto sm:min-w-[220px]">
           <label class="input-label">{{ t('admin.usage.upstreamModelAudit') }}</label>
           <Select v-model="filters.upstream_model_mismatch" :options="upstreamModelMismatchOptions" @change="emitChange" />
@@ -274,12 +262,6 @@ const requestTypeOptions = ref<SelectOption[]>([
   { value: 'cyber', label: t('usage.cyber') }
 ])
 
-const billingTypeOptions = ref<SelectOption[]>([
-  { value: null, label: t('admin.usage.allBillingTypes') },
-  { value: 0, label: t('admin.usage.billingTypeBalance') },
-  { value: 1, label: t('admin.usage.billingTypeSubscription') }
-])
-
 // 错误类型对应后端 phase 参数(与错误表"类型"徽章同语义)
 const errorPhaseOptions = computed<SelectOption[]>(() => [
   { value: null, label: t('admin.usage.allTypes') },
@@ -302,14 +284,6 @@ const errorCategoryOptions = computed<SelectOption[]>(() => [
 const statusCodeOptions = computed<SelectOption[]>(() => [
   { value: null, label: t('usage.errors.allStatuses') },
   ...COMMON_ERROR_STATUS_CODES.map((c) => ({ value: c, label: String(c) })),
-])
-
-const billingModeOptions = ref<SelectOption[]>([
-  { value: null, label: t('admin.usage.allBillingModes') },
-  { value: 'token', label: t('admin.usage.billingModeToken') },
-  { value: 'per_request', label: t('admin.usage.billingModePerRequest') },
-  { value: 'image', label: t('admin.usage.billingModeImage') },
-  { value: 'video', label: t('admin.usage.billingModeVideo') }
 ])
 
 const upstreamModelMismatchOptions = ref<SelectOption[]>([

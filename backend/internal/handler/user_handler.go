@@ -24,13 +24,11 @@ type ChangePasswordRequest struct {
 
 // UpdateProfileRequest represents the update profile request payload
 type UpdateProfileRequest struct {
-	Username  *string `json:"username"`
-	AvatarURL *string `json:"avatar_url"`
+	Username *string `json:"username"`
 }
 
 type userProfileResponse struct {
 	dto.User
-	AvatarURL    string                                 `json:"avatar_url,omitempty"`
 	Identities   service.UserIdentitySummarySet         `json:"identities"`
 	AuthBindings map[string]service.UserIdentitySummary `json:"auth_bindings"`
 	EmailBound   bool                                   `json:"email_bound"`
@@ -104,8 +102,7 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	}
 
 	svcReq := service.UpdateProfileRequest{
-		Username:  req.Username,
-		AvatarURL: req.AvatarURL,
+		Username: req.Username,
 	}
 	updatedUser, err := h.userService.UpdateProfile(c.Request.Context(), subject.UserID, svcReq)
 	if err != nil {
@@ -153,7 +150,6 @@ func userProfileResponseFromService(user *service.User, identities service.UserI
 	bindings := userProfileBindingMap(identities)
 	return userProfileResponse{
 		User:         *base,
-		AvatarURL:    user.AvatarURL,
 		Identities:   identities,
 		AuthBindings: bindings,
 		EmailBound:   identities.Email.Bound,

@@ -234,10 +234,6 @@ const (
 	// Grok accounts without an explicit credentials.base_url.
 	SettingKeyGrokDefaultBaseURLMode = "grok_default_base_url_mode"
 
-	// SettingKeyUpstreamBillingProbeSettings stores the global enable switch and interval
-	// for probing remote Sub2API API-key billing metadata.
-	SettingKeyUpstreamBillingProbeSettings = "upstream_billing_probe_settings"
-
 	// SettingKeyOllamaCloudUsageSettings stores the opt-in global runner switch and interval.
 	SettingKeyOllamaCloudUsageSettings = "ollama_cloud_usage_settings"
 

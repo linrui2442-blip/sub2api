@@ -336,16 +336,6 @@ export default {
         accountSchedulingThresholdsDisabledHint: '100 disables platform auto-pause. Values 1–99 pause scheduling once utilization reaches that percent.',
         accountSchedulingThresholdsRangeHint: 'Integer 1–100 (percent). OpenAI/Anthropic/Grok only.'
       },
-      upstreamBillingProbe: {
-        title: 'Upstream Rate Auto Detection',
-        description: 'Periodically retrieve rates declared by upstream Sub2API sites. Account rates change only when the separate sync switch is enabled.',
-        enabled: 'Enable global auto detection',
-        enabledHint: 'When enabled, scheduled detection runs only for accounts that also enable automatic detection. Disabling stops all scheduled detection; manual detection remains available.',
-        intervalMinutes: 'Detection interval (minutes)',
-        intervalHint: 'Range: 5–1440 minutes. A successful result remains valid for two detection intervals.',
-        saved: 'Upstream rate auto detection settings saved',
-        saveFailed: 'Failed to save upstream rate auto detection settings'
-      },
       ollamaCloudUsage: {
         title: 'Ollama Cloud Usage Refresh',
         description: 'Refresh official Ollama settings-page usage driven by model requests for individually opted-in accounts. Disabled by default. Idle accounts are not polled.',

@@ -3045,16 +3045,6 @@ func (r *accountRepository) FindByExtraField(ctx context.Context, key string, va
 	return r.accountsToService(ctx, accounts)
 }
 
-// ListDueUpstreamBillingProbeAccounts bounds result hydration and network work
-// to limit. PostgreSQL must still filter and order all enabled candidates;
-// MATERIALIZED avoids repeating the defensive timestamp parse expression.
-// Go writes next_probe_at via RFC3339Nano (up to 9 fractional digits) while
-// jsonpath datetime() parses at most microseconds, so fractions beyond 6
-// digits are trimmed first — mirroring ListDueOllamaCloudUsageAccounts.
-// Without this, every nanosecond timestamp is treated as malformed and the
-// fail-open ordering pins the cycle to the lowest account IDs, starving the
-// rest of the pool.
-
 // nowUTC is a SQL expression to generate a UTC RFC3339 timestamp string.
 const nowUTC = `to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`
 

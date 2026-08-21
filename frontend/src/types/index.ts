@@ -38,7 +38,6 @@ export interface User {
   id: number
   username: string
   email: string
-  avatar_url?: string | null
   role: 'admin' | 'user' // User role for authorization
   concurrency: number // Allowed concurrent requests
   rpm_limit?: number // User-level RPM cap (0 = unlimited); effective as fallback when group has no rpm_limit
@@ -677,51 +676,6 @@ export interface TempUnschedulableStatus {
   state?: TempUnschedulableState
 }
 
-export interface UpstreamBillingData {
-  object: 'sub2api.key_billing'
-  schema_version: 1
-  billing_scope: 'token'
-  group_rate_multiplier: number
-  user_rate_multiplier?: number
-  resolved_rate_multiplier: number
-  peak_rate_enabled: boolean
-  peak_start?: string
-  peak_end?: string
-  peak_rate_multiplier?: number
-  applied_peak_multiplier?: number
-  effective_rate_multiplier: number
-  timezone?: string
-  observed_at: string
-}
-
-export type UpstreamBillingProbeStatus = 'ok' | 'unsupported' | 'failed'
-
-export interface UpstreamBillingProbeSnapshot {
-  status: UpstreamBillingProbeStatus
-  data?: UpstreamBillingData
-  received_at?: string
-  fresh_until?: string
-  last_attempt_at: string
-  next_probe_at: string
-  failure_count?: number
-  http_status?: number
-  last_error?: string
-  // Value this probe wrote into the account rate multiplier; absent when the
-  // probe did not sync a rate.
-  synced_rate_multiplier?: number
-}
-
-export interface UpstreamBillingProbeSettings {
-  enabled: boolean
-  interval_minutes: number
-}
-
-export interface UpstreamBillingProbeResult {
-  account_id: number
-  snapshot?: UpstreamBillingProbeSnapshot
-  error?: string
-}
-
 export type OllamaCloudUsageStatus = 'ok' | 'unauthorized' | 'failed'
 
 export interface OllamaCloudUsageWindow {
@@ -789,9 +743,6 @@ export interface Account {
   extra?: (CodexUsageSnapshot & OpenAICompactState & {
     model_rate_limits?: Record<string, { rate_limited_at: string; rate_limit_reset_at: string }>
     antigravity_credits_overages?: Record<string, { activated_at: string; active_until: string }>
-    upstream_billing_probe_enabled?: boolean
-    upstream_billing_rate_sync_enabled?: boolean
-    upstream_billing_probe?: UpstreamBillingProbeSnapshot
     codex_reset_credit_snapshot?: {
       available_count?: number
       credits?: { expires_at?: string }[]
@@ -811,7 +762,6 @@ export interface Account {
   } | null
   scheduler_scores?: AccountSchedulerGroupScore[] | null
   priority: number
-  rate_multiplier?: number // Account billing multiplier (>=0, 0 means free)
   status: 'active' | 'inactive' | 'error'
   error_message: string | null
   last_used_at: string | null
@@ -1083,11 +1033,9 @@ export interface CreateAccountRequest {
   concurrency?: number
   load_factor?: number | null
   priority?: number
-  rate_multiplier?: number // Account billing multiplier (>=0, 0 means free)
   group_ids?: number[]
   expires_at?: number | null
   auto_pause_on_expired?: boolean
-  upstream_billing_probe_enabled?: boolean
   confirm_mixed_channel_risk?: boolean
 }
 
@@ -1101,14 +1049,11 @@ export interface UpdateAccountRequest {
   concurrency?: number
   load_factor?: number | null
   priority?: number
-  rate_multiplier?: number // Account billing multiplier (>=0, 0 means free)
   schedulable?: boolean
   status?: 'active' | 'inactive' | 'error'
   group_ids?: number[]
   expires_at?: number | null
   auto_pause_on_expired?: boolean
-  upstream_billing_probe_enabled?: boolean
-  upstream_billing_rate_sync_enabled?: boolean
   confirm_mixed_channel_risk?: boolean
 }
 
