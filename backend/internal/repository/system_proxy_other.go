@@ -2,8 +2,12 @@
 
 package repository
 
-import "net/url"
+import (
+	"net/url"
 
-func windowsSystemProxy(*url.URL) (*url.URL, bool) {
-	return nil, false
+	"github.com/Wei-Shaw/sub2api/internal/pkg/providerproxy"
+)
+
+func windowsSystemProxy(target *url.URL) (*url.URL, bool) {
+	return providerproxy.WindowsSystemProxy(target)
 }

@@ -5,17 +5,15 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/providerproxy"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyurl"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
 
 	"github.com/imroc/req/v3"
-	"golang.org/x/net/http/httpproxy"
 )
 
 // reqClientOptions 定义 req 客户端的构建参数
@@ -81,21 +79,7 @@ func getSharedReqClient(opts reqClientOptions) (*req.Client, error) {
 }
 
 func providerAuthProxyFromEnvironment(req *http.Request) (*url.URL, error) {
-	if req == nil || req.URL == nil {
-		return nil, nil
-	}
-	cfg := httpproxy.FromEnvironment()
-	if strings.TrimSpace(cfg.HTTPProxy) == "" && strings.TrimSpace(cfg.HTTPSProxy) == "" {
-		allProxy := strings.TrimSpace(os.Getenv("ALL_PROXY"))
-		if allProxy == "" {
-			allProxy = strings.TrimSpace(os.Getenv("all_proxy"))
-		}
-		if allProxy != "" {
-			cfg.HTTPProxy = allProxy
-			cfg.HTTPSProxy = allProxy
-		}
-	}
-	return cfg.ProxyFunc()(req.URL)
+	return providerproxy.FromEnvironment(req)
 }
 
 type providerProxyDecision struct {
@@ -134,66 +118,10 @@ func resolveProviderAuthProxy(req *http.Request) (providerProxyDecision, error) 
 	return providerProxyDecision{Source: "direct"}, nil
 }
 
-type windowsProxyConfig struct {
-	Enabled  bool
-	Server   string
-	Override string
-}
+type windowsProxyConfig = providerproxy.WindowsProxyConfig
 
 func resolveWindowsProxyConfig(target *url.URL, cfg windowsProxyConfig) (*url.URL, bool) {
-	if target == nil || !cfg.Enabled || windowsProxyBypassed(target.Hostname(), cfg.Override) {
-		return nil, false
-	}
-	raw := selectWindowsProxyServer(target.Scheme, cfg.Server)
-	if raw == "" {
-		return nil, false
-	}
-	if !strings.Contains(raw, "://") {
-		raw = "http://" + raw
-	}
-	parsed, err := url.Parse(raw)
-	if err != nil || parsed.Host == "" || parsed.User != nil {
-		return nil, false
-	}
-	return parsed, true
-}
-
-func selectWindowsProxyServer(scheme, configured string) string {
-	configured = strings.TrimSpace(configured)
-	if configured == "" {
-		return ""
-	}
-	if !strings.Contains(configured, "=") {
-		return configured
-	}
-	values := make(map[string]string)
-	for _, part := range strings.Split(configured, ";") {
-		key, value, ok := strings.Cut(part, "=")
-		if ok {
-			values[strings.ToLower(strings.TrimSpace(key))] = strings.TrimSpace(value)
-		}
-	}
-	return values[strings.ToLower(strings.TrimSpace(scheme))]
-}
-
-func windowsProxyBypassed(host, configured string) bool {
-	host = strings.ToLower(strings.TrimSpace(host))
-	if host == "" {
-		return true
-	}
-	for _, part := range strings.Split(configured, ";") {
-		pattern := strings.ToLower(strings.TrimSpace(part))
-		if pattern == "" {
-			continue
-		}
-		if pattern == "<local>" && !strings.Contains(host, ".") {
-			return true
-		}
-		if matched, _ := filepath.Match(pattern, host); matched || pattern == host {
-			return true
-		}
-	}
-	return false
+	return providerproxy.ResolveWindowsProxyConfig(target, cfg)
 }
 
 func instrumentReqClient(client *req.Client) *req.Client {
