@@ -4,12 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"sync"
 )
-
-type LegacyEngine interface {
-	Check(ctx context.Context, req Request) (*LegacyDecision, error)
-}
 
 type PromptEngine interface {
 	EffectiveMode() Mode
@@ -18,12 +13,11 @@ type PromptEngine interface {
 }
 
 type Coordinator struct {
-	legacy LegacyEngine
 	prompt PromptEngine
 }
 
-func NewCoordinator(legacy LegacyEngine, prompt PromptEngine) *Coordinator {
-	return &Coordinator{legacy: legacy, prompt: prompt}
+func NewCoordinator(prompt PromptEngine) *Coordinator {
+	return &Coordinator{prompt: prompt}
 }
 
 func (c *Coordinator) Check(ctx context.Context, req Request) Decision {
@@ -39,56 +33,30 @@ func (c *Coordinator) Check(ctx context.Context, req Request) Decision {
 		// Enqueue is deliberately best-effort. The implementation owns a bounded
 		// context and copies request memory before it can outlive the Handler.
 		_ = c.prompt.Enqueue(ctx, req.Clone())
-		legacy, _ := c.checkLegacy(ctx, req)
-		return prioritize(legacy, nil)
+		return allowDecision(nil, nil)
 	case ModeBlocking:
 		return c.checkBlocking(ctx, req)
 	default:
-		legacy, _ := c.checkLegacy(ctx, req)
-		return prioritize(legacy, nil)
+		return allowDecision(nil, nil)
 	}
 }
 
 func (c *Coordinator) checkBlocking(ctx context.Context, req Request) Decision {
-	var wg sync.WaitGroup
-	wg.Add(2)
-	var legacy *LegacyDecision
-	var prompt *PromptDecision
-	go func() {
-		defer wg.Done()
-		legacy, _ = c.checkLegacy(ctx, req)
-	}()
-	go func() {
-		defer wg.Done()
-		if c.prompt == nil {
-			prompt = unavailablePromptDecision(ErrorCodeUnavailable)
-			return
-		}
-		result, err := c.prompt.Evaluate(ctx, req.Clone())
-		if err != nil {
-			var guardErr *GuardError
-			if errors.As(err, &guardErr) && guardErr.Code == ErrorCodeInvalidResponse {
-				prompt = unavailablePromptDecision(ErrorCodeInvalidResponse)
-				return
-			}
-			prompt = unavailablePromptDecision(ErrorCodeUnavailable)
-			return
-		}
-		if result == nil {
-			prompt = unavailablePromptDecision(ErrorCodeUnavailable)
-			return
-		}
-		prompt = result
-	}()
-	wg.Wait()
-	return prioritize(legacy, prompt)
-}
-
-func (c *Coordinator) checkLegacy(ctx context.Context, req Request) (*LegacyDecision, error) {
-	if c.legacy == nil {
-		return nil, nil
+	if c.prompt == nil {
+		return prioritize(nil, unavailablePromptDecision(ErrorCodeUnavailable))
 	}
-	return c.legacy.Check(ctx, req)
+	prompt, err := c.prompt.Evaluate(ctx, req.Clone())
+	if err != nil {
+		var guardErr *GuardError
+		if errors.As(err, &guardErr) && guardErr.Code == ErrorCodeInvalidResponse {
+			return prioritize(nil, unavailablePromptDecision(ErrorCodeInvalidResponse))
+		}
+		return prioritize(nil, unavailablePromptDecision(ErrorCodeUnavailable))
+	}
+	if prompt == nil {
+		prompt = unavailablePromptDecision(ErrorCodeUnavailable)
+	}
+	return prioritize(nil, prompt)
 }
 
 func prioritize(legacy *LegacyDecision, prompt *PromptDecision) Decision {

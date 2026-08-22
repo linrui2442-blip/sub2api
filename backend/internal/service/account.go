@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"hash/fnv"
-	"log/slog"
 	"net/url"
 	"reflect"
 	"sort"
@@ -32,17 +31,14 @@ type Account struct {
 	ProxyFallbackOriginName *string // 仅展示用
 	Concurrency             int
 	Priority                int
-	// RateMultiplier 账号计费倍率（>=0，允许 0 表示该账号计费为 0）。
-	// 使用指针用于兼容旧版本调度缓存（Redis）中缺字段的情况：nil 表示按 1.0 处理。
-	RateMultiplier     *float64
-	LoadFactor         *int // 调度负载因子；nil 表示使用 Concurrency
-	Status             string
-	ErrorMessage       string
-	LastUsedAt         *time.Time
-	ExpiresAt          *time.Time
-	AutoPauseOnExpired bool
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	LoadFactor              *int // 调度负载因子；nil 表示使用 Concurrency
+	Status                  string
+	ErrorMessage            string
+	LastUsedAt              *time.Time
+	ExpiresAt               *time.Time
+	AutoPauseOnExpired      bool
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
 
 	Schedulable bool
 
@@ -148,20 +144,6 @@ func (a *Account) IsSyntheticUITest() bool {
 	}
 	enabled, ok := a.Extra["synthetic_ui_test"].(bool)
 	return ok && enabled
-}
-
-// BillingRateMultiplier 返回账号计费倍率。
-// - nil 表示未配置/旧缓存缺字段，按 1.0 处理
-// - 允许 0，表示该账号计费为 0
-// - 负数属于非法数据，出于安全考虑按 1.0 处理
-func (a *Account) BillingRateMultiplier() float64 {
-	if a == nil || a.RateMultiplier == nil {
-		return 1.0
-	}
-	if *a.RateMultiplier < 0 {
-		return 1.0
-	}
-	return *a.RateMultiplier
 }
 
 func (a *Account) EffectiveLoadFactor() int {
@@ -2101,41 +2083,6 @@ func (a *Account) IsAnthropicAPIKeyPassthroughEnabled() bool {
 	return ok && enabled
 }
 
-// WebSearch 模拟三态常量
-const (
-	WebSearchModeDefault  = "default"  // 跟随渠道配置
-	WebSearchModeEnabled  = "enabled"  // 强制开启
-	WebSearchModeDisabled = "disabled" // 强制关闭
-)
-
-// GetWebSearchEmulationMode 返回账号的 WebSearch 模拟模式。
-// 三态：default（跟随渠道）/ enabled（强制开启）/ disabled（强制关闭）。
-// 兼容旧 bool 值：true→enabled, false→default（并记录 debug 日志）。
-func (a *Account) GetWebSearchEmulationMode() string {
-	if a == nil || a.Platform != PlatformAnthropic || a.Type != AccountTypeAPIKey || a.Extra == nil {
-		return WebSearchModeDefault
-	}
-	raw := a.Extra[featureKeyWebSearchEmulation]
-	// Tolerant: legacy bool values (pre-migration or stale writes)
-	if b, ok := raw.(bool); ok {
-		slog.Debug("legacy bool web_search_emulation value", "account_id", a.ID, "value", b)
-		if b {
-			return WebSearchModeEnabled
-		}
-		return WebSearchModeDefault
-	}
-	mode, ok := raw.(string)
-	if !ok {
-		return WebSearchModeDefault
-	}
-	switch mode {
-	case WebSearchModeEnabled, WebSearchModeDisabled:
-		return mode
-	default:
-		return WebSearchModeDefault
-	}
-}
-
 // IsCodexCLIOnlyEnabled 返回 OpenAI OAuth 账号是否启用"仅允许 Codex 官方客户端"。
 // 字段：accounts.extra.codex_cli_only。
 // 字段缺失或类型不正确时，按 false（关闭）处理。
@@ -2399,14 +2346,6 @@ func (a *Account) getExtraString(key string) string {
 	return ""
 }
 
-// getExtraStringDefault 从 Extra 中读取指定 key 的字符串值，不存在时返回 defaultVal
-func (a *Account) getExtraStringDefault(key, defaultVal string) string {
-	if v := a.getExtraString(key); v != "" {
-		return v
-	}
-	return defaultVal
-}
-
 // getExtraInt 从 Extra 中读取指定 key 的 int 值
 func (a *Account) getExtraInt(key string) int {
 	if a.Extra == nil {
@@ -2461,62 +2400,6 @@ func (a *Account) GetQuotaResetTimezone() string {
 		return tz
 	}
 	return "UTC"
-}
-
-// --- Quota Notification Getters ---
-
-// QuotaNotifyConfig returns the notify configuration for a given quota dimension.
-// dim must be one of quotaDimDaily, quotaDimWeekly, quotaDimTotal.
-func (a *Account) QuotaNotifyConfig(dim string) (enabled bool, threshold float64, thresholdType string) {
-	enabled = a.getExtraBool("quota_notify_" + dim + "_enabled")
-	threshold = a.getExtraFloat64("quota_notify_" + dim + "_threshold")
-	thresholdType = a.getExtraStringDefault("quota_notify_"+dim+"_threshold_type", thresholdTypeFixed)
-	return
-}
-
-func (a *Account) GetQuotaNotifyDailyEnabled() bool {
-	e, _, _ := a.QuotaNotifyConfig(quotaDimDaily)
-	return e
-}
-
-func (a *Account) GetQuotaNotifyDailyThreshold() float64 {
-	_, t, _ := a.QuotaNotifyConfig(quotaDimDaily)
-	return t
-}
-
-func (a *Account) GetQuotaNotifyDailyThresholdType() string {
-	_, _, tt := a.QuotaNotifyConfig(quotaDimDaily)
-	return tt
-}
-
-func (a *Account) GetQuotaNotifyWeeklyEnabled() bool {
-	e, _, _ := a.QuotaNotifyConfig(quotaDimWeekly)
-	return e
-}
-
-func (a *Account) GetQuotaNotifyWeeklyThreshold() float64 {
-	_, t, _ := a.QuotaNotifyConfig(quotaDimWeekly)
-	return t
-}
-
-func (a *Account) GetQuotaNotifyWeeklyThresholdType() string {
-	_, _, tt := a.QuotaNotifyConfig(quotaDimWeekly)
-	return tt
-}
-
-func (a *Account) GetQuotaNotifyTotalEnabled() bool {
-	e, _, _ := a.QuotaNotifyConfig(quotaDimTotal)
-	return e
-}
-
-func (a *Account) GetQuotaNotifyTotalThreshold() float64 {
-	_, t, _ := a.QuotaNotifyConfig(quotaDimTotal)
-	return t
-}
-
-func (a *Account) GetQuotaNotifyTotalThresholdType() string {
-	_, _, tt := a.QuotaNotifyConfig(quotaDimTotal)
-	return tt
 }
 
 // nextFixedDailyReset 计算在 after 之后的下一个每日固定重置时间点

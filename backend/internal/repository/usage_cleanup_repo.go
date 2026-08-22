@@ -333,9 +333,6 @@ func (r *usageCleanupRepository) deleteUsageLogsBatchWithRollupInvalidation(ctx 
 		return 0, err
 	}
 
-	if err := lockGroupUsageRollupState(ctx, tx); err != nil {
-		return rollback(err)
-	}
 	query := fmt.Sprintf(`
 		WITH target AS (
 			SELECT id
@@ -374,11 +371,6 @@ func (r *usageCleanupRepository) deleteUsageLogsBatchWithRollupInvalidation(ctx 
 		return rollback(err)
 	}
 
-	if deleted > 0 {
-		if err := invalidateGroupUsageRollupsAt(ctx, tx, earliestDeletedAt); err != nil {
-			return rollback(err)
-		}
-	}
 	if err := tx.Commit(); err != nil {
 		return 0, err
 	}
@@ -431,15 +423,9 @@ func buildUsageCleanupWhere(filters service.UsageCleanupFilters) (string, []any)
 		condition, conditionArgs := buildRequestTypeFilterCondition(idx, *filters.RequestType)
 		conditions = append(conditions, condition)
 		args = append(args, conditionArgs...)
-		idx += len(conditionArgs)
 	} else if filters.Stream != nil {
 		conditions = append(conditions, fmt.Sprintf("stream = $%d", idx))
 		args = append(args, *filters.Stream)
-		idx++
-	}
-	if filters.BillingType != nil {
-		conditions = append(conditions, fmt.Sprintf("billing_type = $%d", idx))
-		args = append(args, *filters.BillingType)
 	}
 	return strings.Join(conditions, " AND "), args
 }

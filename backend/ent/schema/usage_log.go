@@ -15,7 +15,7 @@ import (
 
 // UsageLog 定义使用日志实体的 schema。
 //
-// 使用日志记录每次 API 调用的详细信息，包括 token 使用量、成本计算等。
+// 使用日志记录每次 API 调用的详细信息，包括 token、延迟和路由元数据。
 // 这是一个只追加的表，不支持更新和删除。
 type UsageLog struct {
 	ent.Schema
@@ -66,12 +66,7 @@ func (UsageLog) Fields() []ent.Field {
 			Nillable(),
 		field.Int64("channel_id").Optional().Nillable().Comment("渠道 ID"),
 		field.String("model_mapping_chain").MaxLen(500).Optional().Nillable().Comment("模型映射链"),
-		field.String("billing_tier").MaxLen(50).Optional().Nillable().Comment("计费层级标签"),
-		field.String("billing_mode").MaxLen(20).Optional().Nillable().Comment("计费模式：token/per_request/image"),
 		field.Int64("group_id").
-			Optional().
-			Nillable(),
-		field.Int64("subscription_id").
 			Optional().
 			Nillable(),
 
@@ -89,41 +84,7 @@ func (UsageLog) Fields() []ent.Field {
 		field.Int("cache_creation_1h_tokens").
 			Default(0),
 
-		// 成本字段
-		field.Float("input_cost").
-			Default(0).
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,10)"}),
-		field.Float("output_cost").
-			Default(0).
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,10)"}),
-		field.Float("cache_creation_cost").
-			Default(0).
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,10)"}),
-		field.Float("cache_read_cost").
-			Default(0).
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,10)"}),
-		field.Float("total_cost").
-			Default(0).
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,10)"}),
-		field.Float("actual_cost").
-			Default(0).
-			SchemaType(map[string]string{dialect.Postgres: "decimal(20,10)"}),
-		field.Float("rate_multiplier").
-			Default(1).
-			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}),
-		field.Bool("long_context_billing_applied").
-			Default(false).
-			Comment("Whether long-context pricing changed token prices for this request"),
-
-		// account_rate_multiplier: 账号计费倍率快照（NULL 表示按 1.0 处理）
-		field.Float("account_rate_multiplier").
-			Optional().
-			Nillable().
-			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}),
-
 		// 其他字段
-		field.Int8("billing_type").
-			Default(0),
 		field.Bool("stream").
 			Default(false),
 		field.Int("duration_ms").
@@ -164,7 +125,7 @@ func (UsageLog) Fields() []ent.Field {
 			Optional().
 			SchemaType(map[string]string{dialect.Postgres: "jsonb"}),
 
-		// 视频生成字段（Grok 视频按秒计费；billing_mode 走 token/其他模式时这些列仍标记视频用量）
+		// 视频生成字段，用于记录真实媒体用量。
 		field.Int("video_count").
 			Default(0).
 			Comment("视频生成数量；>0 表示本行是视频生成用量"),
@@ -176,10 +137,7 @@ func (UsageLog) Fields() []ent.Field {
 		field.Int("video_duration_seconds").
 			Optional().
 			Nillable().
-			Comment("提交时请求的视频时长（秒），按秒计费的乘数"),
-		// Cache TTL Override 标记（管理员强制替换了缓存 TTL 计费）
-		field.Bool("cache_ttl_overridden").
-			Default(false),
+			Comment("提交时请求的视频时长（秒）"),
 
 		// 时间戳（只有 created_at，日志不可修改）
 		field.Time("created_at").
@@ -211,10 +169,6 @@ func (UsageLog) Edges() []ent.Edge {
 			Ref("usage_logs").
 			Field("group_id").
 			Unique(),
-		edge.From("subscription", UserSubscription.Type).
-			Ref("usage_logs").
-			Field("subscription_id").
-			Unique(),
 	}
 }
 
@@ -225,7 +179,6 @@ func (UsageLog) Indexes() []ent.Index {
 		index.Fields("api_key_id"),
 		index.Fields("account_id"),
 		index.Fields("group_id"),
-		index.Fields("subscription_id"),
 		index.Fields("created_at"),
 		index.Fields("model"),
 		index.Fields("requested_model"),

@@ -1,0 +1,129 @@
+name: Personal Edition CI
+
+on:
+  push:
+    branches:
+      - personal-v1
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: personal-edition-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  personal-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Test Personal Edition policy
+        working-directory: backend
+        run: go test ./internal/personal
+
+  personal-storage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Test Personal SQLite and local caches
+        working-directory: backend
+        run: go test ./internal/repository -run '^TestPersonal' -count=1
+
+  personal-setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Test owner-only first-run installation
+        working-directory: backend
+        run: go test ./internal/setup -run '^TestPersonal' -count=1 -timeout=3m
+
+  personal-application:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Regenerate Personal Wire graph
+        working-directory: backend
+        run: go generate ./cmd/server
+      - name: Boot full Personal Edition application
+        working-directory: backend
+        run: go test ./cmd/server -run '^TestPersonalApplicationBootSmoke$' -count=1 -timeout=5m
+
+  windows-cross-compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+      - name: Build embedded Personal frontend
+        working-directory: frontend
+        env:
+          VITE_PERSONAL_EDITION: "1"
+        run: pnpm run build
+      - name: Verify SaaS routes are absent from Personal bundle
+        working-directory: frontend
+        run: |
+          if grep -R -E 'PurchaseSubscription|AdminPaymentDashboard|AdminAffiliateInvites|ModelPlaza|ForgotPassword' dist >/dev/null 2>&1; then
+            echo 'Commercial/public route markers leaked into Personal frontend bundle.'
+            exit 1
+          fi
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: backend/go.mod
+          check-latest: false
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Regenerate Personal Wire graph
+        working-directory: backend
+        run: go generate ./cmd/server
+      - name: Verify Windows Personal Edition compilation
+        working-directory: backend
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: "0"
+        run: go build -tags=embed -ldflags='-X main.BuildType=personal' -o ../sub2api-personal.exe ./cmd/server
+      - name: Upload Windows Personal Edition
+        uses: actions/upload-artifact@v7
+        with:
+          name: sub2api-personal-windows-x64
+          path: sub2api-personal.exe
+          if-no-files-found: error
+          retention-days: 7

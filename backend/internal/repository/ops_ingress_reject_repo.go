@@ -60,9 +60,9 @@ VALUES `)
 		_, _ = query.WriteString(`
 ON CONFLICT (bucket_start, reject_reason, route_family, protocol, client_ip, user_id, api_key_id)
 DO UPDATE SET request_count = ops_ingress_reject_aggregates.request_count + EXCLUDED.request_count,
-              first_seen = LEAST(ops_ingress_reject_aggregates.first_seen, EXCLUDED.first_seen),
-              last_seen = GREATEST(ops_ingress_reject_aggregates.last_seen, EXCLUDED.last_seen),
-              updated_at = NOW()`)
+              first_seen = MIN(ops_ingress_reject_aggregates.first_seen, excluded.first_seen),
+              last_seen = MAX(ops_ingress_reject_aggregates.last_seen, excluded.last_seen),
+              updated_at = CURRENT_TIMESTAMP`)
 		if _, err := tx.ExecContext(ctx, query.String(), args...); err != nil {
 			return err
 		}
@@ -110,7 +110,7 @@ func (r *opsRepository) ListIngressRejects(ctx context.Context, filter *service.
 		add("protocol = $%d", value)
 	}
 	if value := strings.TrimSpace(filter.ClientIP); value != "" {
-		add("client_ip = $%d::inet", value)
+		add("client_ip = $%d", value)
 	}
 	if filter.UserID != nil {
 		add("user_id = $%d", *filter.UserID)
@@ -125,7 +125,7 @@ func (r *opsRepository) ListIngressRejects(ctx context.Context, filter *service.
 		return nil, err
 	}
 	args = append(args, pageSize, (page-1)*pageSize)
-	query := fmt.Sprintf(`SELECT id,bucket_start,reject_reason,route_family,protocol,host(client_ip),user_id,api_key_id,request_count,first_seen,last_seen
+	query := fmt.Sprintf(`SELECT id,bucket_start,reject_reason,route_family,protocol,client_ip,user_id,api_key_id,request_count,first_seen,last_seen
 FROM ops_ingress_reject_aggregates %s ORDER BY bucket_start DESC,id DESC LIMIT $%d OFFSET $%d`, where, len(args)-1, len(args))
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {

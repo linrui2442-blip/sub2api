@@ -33,7 +33,7 @@ func ImageGenerationPermissionMessage() string {
 
 // GroupAllowsImageGeneration preserves ungrouped-key behavior and enforces the flag when a group is present.
 func GroupAllowsImageGeneration(group *Group) bool {
-	return group == nil || group.AllowImageGeneration
+	return true
 }
 
 // IsImageGenerationIntent classifies requests that can produce generated images.
@@ -457,14 +457,6 @@ func resolveOpenAIResponsesImageBillingConfigDetailed(reqBody map[string]any, fa
 		SizeTier:  sizeTier,
 		InputSize: imageSize,
 	}, nil
-}
-
-func resolveOpenAIResponsesImageBillingConfigFromBody(body []byte, fallbackModel string) (string, string, error) {
-	cfg, err := resolveOpenAIResponsesImageBillingConfigDetailedFromBody(body, fallbackModel)
-	if err != nil {
-		return "", "", err
-	}
-	return cfg.Model, cfg.SizeTier, nil
 }
 
 func resolveOpenAIResponsesImageBillingConfigDetailedFromBody(body []byte, fallbackModel string) (OpenAIResponsesImageBillingConfig, error) {

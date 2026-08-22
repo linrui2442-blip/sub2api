@@ -1,7 +1,7 @@
 <template>
   <AppLayout>
     <div class="space-y-6">
-      <UsageStatsCards :stats="usageStats" :show-account-cost="false" :strike-standard-cost="true" />
+      <UsageStatsCards :stats="usageStats" :show-account-cost="false" />
 
       <div class="space-y-4">
         <div class="card p-4">
@@ -29,7 +29,7 @@
             :model-stats="requestedModelStats"
             :loading="modelStatsLoading"
             :show-source-toggle="false"
-            :show-metric-toggle="true"
+            :show-metric-toggle="false"
             :enable-breakdown="false"
             :show-account-cost="false"
             :start-date="startDate"
@@ -39,7 +39,7 @@
             v-model:metric="groupDistributionMetric"
             :group-stats="groupStats"
             :loading="chartsLoading"
-            :show-metric-toggle="true"
+            :show-metric-toggle="false"
             :enable-breakdown="false"
             :show-account-cost="false"
             :start-date="startDate"
@@ -56,7 +56,7 @@
             :endpoint-path-stats="endpointPathStats"
             :loading="endpointStatsLoading"
             :show-source-toggle="false"
-            :show-metric-toggle="true"
+            :show-metric-toggle="false"
             :enable-breakdown="false"
             :title="t('usage.endpointDistribution')"
             :start-date="startDate"
@@ -110,14 +110,6 @@
             <div class="w-full sm:w-auto sm:min-w-[180px]">
               <label class="input-label">{{ t('usage.type') }}</label>
               <Select v-model="filters.request_type" :options="requestTypeOptions" @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
-              <label class="input-label">{{ t('admin.usage.billingType') }}</label>
-              <Select v-model="filters.billing_type" :options="billingTypeOptions" @change="applyFilters" />
-            </div>
-            <div class="w-full sm:w-auto sm:min-w-[200px]">
-              <label class="input-label">{{ t('admin.usage.billingMode') }}</label>
-              <Select v-model="filters.billing_mode" :options="billingModeOptions" @change="applyFilters" />
             </div>
           </div>
 
@@ -231,7 +223,6 @@ import Icon from '@/components/icons/Icon.vue'
 import UserErrorRequestsTable from '@/components/user/UserErrorRequestsTable.vue'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { formatReasoningEffort } from '@/utils/format'
-import { getBillingModeLabel, getDisplayBillingMode as resolveDisplayBillingMode } from '@/utils/billingMode'
 import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
 import type {
   ApiKey,
@@ -251,7 +242,7 @@ import { COMMON_ERROR_STATUS_CODES } from '@/utils/errorBadges'
 const { t } = useI18n()
 const appStore = useAppStore()
 
-type DistributionMetric = 'tokens' | 'actual_cost'
+type DistributionMetric = 'tokens'
 type EndpointSource = 'inbound' | 'upstream' | 'path'
 
 const usageStats = ref<UsageStatsResponse | null>(null)
@@ -355,8 +346,6 @@ const filters = ref<UsageQueryParams>({
   start_date: startDate.value,
   end_date: endDate.value,
   request_type: undefined,
-  billing_type: null,
-  billing_mode: null,
 })
 
 const pagination = reactive({
@@ -379,18 +368,6 @@ const requestTypeOptions = computed<SelectOption[]>(() => [
   { value: 'live', label: t('usage.live') },
   { value: 'stream', label: t('usage.stream') },
   { value: 'sync', label: t('usage.sync') },
-])
-const billingTypeOptions = computed<SelectOption[]>(() => [
-  { value: null, label: t('admin.usage.allBillingTypes') },
-  { value: 0, label: t('admin.usage.billingTypeBalance') },
-  { value: 1, label: t('admin.usage.billingTypeSubscription') },
-])
-const billingModeOptions = computed<SelectOption[]>(() => [
-  { value: null, label: t('admin.usage.allBillingModes') },
-  { value: 'token', label: t('admin.usage.billingModeToken') },
-  { value: 'per_request', label: t('admin.usage.billingModePerRequest') },
-  { value: 'image', label: t('admin.usage.billingModeImage') },
-  { value: 'video', label: t('admin.usage.billingModeVideo') },
 ])
 
 const apiKeys = ref<ApiKey[]>([])
@@ -551,8 +528,6 @@ const resetFilters = () => {
     start_date: range.start,
     end_date: range.end,
     request_type: undefined,
-    billing_type: null,
-    billing_mode: null,
   }
   granularity.value = getGranularityForRange(range.start, range.end)
   applyFilters()
@@ -603,10 +578,6 @@ const getRequestTypeExportText = (log: UsageLog): string => {
   return 'Unknown'
 }
 
-const getDisplayBillingMode = (
-  row: Pick<UsageLog, 'billing_mode' | 'image_count'> | null | undefined
-): string | null | undefined => resolveDisplayBillingMode(row)
-
 const escapeCSVValue = (value: unknown): string => {
   if (value == null) return ''
   const str = String(value)
@@ -643,14 +614,10 @@ const exportToCSV = async () => {
       'Inbound Endpoint',
       'IP Address',
       'Type',
-      'Billing Mode',
       'Input Tokens',
       'Output Tokens',
       'Cache Read Tokens',
       'Cache Creation Tokens',
-      'Rate Multiplier',
-      'Billed Cost',
-      'Original Cost',
       'First Token (ms)',
       'Duration (ms)',
     ]
@@ -662,14 +629,10 @@ const exportToCSV = async () => {
       log.inbound_endpoint || '',
       log.ip_address || '',
       getRequestTypeExportText(log),
-      getBillingModeLabel(getDisplayBillingMode(log), t),
       log.input_tokens,
       log.output_tokens,
       log.cache_read_tokens,
       log.cache_creation_tokens,
-      log.rate_multiplier,
-      log.actual_cost.toFixed(8),
-      log.total_cost.toFixed(8),
       log.first_token_ms ?? '',
       log.duration_ms ?? '',
     ].map(escapeCSVValue))
@@ -705,9 +668,7 @@ const allColumns = computed<Column[]>(() => [
   { key: 'ip_address', label: 'IP', sortable: false },
   { key: 'group', label: t('admin.usage.group'), sortable: false },
   { key: 'stream', label: t('usage.type'), sortable: false },
-  { key: 'billing_mode', label: t('admin.usage.billingMode'), sortable: false },
   { key: 'tokens', label: t('usage.tokens'), sortable: false },
-  { key: 'cost', label: t('usage.cost'), sortable: false },
   { key: 'latency', label: t('usage.latency'), sortable: false },
   { key: 'created_at', label: t('usage.time'), sortable: true },
   { key: 'user_agent', label: t('usage.userAgent'), sortable: false },

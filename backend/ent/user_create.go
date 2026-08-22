@@ -11,19 +11,11 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/Wei-Shaw/sub2api/ent/announcementread"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
 	"github.com/Wei-Shaw/sub2api/ent/group"
-	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
-	"github.com/Wei-Shaw/sub2api/ent/pendingauthsession"
-	"github.com/Wei-Shaw/sub2api/ent/promocodeusage"
-	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
-	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
-	"github.com/Wei-Shaw/sub2api/ent/userplatformquota"
-	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 )
 
 // UserCreate is the builder for creating a User entity.
@@ -98,34 +90,6 @@ func (_c *UserCreate) SetRole(v string) *UserCreate {
 func (_c *UserCreate) SetNillableRole(v *string) *UserCreate {
 	if v != nil {
 		_c.SetRole(*v)
-	}
-	return _c
-}
-
-// SetBalance sets the "balance" field.
-func (_c *UserCreate) SetBalance(v float64) *UserCreate {
-	_c.mutation.SetBalance(v)
-	return _c
-}
-
-// SetNillableBalance sets the "balance" field if the given value is not nil.
-func (_c *UserCreate) SetNillableBalance(v *float64) *UserCreate {
-	if v != nil {
-		_c.SetBalance(*v)
-	}
-	return _c
-}
-
-// SetFrozenBalance sets the "frozen_balance" field.
-func (_c *UserCreate) SetFrozenBalance(v float64) *UserCreate {
-	_c.mutation.SetFrozenBalance(v)
-	return _c
-}
-
-// SetNillableFrozenBalance sets the "frozen_balance" field if the given value is not nil.
-func (_c *UserCreate) SetNillableFrozenBalance(v *float64) *UserCreate {
-	if v != nil {
-		_c.SetFrozenBalance(*v)
 	}
 	return _c
 }
@@ -270,76 +234,6 @@ func (_c *UserCreate) SetNillableLastActiveAt(v *time.Time) *UserCreate {
 	return _c
 }
 
-// SetBalanceNotifyEnabled sets the "balance_notify_enabled" field.
-func (_c *UserCreate) SetBalanceNotifyEnabled(v bool) *UserCreate {
-	_c.mutation.SetBalanceNotifyEnabled(v)
-	return _c
-}
-
-// SetNillableBalanceNotifyEnabled sets the "balance_notify_enabled" field if the given value is not nil.
-func (_c *UserCreate) SetNillableBalanceNotifyEnabled(v *bool) *UserCreate {
-	if v != nil {
-		_c.SetBalanceNotifyEnabled(*v)
-	}
-	return _c
-}
-
-// SetBalanceNotifyThresholdType sets the "balance_notify_threshold_type" field.
-func (_c *UserCreate) SetBalanceNotifyThresholdType(v string) *UserCreate {
-	_c.mutation.SetBalanceNotifyThresholdType(v)
-	return _c
-}
-
-// SetNillableBalanceNotifyThresholdType sets the "balance_notify_threshold_type" field if the given value is not nil.
-func (_c *UserCreate) SetNillableBalanceNotifyThresholdType(v *string) *UserCreate {
-	if v != nil {
-		_c.SetBalanceNotifyThresholdType(*v)
-	}
-	return _c
-}
-
-// SetBalanceNotifyThreshold sets the "balance_notify_threshold" field.
-func (_c *UserCreate) SetBalanceNotifyThreshold(v float64) *UserCreate {
-	_c.mutation.SetBalanceNotifyThreshold(v)
-	return _c
-}
-
-// SetNillableBalanceNotifyThreshold sets the "balance_notify_threshold" field if the given value is not nil.
-func (_c *UserCreate) SetNillableBalanceNotifyThreshold(v *float64) *UserCreate {
-	if v != nil {
-		_c.SetBalanceNotifyThreshold(*v)
-	}
-	return _c
-}
-
-// SetBalanceNotifyExtraEmails sets the "balance_notify_extra_emails" field.
-func (_c *UserCreate) SetBalanceNotifyExtraEmails(v string) *UserCreate {
-	_c.mutation.SetBalanceNotifyExtraEmails(v)
-	return _c
-}
-
-// SetNillableBalanceNotifyExtraEmails sets the "balance_notify_extra_emails" field if the given value is not nil.
-func (_c *UserCreate) SetNillableBalanceNotifyExtraEmails(v *string) *UserCreate {
-	if v != nil {
-		_c.SetBalanceNotifyExtraEmails(*v)
-	}
-	return _c
-}
-
-// SetTotalRecharged sets the "total_recharged" field.
-func (_c *UserCreate) SetTotalRecharged(v float64) *UserCreate {
-	_c.mutation.SetTotalRecharged(v)
-	return _c
-}
-
-// SetNillableTotalRecharged sets the "total_recharged" field if the given value is not nil.
-func (_c *UserCreate) SetNillableTotalRecharged(v *float64) *UserCreate {
-	if v != nil {
-		_c.SetTotalRecharged(*v)
-	}
-	return _c
-}
-
 // SetRpmLimit sets the "rpm_limit" field.
 func (_c *UserCreate) SetRpmLimit(v int) *UserCreate {
 	_c.mutation.SetRpmLimit(v)
@@ -367,66 +261,6 @@ func (_c *UserCreate) AddAPIKeys(v ...*APIKey) *UserCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddAPIKeyIDs(ids...)
-}
-
-// AddRedeemCodeIDs adds the "redeem_codes" edge to the RedeemCode entity by IDs.
-func (_c *UserCreate) AddRedeemCodeIDs(ids ...int64) *UserCreate {
-	_c.mutation.AddRedeemCodeIDs(ids...)
-	return _c
-}
-
-// AddRedeemCodes adds the "redeem_codes" edges to the RedeemCode entity.
-func (_c *UserCreate) AddRedeemCodes(v ...*RedeemCode) *UserCreate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _c.AddRedeemCodeIDs(ids...)
-}
-
-// AddSubscriptionIDs adds the "subscriptions" edge to the UserSubscription entity by IDs.
-func (_c *UserCreate) AddSubscriptionIDs(ids ...int64) *UserCreate {
-	_c.mutation.AddSubscriptionIDs(ids...)
-	return _c
-}
-
-// AddSubscriptions adds the "subscriptions" edges to the UserSubscription entity.
-func (_c *UserCreate) AddSubscriptions(v ...*UserSubscription) *UserCreate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _c.AddSubscriptionIDs(ids...)
-}
-
-// AddAssignedSubscriptionIDs adds the "assigned_subscriptions" edge to the UserSubscription entity by IDs.
-func (_c *UserCreate) AddAssignedSubscriptionIDs(ids ...int64) *UserCreate {
-	_c.mutation.AddAssignedSubscriptionIDs(ids...)
-	return _c
-}
-
-// AddAssignedSubscriptions adds the "assigned_subscriptions" edges to the UserSubscription entity.
-func (_c *UserCreate) AddAssignedSubscriptions(v ...*UserSubscription) *UserCreate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _c.AddAssignedSubscriptionIDs(ids...)
-}
-
-// AddAnnouncementReadIDs adds the "announcement_reads" edge to the AnnouncementRead entity by IDs.
-func (_c *UserCreate) AddAnnouncementReadIDs(ids ...int64) *UserCreate {
-	_c.mutation.AddAnnouncementReadIDs(ids...)
-	return _c
-}
-
-// AddAnnouncementReads adds the "announcement_reads" edges to the AnnouncementRead entity.
-func (_c *UserCreate) AddAnnouncementReads(v ...*AnnouncementRead) *UserCreate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _c.AddAnnouncementReadIDs(ids...)
 }
 
 // AddAllowedGroupIDs adds the "allowed_groups" edge to the Group entity by IDs.
@@ -459,51 +293,6 @@ func (_c *UserCreate) AddUsageLogs(v ...*UsageLog) *UserCreate {
 	return _c.AddUsageLogIDs(ids...)
 }
 
-// AddAttributeValueIDs adds the "attribute_values" edge to the UserAttributeValue entity by IDs.
-func (_c *UserCreate) AddAttributeValueIDs(ids ...int64) *UserCreate {
-	_c.mutation.AddAttributeValueIDs(ids...)
-	return _c
-}
-
-// AddAttributeValues adds the "attribute_values" edges to the UserAttributeValue entity.
-func (_c *UserCreate) AddAttributeValues(v ...*UserAttributeValue) *UserCreate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _c.AddAttributeValueIDs(ids...)
-}
-
-// AddPromoCodeUsageIDs adds the "promo_code_usages" edge to the PromoCodeUsage entity by IDs.
-func (_c *UserCreate) AddPromoCodeUsageIDs(ids ...int64) *UserCreate {
-	_c.mutation.AddPromoCodeUsageIDs(ids...)
-	return _c
-}
-
-// AddPromoCodeUsages adds the "promo_code_usages" edges to the PromoCodeUsage entity.
-func (_c *UserCreate) AddPromoCodeUsages(v ...*PromoCodeUsage) *UserCreate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _c.AddPromoCodeUsageIDs(ids...)
-}
-
-// AddPaymentOrderIDs adds the "payment_orders" edge to the PaymentOrder entity by IDs.
-func (_c *UserCreate) AddPaymentOrderIDs(ids ...int64) *UserCreate {
-	_c.mutation.AddPaymentOrderIDs(ids...)
-	return _c
-}
-
-// AddPaymentOrders adds the "payment_orders" edges to the PaymentOrder entity.
-func (_c *UserCreate) AddPaymentOrders(v ...*PaymentOrder) *UserCreate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _c.AddPaymentOrderIDs(ids...)
-}
-
 // AddAuthIdentityIDs adds the "auth_identities" edge to the AuthIdentity entity by IDs.
 func (_c *UserCreate) AddAuthIdentityIDs(ids ...int64) *UserCreate {
 	_c.mutation.AddAuthIdentityIDs(ids...)
@@ -517,36 +306,6 @@ func (_c *UserCreate) AddAuthIdentities(v ...*AuthIdentity) *UserCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddAuthIdentityIDs(ids...)
-}
-
-// AddPendingAuthSessionIDs adds the "pending_auth_sessions" edge to the PendingAuthSession entity by IDs.
-func (_c *UserCreate) AddPendingAuthSessionIDs(ids ...int64) *UserCreate {
-	_c.mutation.AddPendingAuthSessionIDs(ids...)
-	return _c
-}
-
-// AddPendingAuthSessions adds the "pending_auth_sessions" edges to the PendingAuthSession entity.
-func (_c *UserCreate) AddPendingAuthSessions(v ...*PendingAuthSession) *UserCreate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _c.AddPendingAuthSessionIDs(ids...)
-}
-
-// AddPlatformQuotaIDs adds the "platform_quotas" edge to the UserPlatformQuota entity by IDs.
-func (_c *UserCreate) AddPlatformQuotaIDs(ids ...int64) *UserCreate {
-	_c.mutation.AddPlatformQuotaIDs(ids...)
-	return _c
-}
-
-// AddPlatformQuotas adds the "platform_quotas" edges to the UserPlatformQuota entity.
-func (_c *UserCreate) AddPlatformQuotas(v ...*UserPlatformQuota) *UserCreate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _c.AddPlatformQuotaIDs(ids...)
 }
 
 // Mutation returns the UserMutation object of the builder.
@@ -604,14 +363,6 @@ func (_c *UserCreate) defaults() error {
 		v := user.DefaultRole
 		_c.mutation.SetRole(v)
 	}
-	if _, ok := _c.mutation.Balance(); !ok {
-		v := user.DefaultBalance
-		_c.mutation.SetBalance(v)
-	}
-	if _, ok := _c.mutation.FrozenBalance(); !ok {
-		v := user.DefaultFrozenBalance
-		_c.mutation.SetFrozenBalance(v)
-	}
 	if _, ok := _c.mutation.Concurrency(); !ok {
 		v := user.DefaultConcurrency
 		_c.mutation.SetConcurrency(v)
@@ -635,22 +386,6 @@ func (_c *UserCreate) defaults() error {
 	if _, ok := _c.mutation.SignupSource(); !ok {
 		v := user.DefaultSignupSource
 		_c.mutation.SetSignupSource(v)
-	}
-	if _, ok := _c.mutation.BalanceNotifyEnabled(); !ok {
-		v := user.DefaultBalanceNotifyEnabled
-		_c.mutation.SetBalanceNotifyEnabled(v)
-	}
-	if _, ok := _c.mutation.BalanceNotifyThresholdType(); !ok {
-		v := user.DefaultBalanceNotifyThresholdType
-		_c.mutation.SetBalanceNotifyThresholdType(v)
-	}
-	if _, ok := _c.mutation.BalanceNotifyExtraEmails(); !ok {
-		v := user.DefaultBalanceNotifyExtraEmails
-		_c.mutation.SetBalanceNotifyExtraEmails(v)
-	}
-	if _, ok := _c.mutation.TotalRecharged(); !ok {
-		v := user.DefaultTotalRecharged
-		_c.mutation.SetTotalRecharged(v)
 	}
 	if _, ok := _c.mutation.RpmLimit(); !ok {
 		v := user.DefaultRpmLimit
@@ -691,12 +426,6 @@ func (_c *UserCreate) check() error {
 			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "User.role": %w`, err)}
 		}
 	}
-	if _, ok := _c.mutation.Balance(); !ok {
-		return &ValidationError{Name: "balance", err: errors.New(`ent: missing required field "User.balance"`)}
-	}
-	if _, ok := _c.mutation.FrozenBalance(); !ok {
-		return &ValidationError{Name: "frozen_balance", err: errors.New(`ent: missing required field "User.frozen_balance"`)}
-	}
 	if _, ok := _c.mutation.Concurrency(); !ok {
 		return &ValidationError{Name: "concurrency", err: errors.New(`ent: missing required field "User.concurrency"`)}
 	}
@@ -729,18 +458,6 @@ func (_c *UserCreate) check() error {
 		if err := user.SignupSourceValidator(v); err != nil {
 			return &ValidationError{Name: "signup_source", err: fmt.Errorf(`ent: validator failed for field "User.signup_source": %w`, err)}
 		}
-	}
-	if _, ok := _c.mutation.BalanceNotifyEnabled(); !ok {
-		return &ValidationError{Name: "balance_notify_enabled", err: errors.New(`ent: missing required field "User.balance_notify_enabled"`)}
-	}
-	if _, ok := _c.mutation.BalanceNotifyThresholdType(); !ok {
-		return &ValidationError{Name: "balance_notify_threshold_type", err: errors.New(`ent: missing required field "User.balance_notify_threshold_type"`)}
-	}
-	if _, ok := _c.mutation.BalanceNotifyExtraEmails(); !ok {
-		return &ValidationError{Name: "balance_notify_extra_emails", err: errors.New(`ent: missing required field "User.balance_notify_extra_emails"`)}
-	}
-	if _, ok := _c.mutation.TotalRecharged(); !ok {
-		return &ValidationError{Name: "total_recharged", err: errors.New(`ent: missing required field "User.total_recharged"`)}
 	}
 	if _, ok := _c.mutation.RpmLimit(); !ok {
 		return &ValidationError{Name: "rpm_limit", err: errors.New(`ent: missing required field "User.rpm_limit"`)}
@@ -796,14 +513,6 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 		_spec.SetField(user.FieldRole, field.TypeString, value)
 		_node.Role = value
 	}
-	if value, ok := _c.mutation.Balance(); ok {
-		_spec.SetField(user.FieldBalance, field.TypeFloat64, value)
-		_node.Balance = value
-	}
-	if value, ok := _c.mutation.FrozenBalance(); ok {
-		_spec.SetField(user.FieldFrozenBalance, field.TypeFloat64, value)
-		_node.FrozenBalance = value
-	}
 	if value, ok := _c.mutation.Concurrency(); ok {
 		_spec.SetField(user.FieldConcurrency, field.TypeInt, value)
 		_node.Concurrency = value
@@ -844,26 +553,6 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 		_spec.SetField(user.FieldLastActiveAt, field.TypeTime, value)
 		_node.LastActiveAt = &value
 	}
-	if value, ok := _c.mutation.BalanceNotifyEnabled(); ok {
-		_spec.SetField(user.FieldBalanceNotifyEnabled, field.TypeBool, value)
-		_node.BalanceNotifyEnabled = value
-	}
-	if value, ok := _c.mutation.BalanceNotifyThresholdType(); ok {
-		_spec.SetField(user.FieldBalanceNotifyThresholdType, field.TypeString, value)
-		_node.BalanceNotifyThresholdType = value
-	}
-	if value, ok := _c.mutation.BalanceNotifyThreshold(); ok {
-		_spec.SetField(user.FieldBalanceNotifyThreshold, field.TypeFloat64, value)
-		_node.BalanceNotifyThreshold = &value
-	}
-	if value, ok := _c.mutation.BalanceNotifyExtraEmails(); ok {
-		_spec.SetField(user.FieldBalanceNotifyExtraEmails, field.TypeString, value)
-		_node.BalanceNotifyExtraEmails = value
-	}
-	if value, ok := _c.mutation.TotalRecharged(); ok {
-		_spec.SetField(user.FieldTotalRecharged, field.TypeFloat64, value)
-		_node.TotalRecharged = value
-	}
 	if value, ok := _c.mutation.RpmLimit(); ok {
 		_spec.SetField(user.FieldRpmLimit, field.TypeInt, value)
 		_node.RpmLimit = value
@@ -877,70 +566,6 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(apikey.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := _c.mutation.RedeemCodesIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.RedeemCodesTable,
-			Columns: []string{user.RedeemCodesColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(redeemcode.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := _c.mutation.SubscriptionsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.SubscriptionsTable,
-			Columns: []string{user.SubscriptionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := _c.mutation.AssignedSubscriptionsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.AssignedSubscriptionsTable,
-			Columns: []string{user.AssignedSubscriptionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := _c.mutation.AnnouncementReadsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.AnnouncementReadsTable,
-			Columns: []string{user.AnnouncementReadsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(announcementread.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {
@@ -984,54 +609,6 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	if nodes := _c.mutation.AttributeValuesIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.AttributeValuesTable,
-			Columns: []string{user.AttributeValuesColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(userattributevalue.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := _c.mutation.PromoCodeUsagesIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.PromoCodeUsagesTable,
-			Columns: []string{user.PromoCodeUsagesColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(promocodeusage.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := _c.mutation.PaymentOrdersIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.PaymentOrdersTable,
-			Columns: []string{user.PaymentOrdersColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(paymentorder.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
 	if nodes := _c.mutation.AuthIdentitiesIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -1041,38 +618,6 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(authidentity.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := _c.mutation.PendingAuthSessionsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.PendingAuthSessionsTable,
-			Columns: []string{user.PendingAuthSessionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(pendingauthsession.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := _c.mutation.PlatformQuotasIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   user.PlatformQuotasTable,
-			Columns: []string{user.PlatformQuotasColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(userplatformquota.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {
@@ -1195,42 +740,6 @@ func (u *UserUpsert) SetRole(v string) *UserUpsert {
 // UpdateRole sets the "role" field to the value that was provided on create.
 func (u *UserUpsert) UpdateRole() *UserUpsert {
 	u.SetExcluded(user.FieldRole)
-	return u
-}
-
-// SetBalance sets the "balance" field.
-func (u *UserUpsert) SetBalance(v float64) *UserUpsert {
-	u.Set(user.FieldBalance, v)
-	return u
-}
-
-// UpdateBalance sets the "balance" field to the value that was provided on create.
-func (u *UserUpsert) UpdateBalance() *UserUpsert {
-	u.SetExcluded(user.FieldBalance)
-	return u
-}
-
-// AddBalance adds v to the "balance" field.
-func (u *UserUpsert) AddBalance(v float64) *UserUpsert {
-	u.Add(user.FieldBalance, v)
-	return u
-}
-
-// SetFrozenBalance sets the "frozen_balance" field.
-func (u *UserUpsert) SetFrozenBalance(v float64) *UserUpsert {
-	u.Set(user.FieldFrozenBalance, v)
-	return u
-}
-
-// UpdateFrozenBalance sets the "frozen_balance" field to the value that was provided on create.
-func (u *UserUpsert) UpdateFrozenBalance() *UserUpsert {
-	u.SetExcluded(user.FieldFrozenBalance)
-	return u
-}
-
-// AddFrozenBalance adds v to the "frozen_balance" field.
-func (u *UserUpsert) AddFrozenBalance(v float64) *UserUpsert {
-	u.Add(user.FieldFrozenBalance, v)
 	return u
 }
 
@@ -1384,84 +893,6 @@ func (u *UserUpsert) ClearLastActiveAt() *UserUpsert {
 	return u
 }
 
-// SetBalanceNotifyEnabled sets the "balance_notify_enabled" field.
-func (u *UserUpsert) SetBalanceNotifyEnabled(v bool) *UserUpsert {
-	u.Set(user.FieldBalanceNotifyEnabled, v)
-	return u
-}
-
-// UpdateBalanceNotifyEnabled sets the "balance_notify_enabled" field to the value that was provided on create.
-func (u *UserUpsert) UpdateBalanceNotifyEnabled() *UserUpsert {
-	u.SetExcluded(user.FieldBalanceNotifyEnabled)
-	return u
-}
-
-// SetBalanceNotifyThresholdType sets the "balance_notify_threshold_type" field.
-func (u *UserUpsert) SetBalanceNotifyThresholdType(v string) *UserUpsert {
-	u.Set(user.FieldBalanceNotifyThresholdType, v)
-	return u
-}
-
-// UpdateBalanceNotifyThresholdType sets the "balance_notify_threshold_type" field to the value that was provided on create.
-func (u *UserUpsert) UpdateBalanceNotifyThresholdType() *UserUpsert {
-	u.SetExcluded(user.FieldBalanceNotifyThresholdType)
-	return u
-}
-
-// SetBalanceNotifyThreshold sets the "balance_notify_threshold" field.
-func (u *UserUpsert) SetBalanceNotifyThreshold(v float64) *UserUpsert {
-	u.Set(user.FieldBalanceNotifyThreshold, v)
-	return u
-}
-
-// UpdateBalanceNotifyThreshold sets the "balance_notify_threshold" field to the value that was provided on create.
-func (u *UserUpsert) UpdateBalanceNotifyThreshold() *UserUpsert {
-	u.SetExcluded(user.FieldBalanceNotifyThreshold)
-	return u
-}
-
-// AddBalanceNotifyThreshold adds v to the "balance_notify_threshold" field.
-func (u *UserUpsert) AddBalanceNotifyThreshold(v float64) *UserUpsert {
-	u.Add(user.FieldBalanceNotifyThreshold, v)
-	return u
-}
-
-// ClearBalanceNotifyThreshold clears the value of the "balance_notify_threshold" field.
-func (u *UserUpsert) ClearBalanceNotifyThreshold() *UserUpsert {
-	u.SetNull(user.FieldBalanceNotifyThreshold)
-	return u
-}
-
-// SetBalanceNotifyExtraEmails sets the "balance_notify_extra_emails" field.
-func (u *UserUpsert) SetBalanceNotifyExtraEmails(v string) *UserUpsert {
-	u.Set(user.FieldBalanceNotifyExtraEmails, v)
-	return u
-}
-
-// UpdateBalanceNotifyExtraEmails sets the "balance_notify_extra_emails" field to the value that was provided on create.
-func (u *UserUpsert) UpdateBalanceNotifyExtraEmails() *UserUpsert {
-	u.SetExcluded(user.FieldBalanceNotifyExtraEmails)
-	return u
-}
-
-// SetTotalRecharged sets the "total_recharged" field.
-func (u *UserUpsert) SetTotalRecharged(v float64) *UserUpsert {
-	u.Set(user.FieldTotalRecharged, v)
-	return u
-}
-
-// UpdateTotalRecharged sets the "total_recharged" field to the value that was provided on create.
-func (u *UserUpsert) UpdateTotalRecharged() *UserUpsert {
-	u.SetExcluded(user.FieldTotalRecharged)
-	return u
-}
-
-// AddTotalRecharged adds v to the "total_recharged" field.
-func (u *UserUpsert) AddTotalRecharged(v float64) *UserUpsert {
-	u.Add(user.FieldTotalRecharged, v)
-	return u
-}
-
 // SetRpmLimit sets the "rpm_limit" field.
 func (u *UserUpsert) SetRpmLimit(v int) *UserUpsert {
 	u.Set(user.FieldRpmLimit, v)
@@ -1599,48 +1030,6 @@ func (u *UserUpsertOne) SetRole(v string) *UserUpsertOne {
 func (u *UserUpsertOne) UpdateRole() *UserUpsertOne {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateRole()
-	})
-}
-
-// SetBalance sets the "balance" field.
-func (u *UserUpsertOne) SetBalance(v float64) *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.SetBalance(v)
-	})
-}
-
-// AddBalance adds v to the "balance" field.
-func (u *UserUpsertOne) AddBalance(v float64) *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.AddBalance(v)
-	})
-}
-
-// UpdateBalance sets the "balance" field to the value that was provided on create.
-func (u *UserUpsertOne) UpdateBalance() *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.UpdateBalance()
-	})
-}
-
-// SetFrozenBalance sets the "frozen_balance" field.
-func (u *UserUpsertOne) SetFrozenBalance(v float64) *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.SetFrozenBalance(v)
-	})
-}
-
-// AddFrozenBalance adds v to the "frozen_balance" field.
-func (u *UserUpsertOne) AddFrozenBalance(v float64) *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.AddFrozenBalance(v)
-	})
-}
-
-// UpdateFrozenBalance sets the "frozen_balance" field to the value that was provided on create.
-func (u *UserUpsertOne) UpdateFrozenBalance() *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.UpdateFrozenBalance()
 	})
 }
 
@@ -1816,97 +1205,6 @@ func (u *UserUpsertOne) UpdateLastActiveAt() *UserUpsertOne {
 func (u *UserUpsertOne) ClearLastActiveAt() *UserUpsertOne {
 	return u.Update(func(s *UserUpsert) {
 		s.ClearLastActiveAt()
-	})
-}
-
-// SetBalanceNotifyEnabled sets the "balance_notify_enabled" field.
-func (u *UserUpsertOne) SetBalanceNotifyEnabled(v bool) *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.SetBalanceNotifyEnabled(v)
-	})
-}
-
-// UpdateBalanceNotifyEnabled sets the "balance_notify_enabled" field to the value that was provided on create.
-func (u *UserUpsertOne) UpdateBalanceNotifyEnabled() *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.UpdateBalanceNotifyEnabled()
-	})
-}
-
-// SetBalanceNotifyThresholdType sets the "balance_notify_threshold_type" field.
-func (u *UserUpsertOne) SetBalanceNotifyThresholdType(v string) *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.SetBalanceNotifyThresholdType(v)
-	})
-}
-
-// UpdateBalanceNotifyThresholdType sets the "balance_notify_threshold_type" field to the value that was provided on create.
-func (u *UserUpsertOne) UpdateBalanceNotifyThresholdType() *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.UpdateBalanceNotifyThresholdType()
-	})
-}
-
-// SetBalanceNotifyThreshold sets the "balance_notify_threshold" field.
-func (u *UserUpsertOne) SetBalanceNotifyThreshold(v float64) *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.SetBalanceNotifyThreshold(v)
-	})
-}
-
-// AddBalanceNotifyThreshold adds v to the "balance_notify_threshold" field.
-func (u *UserUpsertOne) AddBalanceNotifyThreshold(v float64) *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.AddBalanceNotifyThreshold(v)
-	})
-}
-
-// UpdateBalanceNotifyThreshold sets the "balance_notify_threshold" field to the value that was provided on create.
-func (u *UserUpsertOne) UpdateBalanceNotifyThreshold() *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.UpdateBalanceNotifyThreshold()
-	})
-}
-
-// ClearBalanceNotifyThreshold clears the value of the "balance_notify_threshold" field.
-func (u *UserUpsertOne) ClearBalanceNotifyThreshold() *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.ClearBalanceNotifyThreshold()
-	})
-}
-
-// SetBalanceNotifyExtraEmails sets the "balance_notify_extra_emails" field.
-func (u *UserUpsertOne) SetBalanceNotifyExtraEmails(v string) *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.SetBalanceNotifyExtraEmails(v)
-	})
-}
-
-// UpdateBalanceNotifyExtraEmails sets the "balance_notify_extra_emails" field to the value that was provided on create.
-func (u *UserUpsertOne) UpdateBalanceNotifyExtraEmails() *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.UpdateBalanceNotifyExtraEmails()
-	})
-}
-
-// SetTotalRecharged sets the "total_recharged" field.
-func (u *UserUpsertOne) SetTotalRecharged(v float64) *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.SetTotalRecharged(v)
-	})
-}
-
-// AddTotalRecharged adds v to the "total_recharged" field.
-func (u *UserUpsertOne) AddTotalRecharged(v float64) *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.AddTotalRecharged(v)
-	})
-}
-
-// UpdateTotalRecharged sets the "total_recharged" field to the value that was provided on create.
-func (u *UserUpsertOne) UpdateTotalRecharged() *UserUpsertOne {
-	return u.Update(func(s *UserUpsert) {
-		s.UpdateTotalRecharged()
 	})
 }
 
@@ -2219,48 +1517,6 @@ func (u *UserUpsertBulk) UpdateRole() *UserUpsertBulk {
 	})
 }
 
-// SetBalance sets the "balance" field.
-func (u *UserUpsertBulk) SetBalance(v float64) *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.SetBalance(v)
-	})
-}
-
-// AddBalance adds v to the "balance" field.
-func (u *UserUpsertBulk) AddBalance(v float64) *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.AddBalance(v)
-	})
-}
-
-// UpdateBalance sets the "balance" field to the value that was provided on create.
-func (u *UserUpsertBulk) UpdateBalance() *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.UpdateBalance()
-	})
-}
-
-// SetFrozenBalance sets the "frozen_balance" field.
-func (u *UserUpsertBulk) SetFrozenBalance(v float64) *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.SetFrozenBalance(v)
-	})
-}
-
-// AddFrozenBalance adds v to the "frozen_balance" field.
-func (u *UserUpsertBulk) AddFrozenBalance(v float64) *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.AddFrozenBalance(v)
-	})
-}
-
-// UpdateFrozenBalance sets the "frozen_balance" field to the value that was provided on create.
-func (u *UserUpsertBulk) UpdateFrozenBalance() *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.UpdateFrozenBalance()
-	})
-}
-
 // SetConcurrency sets the "concurrency" field.
 func (u *UserUpsertBulk) SetConcurrency(v int) *UserUpsertBulk {
 	return u.Update(func(s *UserUpsert) {
@@ -2433,97 +1689,6 @@ func (u *UserUpsertBulk) UpdateLastActiveAt() *UserUpsertBulk {
 func (u *UserUpsertBulk) ClearLastActiveAt() *UserUpsertBulk {
 	return u.Update(func(s *UserUpsert) {
 		s.ClearLastActiveAt()
-	})
-}
-
-// SetBalanceNotifyEnabled sets the "balance_notify_enabled" field.
-func (u *UserUpsertBulk) SetBalanceNotifyEnabled(v bool) *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.SetBalanceNotifyEnabled(v)
-	})
-}
-
-// UpdateBalanceNotifyEnabled sets the "balance_notify_enabled" field to the value that was provided on create.
-func (u *UserUpsertBulk) UpdateBalanceNotifyEnabled() *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.UpdateBalanceNotifyEnabled()
-	})
-}
-
-// SetBalanceNotifyThresholdType sets the "balance_notify_threshold_type" field.
-func (u *UserUpsertBulk) SetBalanceNotifyThresholdType(v string) *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.SetBalanceNotifyThresholdType(v)
-	})
-}
-
-// UpdateBalanceNotifyThresholdType sets the "balance_notify_threshold_type" field to the value that was provided on create.
-func (u *UserUpsertBulk) UpdateBalanceNotifyThresholdType() *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.UpdateBalanceNotifyThresholdType()
-	})
-}
-
-// SetBalanceNotifyThreshold sets the "balance_notify_threshold" field.
-func (u *UserUpsertBulk) SetBalanceNotifyThreshold(v float64) *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.SetBalanceNotifyThreshold(v)
-	})
-}
-
-// AddBalanceNotifyThreshold adds v to the "balance_notify_threshold" field.
-func (u *UserUpsertBulk) AddBalanceNotifyThreshold(v float64) *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.AddBalanceNotifyThreshold(v)
-	})
-}
-
-// UpdateBalanceNotifyThreshold sets the "balance_notify_threshold" field to the value that was provided on create.
-func (u *UserUpsertBulk) UpdateBalanceNotifyThreshold() *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.UpdateBalanceNotifyThreshold()
-	})
-}
-
-// ClearBalanceNotifyThreshold clears the value of the "balance_notify_threshold" field.
-func (u *UserUpsertBulk) ClearBalanceNotifyThreshold() *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.ClearBalanceNotifyThreshold()
-	})
-}
-
-// SetBalanceNotifyExtraEmails sets the "balance_notify_extra_emails" field.
-func (u *UserUpsertBulk) SetBalanceNotifyExtraEmails(v string) *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.SetBalanceNotifyExtraEmails(v)
-	})
-}
-
-// UpdateBalanceNotifyExtraEmails sets the "balance_notify_extra_emails" field to the value that was provided on create.
-func (u *UserUpsertBulk) UpdateBalanceNotifyExtraEmails() *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.UpdateBalanceNotifyExtraEmails()
-	})
-}
-
-// SetTotalRecharged sets the "total_recharged" field.
-func (u *UserUpsertBulk) SetTotalRecharged(v float64) *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.SetTotalRecharged(v)
-	})
-}
-
-// AddTotalRecharged adds v to the "total_recharged" field.
-func (u *UserUpsertBulk) AddTotalRecharged(v float64) *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.AddTotalRecharged(v)
-	})
-}
-
-// UpdateTotalRecharged sets the "total_recharged" field to the value that was provided on create.
-func (u *UserUpsertBulk) UpdateTotalRecharged() *UserUpsertBulk {
-	return u.Update(func(s *UserUpsert) {
-		s.UpdateTotalRecharged()
 	})
 }
 

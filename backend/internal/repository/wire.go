@@ -1,13 +1,13 @@
 package repository
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/google/wire"
 	"github.com/redis/go-redis/v9"
@@ -30,12 +30,6 @@ func ProvideConcurrencyCache(rdb *redis.Client, cfg *config.Config) service.Conc
 // 从配置中读取代理设置，支持国内服务器通过代理访问 GitHub
 func ProvideGitHubReleaseClient(cfg *config.Config) service.GitHubReleaseClient {
 	return NewGitHubReleaseClient(cfg.Update.ProxyURL, cfg.Security.ProxyFallback.AllowDirectOnError)
-}
-
-// ProvidePricingRemoteClient 创建定价数据远程客户端
-// 从配置中读取代理设置，支持国内服务器通过代理访问 GitHub 上的定价数据
-func ProvidePricingRemoteClient(cfg *config.Config) service.PricingRemoteClient {
-	return NewPricingRemoteClient(cfg.Update.ProxyURL, cfg.Security.ProxyFallback.AllowDirectOnError)
 }
 
 // ProvideSessionLimitCache 创建会话限制缓存
@@ -70,18 +64,12 @@ var ProviderSet = wire.NewSet(
 	NewGroupRepository,
 	NewAdminGroupRepository,
 	NewCompositeModelRouteRepository,
-	NewAccountRepository,
-	NewAdminAccountRepository,
+	NewPersonalAwareAccountRepository,
+	NewPersonalAwareAdminAccountRepository,
 	NewScheduledTestPlanRepository,   // 定时测试计划仓储
 	NewScheduledTestResultRepository, // 定时测试结果仓储
 	NewProxyRepository,
-	NewRedeemCodeRepository,
-	NewPromoCodeRepository,
-	NewAnnouncementRepository,
-	NewAnnouncementReadRepository,
 	NewUsageLogRepository,
-	NewUsageBillingRepository,
-	NewBatchImageRepository,
 	NewIdempotencyRepository,
 	NewUsageCleanupRepository,
 	NewDashboardAggregationRepository,
@@ -90,24 +78,13 @@ var ProviderSet = wire.NewSet(
 	NewAuditLogRepository,
 	NewPasskeyRepository,
 	NewPasskeySessionStore,
-	NewUserSubscriptionRepository,
-	NewUserAttributeDefinitionRepository,
-	NewUserAttributeValueRepository,
-	NewUserGroupRateRepository,
+	NewUserGroupRPMOverrideRepository,
 	NewErrorPassthroughRepository,
 	NewTLSFingerprintProfileRepository,
 	NewChannelRepository,
-	NewChannelMonitorRepository,
-	NewChannelMonitorV2Repository,
-	NewChannelMonitorRequestTemplateRepository,
-	NewContentModerationRepository,
-	NewAffiliateRepository,
-	NewUserPlatformQuotaRepository,     // T14: user × platform quota
-	NewUserPlatformQuotaServiceAdapter, // T14: adapter → service.UserPlatformQuotaRepository
 
 	// Cache implementations
 	NewGatewayCache,
-	NewBillingCache,
 	NewAPIKeyCache,
 	NewTempUnschedCache,
 	NewTimeoutCounterCache,
@@ -121,38 +98,22 @@ var ProviderSet = wire.NewSet(
 	NewDashboardCache,
 	NewEmailCache,
 	NewIdentityCache,
-	NewRedeemCache,
 	NewUpdateCache,
 	NewGeminiTokenCache,
-	NewImageTaskStore,
-	NewBatchImageQueue,
-	NewBatchImageDownloadLimiter,
 	NewLeaderLockCache,
 	ProvideSchedulerCache,
 	NewSchedulerOutboxRepository,
 	NewAuthCacheInvalidationOutboxRepository,
 	NewProxyLatencyCache,
 	NewTotpCache,
-	NewRefreshTokenCache,
+	ProvideRefreshTokenCache,
 	NewErrorPassthroughCache,
 	NewTLSFingerprintProfileCache,
-	NewContentModerationHashCache,
 
 	// Encryptors
 	NewAESEncryptor,
 
-	// Backup infrastructure
-	NewPgDumper,
-	NewS3BackupStoreFactory,
-
-	// Image storage (async image task result offload)
-	ProvideImageStorageFactory,
-
 	// HTTP service ports (DI Strategy A: return interface directly)
-	NewTurnstileVerifier,
-	NewTencentCaptchaVerifier,
-	NewAliyunCaptchaVerifier,
-	ProvidePricingRemoteClient,
 	ProvideGitHubReleaseClient,
 	NewProxyExitInfoProber,
 	NewClaudeUsageFetcher,
@@ -179,16 +140,6 @@ var ProviderSet = wire.NewSet(
 func ProvideEnt(cfg *config.Config) (*ent.Client, error) {
 	client, _, err := InitEnt(cfg)
 	return client, err
-}
-
-// ProvideImageStorageFactory 提供按需构造对象存储客户端的工厂。
-//
-// 这里返回工厂而不是实例：异步生图的开关与凭证可以在后台随时改动，客户端必须能在
-// 设置保存后重建，而不是在启动时定死一份。
-func ProvideImageStorageFactory() service.ImageStorageFactory {
-	return func(ctx context.Context, cfg *config.ImageStorageConfig) (service.ImageStorage, error) {
-		return NewS3ImageStorage(ctx, cfg)
-	}
 }
 
 // ProvideSQLDB 从 Ent 客户端提取底层的 *sql.DB 连接。
@@ -227,4 +178,13 @@ func ProvideSQLDB(client *ent.Client) (*sql.DB, error) {
 // 提供：*redis.Client
 func ProvideRedis(cfg *config.Config) *redis.Client {
 	return InitRedis(cfg)
+}
+
+// ProvideRefreshTokenCache keeps Personal browser sessions durable in SQLite,
+// while the upstream compatibility runtime retains its Redis implementation.
+func ProvideRefreshTokenCache(rdb *redis.Client, db *sql.DB) service.RefreshTokenCache {
+	if personal.Enabled() {
+		return newPersonalRefreshTokenCache(db)
+	}
+	return NewRefreshTokenCache(rdb)
 }

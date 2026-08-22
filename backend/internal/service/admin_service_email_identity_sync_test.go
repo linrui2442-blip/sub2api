@@ -117,14 +117,6 @@ func (s *emailSyncRepoStub) ExistsByEmailAlias(context.Context, string) (bool, e
 	return false, nil
 }
 
-func (s *emailSyncRepoStub) AdjustBalance(ctx context.Context, id int64, delta float64) (BalanceChange, error) {
-	panic("unexpected AdjustBalance call")
-}
-
-func (s *emailSyncRepoStub) SetBalance(ctx context.Context, id int64, value float64) (BalanceChange, error) {
-	panic("unexpected SetBalance call")
-}
-
 func (s *emailSyncRepoStub) RemoveGroupFromAllowedGroups(context.Context, int64) (int64, error) {
 	return 0, nil
 }

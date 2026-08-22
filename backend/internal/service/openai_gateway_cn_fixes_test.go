@@ -35,42 +35,6 @@ func TestResolveMessagesDispatchModel_CNProvidersNoDispatchMapping(t *testing.T)
 		"openai 分组的调度默认映射不应受 CN 修复影响")
 }
 
-func TestFilterCNProviderBillingModelCandidates(t *testing.T) {
-	svc := &OpenAIGatewayService{} // resolver 为 nil → 无显式分组/渠道定价
-	apiKey := &APIKey{Group: &Group{ID: 1, Platform: PlatformKimi}}
-
-	cnAccount := &Account{ID: 1, Platform: PlatformKimi}
-	filtered := svc.filterCNProviderBillingModelCandidates(context.Background(), cnAccount, apiKey,
-		[]string{"kimi-k2-0905-preview", "claude-sonnet-4-5", "moonshot-v1-8k"})
-	require.Equal(t, []string{"kimi-k2-0905-preview", "moonshot-v1-8k"}, filtered,
-		"无显式定价时 claude-* 候选必须被过滤")
-
-	allClaude := svc.filterCNProviderBillingModelCandidates(context.Background(), cnAccount, apiKey,
-		[]string{"claude-sonnet-4-5", "claude-sonnet-4-5"})
-	require.Empty(t, allClaude, "全 claude 候选应被清空（上层走零成本+告警落账）")
-
-	// 非 CN 账号完全不受影响。
-	openaiAccount := &Account{ID: 2, Platform: PlatformOpenAI}
-	passthrough := svc.filterCNProviderBillingModelCandidates(context.Background(), openaiAccount, apiKey,
-		[]string{"claude-sonnet-4-5", "gpt-5.4"})
-	require.Equal(t, []string{"claude-sonnet-4-5", "gpt-5.4"}, passthrough)
-
-	require.Nil(t, svc.filterCNProviderBillingModelCandidates(context.Background(), nil, apiKey, nil))
-}
-
-func TestCalculateOpenAIRecordUsageCost_EmptyCandidatesIsPricingUnavailable(t *testing.T) {
-	svc := &OpenAIGatewayService{}
-	apiKey := &APIKey{Group: &Group{ID: 1, Platform: PlatformKimi}}
-
-	_, err := svc.calculateOpenAIRecordUsageCost(
-		context.Background(), nil, apiKey, nil,
-		1.0, 1.0, 1.0, 1.0, UsageTokens{InputTokens: 100}, "", nil, time.Time{},
-	)
-	require.Error(t, err)
-	require.True(t, isUsagePricingUnavailableError(err),
-		"空候选必须按无价可循处理（上层零成本落账），而不是丢弃整条 usage 记录: %v", err)
-}
-
 func TestResponsesStreamingFromNativeAnthropic_ClientDisconnectDrainsUsage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	svc := newNativeAnthropicHangTestService(5)

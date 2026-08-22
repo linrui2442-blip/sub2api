@@ -8,7 +8,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/stretchr/testify/require"
 
-	_ "github.com/lib/pq"
+	_ "modernc.org/sqlite"
 )
 
 func TestClampDBPoolSettings(t *testing.T) {
@@ -79,7 +79,7 @@ func TestApplyDBPoolSettings(t *testing.T) {
 		},
 	}
 
-	db, err := sql.Open("postgres", "host=127.0.0.1 port=5432 user=postgres sslmode=disable")
+	db, err := sql.Open("sqlite", "file:db_pool_settings?mode=memory&cache=shared")
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = db.Close()

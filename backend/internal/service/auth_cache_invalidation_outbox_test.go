@@ -15,6 +15,7 @@ type authInvalidationRepoStub struct {
 	mu         sync.Mutex
 	events     []AuthCacheInvalidationEvent
 	claimLimit int
+	claimCalls int
 	scheduled  []int64
 	deleted    []int64
 	retried    []int64
@@ -27,6 +28,7 @@ func (r *authInvalidationRepoStub) Claim(_ context.Context, _ string, limit int,
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.claimLimit = limit
+	r.claimCalls++
 	return append([]AuthCacheInvalidationEvent(nil), r.events...), nil
 }
 func (r *authInvalidationRepoStub) DeleteClaimed(_ context.Context, id int64, _ string) error {
@@ -206,6 +208,19 @@ func TestAuthCacheInvalidationWorker_LifecycleIsManagedAndIdempotent(t *testing.
 	require.False(t, worker.Health(context.Background()).Running)
 }
 
+func TestAuthCacheInvalidationWorker_EmptyQueueContinuesWithoutFailures(t *testing.T) {
+	repo := &authInvalidationRepoStub{}
+	worker := NewAuthCacheInvalidationWorker(repo, &authInvalidationCacheStub{})
+	worker.Start()
+	require.Eventually(t, func() bool {
+		repo.mu.Lock()
+		defer repo.mu.Unlock()
+		return repo.claimCalls >= 3
+	}, 2*time.Second, 25*time.Millisecond)
+	worker.Stop()
+	require.Zero(t, worker.Health(context.Background()).Failures)
+}
+
 func TestAuthInvalidationRetryDelayIsBoundedAndJittered(t *testing.T) {
 	for attempt := 1; attempt <= 20; attempt++ {
 		delay := authInvalidationRetryDelay(attempt)
@@ -227,7 +242,7 @@ func TestAuthCacheInvalidationSubscriber_RetriesInitialFailureAndStops(t *testin
 		<-ctx.Done()
 		return ctx.Err()
 	}}
-	svc := NewAPIKeyService(nil, nil, nil, nil, nil, cache, nil)
+	svc := NewAPIKeyService(nil, nil, nil, nil, cache, nil)
 	localCache, err := ristretto.NewCache(&ristretto.Config{NumCounters: 10, MaxCost: 1, BufferItems: 64})
 	require.NoError(t, err)
 	defer localCache.Close()
@@ -256,7 +271,7 @@ func TestAuthCacheInvalidationSubscriber_ReconnectsAfterRuntimeDisconnect(t *tes
 		<-ctx.Done()
 		return ctx.Err()
 	}}
-	svc := NewAPIKeyService(nil, nil, nil, nil, nil, cache, nil)
+	svc := NewAPIKeyService(nil, nil, nil, nil, cache, nil)
 	localCache, err := ristretto.NewCache(&ristretto.Config{NumCounters: 10, MaxCost: 1, BufferItems: 64})
 	require.NoError(t, err)
 	defer localCache.Close()

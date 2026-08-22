@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	middleware "github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -163,55 +162,22 @@ func newTestGatewayHandler(t *testing.T, group *service.Group, accounts []*servi
 	schedulerSnapshot := service.NewSchedulerSnapshotService(schedulerCache, nil, nil, nil, nil)
 
 	gwSvc := service.NewGatewayService(
-		nil, // accountRepo (not used: scheduler snapshot hit)
-		&fakeGroupRepo{group: group},
-		nil, // usageLogRepo
-		nil, // usageBillingRepo
-		nil, // userRepo
-		nil, // userSubRepo
-		nil, // userGroupRateRepo
-		nil, // cache (disable sticky)
-		nil, // cfg
-		schedulerSnapshot,
-		nil, // concurrencyService (disable load-aware; tryAcquire always acquired)
-		nil, // billingService
-		nil, // rateLimitService
-		nil, // billingCacheService
-		nil, // identityService
-		nil, // httpUpstream
-		nil, // deferredService
-		nil, // claudeTokenProvider
-		nil, // sessionLimitCache
-		nil, // rpmCache
-		nil, // digestStore
-		nil, // settingService
-		nil, // tlsFPProfileService
-		nil, // channelService
-		nil, // resolver
-		nil, // compositeResolver
-		nil, // balanceNotifyService
-		nil, // userPlatformQuotaRepo
+		nil, &fakeGroupRepo{group: group}, nil, nil, nil, nil,
+		schedulerSnapshot, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
-
-	// RunModeSimple：跳过计费检查，避免引入 repo/cache 依赖。
-	cfg := &config.Config{RunMode: config.RunModeSimple}
-	billingCacheSvc := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
 
 	concurrencySvc := service.NewConcurrencyService(&fakeConcurrencyCache{})
 	concurrencyHelper := NewConcurrencyHelper(concurrencySvc, SSEPingFormatClaude, 0)
 
 	h := &GatewayHandler{
-		gatewayService:      gwSvc,
-		billingCacheService: billingCacheSvc,
-		concurrencyHelper:   concurrencyHelper,
+		gatewayService:    gwSvc,
+		concurrencyHelper: concurrencyHelper,
 		// 这些字段对本测试不敏感，保持较小即可
 		maxAccountSwitches:       1,
 		maxAccountSwitchesGemini: 1,
 	}
 
-	cleanup := func() {
-		billingCacheSvc.Stop()
-	}
+	cleanup := func() {}
 	return h, cleanup
 }
 
@@ -271,7 +237,6 @@ func TestGatewayHandlerMessages_InterceptWarmup_AntigravityAccount_MixedScheduli
 		User: &service.User{
 			ID:          4001,
 			Concurrency: 10,
-			Balance:     100,
 		},
 		Group: group,
 	}
@@ -361,7 +326,6 @@ func TestGatewayHandlerMessages_InterceptWarmup_AntigravityAccount_ForcePlatform
 		User: &service.User{
 			ID:          4002,
 			Concurrency: 10,
-			Balance:     100,
 		},
 		Group: group,
 	}

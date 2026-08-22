@@ -1,9 +1,6 @@
 package service
 
-import (
-	"context"
-	"strings"
-)
+import "strings"
 
 // Email alias normalization for registration dedup.
 //
@@ -124,19 +121,4 @@ func stripEmailLocalDots(local string) string {
 func isGmailFamilyDomain(domain string) bool {
 	_, ok := gmailFamilyDomains[domain]
 	return ok
-}
-
-// existsByEmailOrAlias reports whether an email — or any alias variant that
-// resolves to the same inbox — is already registered.
-//
-// It first performs the exact ExistsByEmail check, then, only on a miss, probes
-// for an alias collision. Consistent with ExistsByEmail, lookup errors are
-// surfaced (fail-closed) so the registration path returns a service error instead
-// of letting an attacker bypass the check by inducing errors.
-func (s *AuthService) existsByEmailOrAlias(ctx context.Context, email string) (bool, error) {
-	exists, err := s.userRepo.ExistsByEmail(ctx, email)
-	if err != nil || exists {
-		return exists, err
-	}
-	return s.userRepo.ExistsByEmailAlias(ctx, email)
 }

@@ -2,7 +2,11 @@ package repository
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -11,6 +15,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
 
 	"github.com/imroc/req/v3"
+	"golang.org/x/net/http/httpproxy"
 )
 
 // reqClientOptions 定义 req 客户端的构建参数
@@ -58,6 +63,13 @@ func getSharedReqClient(opts reqClientOptions) (*req.Client, error) {
 	}
 	if trimmed != "" {
 		client.SetProxyURL(trimmed)
+		slog.Info("provider auth proxy resolved", "proxy_source", "account", "proxy_enabled", true)
+	} else {
+		// OAuth account creation happens before an account-specific proxy can
+		// exist. Resolve the standard environment on every request so Personal
+		// runtime changes to HTTP(S)_PROXY/NO_PROXY take effect without creating
+		// another provider-specific transport. ALL_PROXY is the final fallback.
+		client.GetTransport().SetProxy(providerAuthProxy)
 	}
 	client = instrumentReqClient(client)
 
@@ -66,6 +78,122 @@ func getSharedReqClient(opts reqClientOptions) (*req.Client, error) {
 		return c, nil
 	}
 	return client, nil
+}
+
+func providerAuthProxyFromEnvironment(req *http.Request) (*url.URL, error) {
+	if req == nil || req.URL == nil {
+		return nil, nil
+	}
+	cfg := httpproxy.FromEnvironment()
+	if strings.TrimSpace(cfg.HTTPProxy) == "" && strings.TrimSpace(cfg.HTTPSProxy) == "" {
+		allProxy := strings.TrimSpace(os.Getenv("ALL_PROXY"))
+		if allProxy == "" {
+			allProxy = strings.TrimSpace(os.Getenv("all_proxy"))
+		}
+		if allProxy != "" {
+			cfg.HTTPProxy = allProxy
+			cfg.HTTPSProxy = allProxy
+		}
+	}
+	return cfg.ProxyFunc()(req.URL)
+}
+
+type providerProxyDecision struct {
+	URL    *url.URL
+	Source string
+}
+
+var systemProxyResolver = windowsSystemProxy
+
+// providerAuthProxy resolves the Personal authentication egress policy. An
+// explicit account proxy is installed by getSharedReqClient before this
+// function is used. Personal Edition currently has no separate default proxy,
+// so Windows system settings precede the standard environment fallback.
+func providerAuthProxy(req *http.Request) (*url.URL, error) {
+	decision, err := resolveProviderAuthProxy(req)
+	if err == nil {
+		slog.Info("provider auth proxy resolved", "proxy_source", decision.Source, "proxy_enabled", decision.URL != nil)
+	}
+	return decision.URL, err
+}
+
+func resolveProviderAuthProxy(req *http.Request) (providerProxyDecision, error) {
+	if req == nil || req.URL == nil {
+		return providerProxyDecision{Source: "direct"}, nil
+	}
+	if proxy, ok := systemProxyResolver(req.URL); ok {
+		return providerProxyDecision{URL: proxy, Source: "windows_system"}, nil
+	}
+	proxy, err := providerAuthProxyFromEnvironment(req)
+	if err != nil {
+		return providerProxyDecision{}, err
+	}
+	if proxy != nil {
+		return providerProxyDecision{URL: proxy, Source: "environment"}, nil
+	}
+	return providerProxyDecision{Source: "direct"}, nil
+}
+
+type windowsProxyConfig struct {
+	Enabled  bool
+	Server   string
+	Override string
+}
+
+func resolveWindowsProxyConfig(target *url.URL, cfg windowsProxyConfig) (*url.URL, bool) {
+	if target == nil || !cfg.Enabled || windowsProxyBypassed(target.Hostname(), cfg.Override) {
+		return nil, false
+	}
+	raw := selectWindowsProxyServer(target.Scheme, cfg.Server)
+	if raw == "" {
+		return nil, false
+	}
+	if !strings.Contains(raw, "://") {
+		raw = "http://" + raw
+	}
+	parsed, err := url.Parse(raw)
+	if err != nil || parsed.Host == "" || parsed.User != nil {
+		return nil, false
+	}
+	return parsed, true
+}
+
+func selectWindowsProxyServer(scheme, configured string) string {
+	configured = strings.TrimSpace(configured)
+	if configured == "" {
+		return ""
+	}
+	if !strings.Contains(configured, "=") {
+		return configured
+	}
+	values := make(map[string]string)
+	for _, part := range strings.Split(configured, ";") {
+		key, value, ok := strings.Cut(part, "=")
+		if ok {
+			values[strings.ToLower(strings.TrimSpace(key))] = strings.TrimSpace(value)
+		}
+	}
+	return values[strings.ToLower(strings.TrimSpace(scheme))]
+}
+
+func windowsProxyBypassed(host, configured string) bool {
+	host = strings.ToLower(strings.TrimSpace(host))
+	if host == "" {
+		return true
+	}
+	for _, part := range strings.Split(configured, ";") {
+		pattern := strings.ToLower(strings.TrimSpace(part))
+		if pattern == "" {
+			continue
+		}
+		if pattern == "<local>" && !strings.Contains(host, ".") {
+			return true
+		}
+		if matched, _ := filepath.Match(pattern, host); matched || pattern == host {
+			return true
+		}
+	}
+	return false
 }
 
 func instrumentReqClient(client *req.Client) *req.Client {

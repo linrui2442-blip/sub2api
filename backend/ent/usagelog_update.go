@@ -16,7 +16,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
-	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 )
 
 // UsageLogUpdate is the builder for updating UsageLog entities.
@@ -229,46 +228,6 @@ func (_u *UsageLogUpdate) ClearModelMappingChain() *UsageLogUpdate {
 	return _u
 }
 
-// SetBillingTier sets the "billing_tier" field.
-func (_u *UsageLogUpdate) SetBillingTier(v string) *UsageLogUpdate {
-	_u.mutation.SetBillingTier(v)
-	return _u
-}
-
-// SetNillableBillingTier sets the "billing_tier" field if the given value is not nil.
-func (_u *UsageLogUpdate) SetNillableBillingTier(v *string) *UsageLogUpdate {
-	if v != nil {
-		_u.SetBillingTier(*v)
-	}
-	return _u
-}
-
-// ClearBillingTier clears the value of the "billing_tier" field.
-func (_u *UsageLogUpdate) ClearBillingTier() *UsageLogUpdate {
-	_u.mutation.ClearBillingTier()
-	return _u
-}
-
-// SetBillingMode sets the "billing_mode" field.
-func (_u *UsageLogUpdate) SetBillingMode(v string) *UsageLogUpdate {
-	_u.mutation.SetBillingMode(v)
-	return _u
-}
-
-// SetNillableBillingMode sets the "billing_mode" field if the given value is not nil.
-func (_u *UsageLogUpdate) SetNillableBillingMode(v *string) *UsageLogUpdate {
-	if v != nil {
-		_u.SetBillingMode(*v)
-	}
-	return _u
-}
-
-// ClearBillingMode clears the value of the "billing_mode" field.
-func (_u *UsageLogUpdate) ClearBillingMode() *UsageLogUpdate {
-	_u.mutation.ClearBillingMode()
-	return _u
-}
-
 // SetGroupID sets the "group_id" field.
 func (_u *UsageLogUpdate) SetGroupID(v int64) *UsageLogUpdate {
 	_u.mutation.SetGroupID(v)
@@ -286,26 +245,6 @@ func (_u *UsageLogUpdate) SetNillableGroupID(v *int64) *UsageLogUpdate {
 // ClearGroupID clears the value of the "group_id" field.
 func (_u *UsageLogUpdate) ClearGroupID() *UsageLogUpdate {
 	_u.mutation.ClearGroupID()
-	return _u
-}
-
-// SetSubscriptionID sets the "subscription_id" field.
-func (_u *UsageLogUpdate) SetSubscriptionID(v int64) *UsageLogUpdate {
-	_u.mutation.SetSubscriptionID(v)
-	return _u
-}
-
-// SetNillableSubscriptionID sets the "subscription_id" field if the given value is not nil.
-func (_u *UsageLogUpdate) SetNillableSubscriptionID(v *int64) *UsageLogUpdate {
-	if v != nil {
-		_u.SetSubscriptionID(*v)
-	}
-	return _u
-}
-
-// ClearSubscriptionID clears the value of the "subscription_id" field.
-func (_u *UsageLogUpdate) ClearSubscriptionID() *UsageLogUpdate {
-	_u.mutation.ClearSubscriptionID()
 	return _u
 }
 
@@ -432,215 +371,6 @@ func (_u *UsageLogUpdate) SetNillableCacheCreation1hTokens(v *int) *UsageLogUpda
 // AddCacheCreation1hTokens adds value to the "cache_creation_1h_tokens" field.
 func (_u *UsageLogUpdate) AddCacheCreation1hTokens(v int) *UsageLogUpdate {
 	_u.mutation.AddCacheCreation1hTokens(v)
-	return _u
-}
-
-// SetInputCost sets the "input_cost" field.
-func (_u *UsageLogUpdate) SetInputCost(v float64) *UsageLogUpdate {
-	_u.mutation.ResetInputCost()
-	_u.mutation.SetInputCost(v)
-	return _u
-}
-
-// SetNillableInputCost sets the "input_cost" field if the given value is not nil.
-func (_u *UsageLogUpdate) SetNillableInputCost(v *float64) *UsageLogUpdate {
-	if v != nil {
-		_u.SetInputCost(*v)
-	}
-	return _u
-}
-
-// AddInputCost adds value to the "input_cost" field.
-func (_u *UsageLogUpdate) AddInputCost(v float64) *UsageLogUpdate {
-	_u.mutation.AddInputCost(v)
-	return _u
-}
-
-// SetOutputCost sets the "output_cost" field.
-func (_u *UsageLogUpdate) SetOutputCost(v float64) *UsageLogUpdate {
-	_u.mutation.ResetOutputCost()
-	_u.mutation.SetOutputCost(v)
-	return _u
-}
-
-// SetNillableOutputCost sets the "output_cost" field if the given value is not nil.
-func (_u *UsageLogUpdate) SetNillableOutputCost(v *float64) *UsageLogUpdate {
-	if v != nil {
-		_u.SetOutputCost(*v)
-	}
-	return _u
-}
-
-// AddOutputCost adds value to the "output_cost" field.
-func (_u *UsageLogUpdate) AddOutputCost(v float64) *UsageLogUpdate {
-	_u.mutation.AddOutputCost(v)
-	return _u
-}
-
-// SetCacheCreationCost sets the "cache_creation_cost" field.
-func (_u *UsageLogUpdate) SetCacheCreationCost(v float64) *UsageLogUpdate {
-	_u.mutation.ResetCacheCreationCost()
-	_u.mutation.SetCacheCreationCost(v)
-	return _u
-}
-
-// SetNillableCacheCreationCost sets the "cache_creation_cost" field if the given value is not nil.
-func (_u *UsageLogUpdate) SetNillableCacheCreationCost(v *float64) *UsageLogUpdate {
-	if v != nil {
-		_u.SetCacheCreationCost(*v)
-	}
-	return _u
-}
-
-// AddCacheCreationCost adds value to the "cache_creation_cost" field.
-func (_u *UsageLogUpdate) AddCacheCreationCost(v float64) *UsageLogUpdate {
-	_u.mutation.AddCacheCreationCost(v)
-	return _u
-}
-
-// SetCacheReadCost sets the "cache_read_cost" field.
-func (_u *UsageLogUpdate) SetCacheReadCost(v float64) *UsageLogUpdate {
-	_u.mutation.ResetCacheReadCost()
-	_u.mutation.SetCacheReadCost(v)
-	return _u
-}
-
-// SetNillableCacheReadCost sets the "cache_read_cost" field if the given value is not nil.
-func (_u *UsageLogUpdate) SetNillableCacheReadCost(v *float64) *UsageLogUpdate {
-	if v != nil {
-		_u.SetCacheReadCost(*v)
-	}
-	return _u
-}
-
-// AddCacheReadCost adds value to the "cache_read_cost" field.
-func (_u *UsageLogUpdate) AddCacheReadCost(v float64) *UsageLogUpdate {
-	_u.mutation.AddCacheReadCost(v)
-	return _u
-}
-
-// SetTotalCost sets the "total_cost" field.
-func (_u *UsageLogUpdate) SetTotalCost(v float64) *UsageLogUpdate {
-	_u.mutation.ResetTotalCost()
-	_u.mutation.SetTotalCost(v)
-	return _u
-}
-
-// SetNillableTotalCost sets the "total_cost" field if the given value is not nil.
-func (_u *UsageLogUpdate) SetNillableTotalCost(v *float64) *UsageLogUpdate {
-	if v != nil {
-		_u.SetTotalCost(*v)
-	}
-	return _u
-}
-
-// AddTotalCost adds value to the "total_cost" field.
-func (_u *UsageLogUpdate) AddTotalCost(v float64) *UsageLogUpdate {
-	_u.mutation.AddTotalCost(v)
-	return _u
-}
-
-// SetActualCost sets the "actual_cost" field.
-func (_u *UsageLogUpdate) SetActualCost(v float64) *UsageLogUpdate {
-	_u.mutation.ResetActualCost()
-	_u.mutation.SetActualCost(v)
-	return _u
-}
-
-// SetNillableActualCost sets the "actual_cost" field if the given value is not nil.
-func (_u *UsageLogUpdate) SetNillableActualCost(v *float64) *UsageLogUpdate {
-	if v != nil {
-		_u.SetActualCost(*v)
-	}
-	return _u
-}
-
-// AddActualCost adds value to the "actual_cost" field.
-func (_u *UsageLogUpdate) AddActualCost(v float64) *UsageLogUpdate {
-	_u.mutation.AddActualCost(v)
-	return _u
-}
-
-// SetRateMultiplier sets the "rate_multiplier" field.
-func (_u *UsageLogUpdate) SetRateMultiplier(v float64) *UsageLogUpdate {
-	_u.mutation.ResetRateMultiplier()
-	_u.mutation.SetRateMultiplier(v)
-	return _u
-}
-
-// SetNillableRateMultiplier sets the "rate_multiplier" field if the given value is not nil.
-func (_u *UsageLogUpdate) SetNillableRateMultiplier(v *float64) *UsageLogUpdate {
-	if v != nil {
-		_u.SetRateMultiplier(*v)
-	}
-	return _u
-}
-
-// AddRateMultiplier adds value to the "rate_multiplier" field.
-func (_u *UsageLogUpdate) AddRateMultiplier(v float64) *UsageLogUpdate {
-	_u.mutation.AddRateMultiplier(v)
-	return _u
-}
-
-// SetLongContextBillingApplied sets the "long_context_billing_applied" field.
-func (_u *UsageLogUpdate) SetLongContextBillingApplied(v bool) *UsageLogUpdate {
-	_u.mutation.SetLongContextBillingApplied(v)
-	return _u
-}
-
-// SetNillableLongContextBillingApplied sets the "long_context_billing_applied" field if the given value is not nil.
-func (_u *UsageLogUpdate) SetNillableLongContextBillingApplied(v *bool) *UsageLogUpdate {
-	if v != nil {
-		_u.SetLongContextBillingApplied(*v)
-	}
-	return _u
-}
-
-// SetAccountRateMultiplier sets the "account_rate_multiplier" field.
-func (_u *UsageLogUpdate) SetAccountRateMultiplier(v float64) *UsageLogUpdate {
-	_u.mutation.ResetAccountRateMultiplier()
-	_u.mutation.SetAccountRateMultiplier(v)
-	return _u
-}
-
-// SetNillableAccountRateMultiplier sets the "account_rate_multiplier" field if the given value is not nil.
-func (_u *UsageLogUpdate) SetNillableAccountRateMultiplier(v *float64) *UsageLogUpdate {
-	if v != nil {
-		_u.SetAccountRateMultiplier(*v)
-	}
-	return _u
-}
-
-// AddAccountRateMultiplier adds value to the "account_rate_multiplier" field.
-func (_u *UsageLogUpdate) AddAccountRateMultiplier(v float64) *UsageLogUpdate {
-	_u.mutation.AddAccountRateMultiplier(v)
-	return _u
-}
-
-// ClearAccountRateMultiplier clears the value of the "account_rate_multiplier" field.
-func (_u *UsageLogUpdate) ClearAccountRateMultiplier() *UsageLogUpdate {
-	_u.mutation.ClearAccountRateMultiplier()
-	return _u
-}
-
-// SetBillingType sets the "billing_type" field.
-func (_u *UsageLogUpdate) SetBillingType(v int8) *UsageLogUpdate {
-	_u.mutation.ResetBillingType()
-	_u.mutation.SetBillingType(v)
-	return _u
-}
-
-// SetNillableBillingType sets the "billing_type" field if the given value is not nil.
-func (_u *UsageLogUpdate) SetNillableBillingType(v *int8) *UsageLogUpdate {
-	if v != nil {
-		_u.SetBillingType(*v)
-	}
-	return _u
-}
-
-// AddBillingType adds value to the "billing_type" field.
-func (_u *UsageLogUpdate) AddBillingType(v int8) *UsageLogUpdate {
-	_u.mutation.AddBillingType(v)
 	return _u
 }
 
@@ -933,20 +663,6 @@ func (_u *UsageLogUpdate) ClearVideoDurationSeconds() *UsageLogUpdate {
 	return _u
 }
 
-// SetCacheTTLOverridden sets the "cache_ttl_overridden" field.
-func (_u *UsageLogUpdate) SetCacheTTLOverridden(v bool) *UsageLogUpdate {
-	_u.mutation.SetCacheTTLOverridden(v)
-	return _u
-}
-
-// SetNillableCacheTTLOverridden sets the "cache_ttl_overridden" field if the given value is not nil.
-func (_u *UsageLogUpdate) SetNillableCacheTTLOverridden(v *bool) *UsageLogUpdate {
-	if v != nil {
-		_u.SetCacheTTLOverridden(*v)
-	}
-	return _u
-}
-
 // SetUser sets the "user" edge to the User entity.
 func (_u *UsageLogUpdate) SetUser(v *User) *UsageLogUpdate {
 	return _u.SetUserID(v.ID)
@@ -965,11 +681,6 @@ func (_u *UsageLogUpdate) SetAccount(v *Account) *UsageLogUpdate {
 // SetGroup sets the "group" edge to the Group entity.
 func (_u *UsageLogUpdate) SetGroup(v *Group) *UsageLogUpdate {
 	return _u.SetGroupID(v.ID)
-}
-
-// SetSubscription sets the "subscription" edge to the UserSubscription entity.
-func (_u *UsageLogUpdate) SetSubscription(v *UserSubscription) *UsageLogUpdate {
-	return _u.SetSubscriptionID(v.ID)
 }
 
 // Mutation returns the UsageLogMutation object of the builder.
@@ -998,12 +709,6 @@ func (_u *UsageLogUpdate) ClearAccount() *UsageLogUpdate {
 // ClearGroup clears the "group" edge to the Group entity.
 func (_u *UsageLogUpdate) ClearGroup() *UsageLogUpdate {
 	_u.mutation.ClearGroup()
-	return _u
-}
-
-// ClearSubscription clears the "subscription" edge to the UserSubscription entity.
-func (_u *UsageLogUpdate) ClearSubscription() *UsageLogUpdate {
-	_u.mutation.ClearSubscription()
 	return _u
 }
 
@@ -1064,16 +769,6 @@ func (_u *UsageLogUpdate) check() error {
 	if v, ok := _u.mutation.ModelMappingChain(); ok {
 		if err := usagelog.ModelMappingChainValidator(v); err != nil {
 			return &ValidationError{Name: "model_mapping_chain", err: fmt.Errorf(`ent: validator failed for field "UsageLog.model_mapping_chain": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.BillingTier(); ok {
-		if err := usagelog.BillingTierValidator(v); err != nil {
-			return &ValidationError{Name: "billing_tier", err: fmt.Errorf(`ent: validator failed for field "UsageLog.billing_tier": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.BillingMode(); ok {
-		if err := usagelog.BillingModeValidator(v); err != nil {
-			return &ValidationError{Name: "billing_mode", err: fmt.Errorf(`ent: validator failed for field "UsageLog.billing_mode": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.UserAgent(); ok {
@@ -1180,18 +875,6 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.ModelMappingChainCleared() {
 		_spec.ClearField(usagelog.FieldModelMappingChain, field.TypeString)
 	}
-	if value, ok := _u.mutation.BillingTier(); ok {
-		_spec.SetField(usagelog.FieldBillingTier, field.TypeString, value)
-	}
-	if _u.mutation.BillingTierCleared() {
-		_spec.ClearField(usagelog.FieldBillingTier, field.TypeString)
-	}
-	if value, ok := _u.mutation.BillingMode(); ok {
-		_spec.SetField(usagelog.FieldBillingMode, field.TypeString, value)
-	}
-	if _u.mutation.BillingModeCleared() {
-		_spec.ClearField(usagelog.FieldBillingMode, field.TypeString)
-	}
 	if value, ok := _u.mutation.InputTokens(); ok {
 		_spec.SetField(usagelog.FieldInputTokens, field.TypeInt, value)
 	}
@@ -1227,66 +910,6 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedCacheCreation1hTokens(); ok {
 		_spec.AddField(usagelog.FieldCacheCreation1hTokens, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.InputCost(); ok {
-		_spec.SetField(usagelog.FieldInputCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedInputCost(); ok {
-		_spec.AddField(usagelog.FieldInputCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.OutputCost(); ok {
-		_spec.SetField(usagelog.FieldOutputCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedOutputCost(); ok {
-		_spec.AddField(usagelog.FieldOutputCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.CacheCreationCost(); ok {
-		_spec.SetField(usagelog.FieldCacheCreationCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedCacheCreationCost(); ok {
-		_spec.AddField(usagelog.FieldCacheCreationCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.CacheReadCost(); ok {
-		_spec.SetField(usagelog.FieldCacheReadCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedCacheReadCost(); ok {
-		_spec.AddField(usagelog.FieldCacheReadCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.TotalCost(); ok {
-		_spec.SetField(usagelog.FieldTotalCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedTotalCost(); ok {
-		_spec.AddField(usagelog.FieldTotalCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.ActualCost(); ok {
-		_spec.SetField(usagelog.FieldActualCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedActualCost(); ok {
-		_spec.AddField(usagelog.FieldActualCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.RateMultiplier(); ok {
-		_spec.SetField(usagelog.FieldRateMultiplier, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedRateMultiplier(); ok {
-		_spec.AddField(usagelog.FieldRateMultiplier, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.LongContextBillingApplied(); ok {
-		_spec.SetField(usagelog.FieldLongContextBillingApplied, field.TypeBool, value)
-	}
-	if value, ok := _u.mutation.AccountRateMultiplier(); ok {
-		_spec.SetField(usagelog.FieldAccountRateMultiplier, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedAccountRateMultiplier(); ok {
-		_spec.AddField(usagelog.FieldAccountRateMultiplier, field.TypeFloat64, value)
-	}
-	if _u.mutation.AccountRateMultiplierCleared() {
-		_spec.ClearField(usagelog.FieldAccountRateMultiplier, field.TypeFloat64)
-	}
-	if value, ok := _u.mutation.BillingType(); ok {
-		_spec.SetField(usagelog.FieldBillingType, field.TypeInt8, value)
-	}
-	if value, ok := _u.mutation.AddedBillingType(); ok {
-		_spec.AddField(usagelog.FieldBillingType, field.TypeInt8, value)
 	}
 	if value, ok := _u.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
@@ -1377,9 +1000,6 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.VideoDurationSecondsCleared() {
 		_spec.ClearField(usagelog.FieldVideoDurationSeconds, field.TypeInt)
-	}
-	if value, ok := _u.mutation.CacheTTLOverridden(); ok {
-		_spec.SetField(usagelog.FieldCacheTTLOverridden, field.TypeBool, value)
 	}
 	if _u.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1490,35 +1110,6 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.SubscriptionCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   usagelog.SubscriptionTable,
-			Columns: []string{usagelog.SubscriptionColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.SubscriptionIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   usagelog.SubscriptionTable,
-			Columns: []string{usagelog.SubscriptionColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {
@@ -1743,46 +1334,6 @@ func (_u *UsageLogUpdateOne) ClearModelMappingChain() *UsageLogUpdateOne {
 	return _u
 }
 
-// SetBillingTier sets the "billing_tier" field.
-func (_u *UsageLogUpdateOne) SetBillingTier(v string) *UsageLogUpdateOne {
-	_u.mutation.SetBillingTier(v)
-	return _u
-}
-
-// SetNillableBillingTier sets the "billing_tier" field if the given value is not nil.
-func (_u *UsageLogUpdateOne) SetNillableBillingTier(v *string) *UsageLogUpdateOne {
-	if v != nil {
-		_u.SetBillingTier(*v)
-	}
-	return _u
-}
-
-// ClearBillingTier clears the value of the "billing_tier" field.
-func (_u *UsageLogUpdateOne) ClearBillingTier() *UsageLogUpdateOne {
-	_u.mutation.ClearBillingTier()
-	return _u
-}
-
-// SetBillingMode sets the "billing_mode" field.
-func (_u *UsageLogUpdateOne) SetBillingMode(v string) *UsageLogUpdateOne {
-	_u.mutation.SetBillingMode(v)
-	return _u
-}
-
-// SetNillableBillingMode sets the "billing_mode" field if the given value is not nil.
-func (_u *UsageLogUpdateOne) SetNillableBillingMode(v *string) *UsageLogUpdateOne {
-	if v != nil {
-		_u.SetBillingMode(*v)
-	}
-	return _u
-}
-
-// ClearBillingMode clears the value of the "billing_mode" field.
-func (_u *UsageLogUpdateOne) ClearBillingMode() *UsageLogUpdateOne {
-	_u.mutation.ClearBillingMode()
-	return _u
-}
-
 // SetGroupID sets the "group_id" field.
 func (_u *UsageLogUpdateOne) SetGroupID(v int64) *UsageLogUpdateOne {
 	_u.mutation.SetGroupID(v)
@@ -1800,26 +1351,6 @@ func (_u *UsageLogUpdateOne) SetNillableGroupID(v *int64) *UsageLogUpdateOne {
 // ClearGroupID clears the value of the "group_id" field.
 func (_u *UsageLogUpdateOne) ClearGroupID() *UsageLogUpdateOne {
 	_u.mutation.ClearGroupID()
-	return _u
-}
-
-// SetSubscriptionID sets the "subscription_id" field.
-func (_u *UsageLogUpdateOne) SetSubscriptionID(v int64) *UsageLogUpdateOne {
-	_u.mutation.SetSubscriptionID(v)
-	return _u
-}
-
-// SetNillableSubscriptionID sets the "subscription_id" field if the given value is not nil.
-func (_u *UsageLogUpdateOne) SetNillableSubscriptionID(v *int64) *UsageLogUpdateOne {
-	if v != nil {
-		_u.SetSubscriptionID(*v)
-	}
-	return _u
-}
-
-// ClearSubscriptionID clears the value of the "subscription_id" field.
-func (_u *UsageLogUpdateOne) ClearSubscriptionID() *UsageLogUpdateOne {
-	_u.mutation.ClearSubscriptionID()
 	return _u
 }
 
@@ -1946,215 +1477,6 @@ func (_u *UsageLogUpdateOne) SetNillableCacheCreation1hTokens(v *int) *UsageLogU
 // AddCacheCreation1hTokens adds value to the "cache_creation_1h_tokens" field.
 func (_u *UsageLogUpdateOne) AddCacheCreation1hTokens(v int) *UsageLogUpdateOne {
 	_u.mutation.AddCacheCreation1hTokens(v)
-	return _u
-}
-
-// SetInputCost sets the "input_cost" field.
-func (_u *UsageLogUpdateOne) SetInputCost(v float64) *UsageLogUpdateOne {
-	_u.mutation.ResetInputCost()
-	_u.mutation.SetInputCost(v)
-	return _u
-}
-
-// SetNillableInputCost sets the "input_cost" field if the given value is not nil.
-func (_u *UsageLogUpdateOne) SetNillableInputCost(v *float64) *UsageLogUpdateOne {
-	if v != nil {
-		_u.SetInputCost(*v)
-	}
-	return _u
-}
-
-// AddInputCost adds value to the "input_cost" field.
-func (_u *UsageLogUpdateOne) AddInputCost(v float64) *UsageLogUpdateOne {
-	_u.mutation.AddInputCost(v)
-	return _u
-}
-
-// SetOutputCost sets the "output_cost" field.
-func (_u *UsageLogUpdateOne) SetOutputCost(v float64) *UsageLogUpdateOne {
-	_u.mutation.ResetOutputCost()
-	_u.mutation.SetOutputCost(v)
-	return _u
-}
-
-// SetNillableOutputCost sets the "output_cost" field if the given value is not nil.
-func (_u *UsageLogUpdateOne) SetNillableOutputCost(v *float64) *UsageLogUpdateOne {
-	if v != nil {
-		_u.SetOutputCost(*v)
-	}
-	return _u
-}
-
-// AddOutputCost adds value to the "output_cost" field.
-func (_u *UsageLogUpdateOne) AddOutputCost(v float64) *UsageLogUpdateOne {
-	_u.mutation.AddOutputCost(v)
-	return _u
-}
-
-// SetCacheCreationCost sets the "cache_creation_cost" field.
-func (_u *UsageLogUpdateOne) SetCacheCreationCost(v float64) *UsageLogUpdateOne {
-	_u.mutation.ResetCacheCreationCost()
-	_u.mutation.SetCacheCreationCost(v)
-	return _u
-}
-
-// SetNillableCacheCreationCost sets the "cache_creation_cost" field if the given value is not nil.
-func (_u *UsageLogUpdateOne) SetNillableCacheCreationCost(v *float64) *UsageLogUpdateOne {
-	if v != nil {
-		_u.SetCacheCreationCost(*v)
-	}
-	return _u
-}
-
-// AddCacheCreationCost adds value to the "cache_creation_cost" field.
-func (_u *UsageLogUpdateOne) AddCacheCreationCost(v float64) *UsageLogUpdateOne {
-	_u.mutation.AddCacheCreationCost(v)
-	return _u
-}
-
-// SetCacheReadCost sets the "cache_read_cost" field.
-func (_u *UsageLogUpdateOne) SetCacheReadCost(v float64) *UsageLogUpdateOne {
-	_u.mutation.ResetCacheReadCost()
-	_u.mutation.SetCacheReadCost(v)
-	return _u
-}
-
-// SetNillableCacheReadCost sets the "cache_read_cost" field if the given value is not nil.
-func (_u *UsageLogUpdateOne) SetNillableCacheReadCost(v *float64) *UsageLogUpdateOne {
-	if v != nil {
-		_u.SetCacheReadCost(*v)
-	}
-	return _u
-}
-
-// AddCacheReadCost adds value to the "cache_read_cost" field.
-func (_u *UsageLogUpdateOne) AddCacheReadCost(v float64) *UsageLogUpdateOne {
-	_u.mutation.AddCacheReadCost(v)
-	return _u
-}
-
-// SetTotalCost sets the "total_cost" field.
-func (_u *UsageLogUpdateOne) SetTotalCost(v float64) *UsageLogUpdateOne {
-	_u.mutation.ResetTotalCost()
-	_u.mutation.SetTotalCost(v)
-	return _u
-}
-
-// SetNillableTotalCost sets the "total_cost" field if the given value is not nil.
-func (_u *UsageLogUpdateOne) SetNillableTotalCost(v *float64) *UsageLogUpdateOne {
-	if v != nil {
-		_u.SetTotalCost(*v)
-	}
-	return _u
-}
-
-// AddTotalCost adds value to the "total_cost" field.
-func (_u *UsageLogUpdateOne) AddTotalCost(v float64) *UsageLogUpdateOne {
-	_u.mutation.AddTotalCost(v)
-	return _u
-}
-
-// SetActualCost sets the "actual_cost" field.
-func (_u *UsageLogUpdateOne) SetActualCost(v float64) *UsageLogUpdateOne {
-	_u.mutation.ResetActualCost()
-	_u.mutation.SetActualCost(v)
-	return _u
-}
-
-// SetNillableActualCost sets the "actual_cost" field if the given value is not nil.
-func (_u *UsageLogUpdateOne) SetNillableActualCost(v *float64) *UsageLogUpdateOne {
-	if v != nil {
-		_u.SetActualCost(*v)
-	}
-	return _u
-}
-
-// AddActualCost adds value to the "actual_cost" field.
-func (_u *UsageLogUpdateOne) AddActualCost(v float64) *UsageLogUpdateOne {
-	_u.mutation.AddActualCost(v)
-	return _u
-}
-
-// SetRateMultiplier sets the "rate_multiplier" field.
-func (_u *UsageLogUpdateOne) SetRateMultiplier(v float64) *UsageLogUpdateOne {
-	_u.mutation.ResetRateMultiplier()
-	_u.mutation.SetRateMultiplier(v)
-	return _u
-}
-
-// SetNillableRateMultiplier sets the "rate_multiplier" field if the given value is not nil.
-func (_u *UsageLogUpdateOne) SetNillableRateMultiplier(v *float64) *UsageLogUpdateOne {
-	if v != nil {
-		_u.SetRateMultiplier(*v)
-	}
-	return _u
-}
-
-// AddRateMultiplier adds value to the "rate_multiplier" field.
-func (_u *UsageLogUpdateOne) AddRateMultiplier(v float64) *UsageLogUpdateOne {
-	_u.mutation.AddRateMultiplier(v)
-	return _u
-}
-
-// SetLongContextBillingApplied sets the "long_context_billing_applied" field.
-func (_u *UsageLogUpdateOne) SetLongContextBillingApplied(v bool) *UsageLogUpdateOne {
-	_u.mutation.SetLongContextBillingApplied(v)
-	return _u
-}
-
-// SetNillableLongContextBillingApplied sets the "long_context_billing_applied" field if the given value is not nil.
-func (_u *UsageLogUpdateOne) SetNillableLongContextBillingApplied(v *bool) *UsageLogUpdateOne {
-	if v != nil {
-		_u.SetLongContextBillingApplied(*v)
-	}
-	return _u
-}
-
-// SetAccountRateMultiplier sets the "account_rate_multiplier" field.
-func (_u *UsageLogUpdateOne) SetAccountRateMultiplier(v float64) *UsageLogUpdateOne {
-	_u.mutation.ResetAccountRateMultiplier()
-	_u.mutation.SetAccountRateMultiplier(v)
-	return _u
-}
-
-// SetNillableAccountRateMultiplier sets the "account_rate_multiplier" field if the given value is not nil.
-func (_u *UsageLogUpdateOne) SetNillableAccountRateMultiplier(v *float64) *UsageLogUpdateOne {
-	if v != nil {
-		_u.SetAccountRateMultiplier(*v)
-	}
-	return _u
-}
-
-// AddAccountRateMultiplier adds value to the "account_rate_multiplier" field.
-func (_u *UsageLogUpdateOne) AddAccountRateMultiplier(v float64) *UsageLogUpdateOne {
-	_u.mutation.AddAccountRateMultiplier(v)
-	return _u
-}
-
-// ClearAccountRateMultiplier clears the value of the "account_rate_multiplier" field.
-func (_u *UsageLogUpdateOne) ClearAccountRateMultiplier() *UsageLogUpdateOne {
-	_u.mutation.ClearAccountRateMultiplier()
-	return _u
-}
-
-// SetBillingType sets the "billing_type" field.
-func (_u *UsageLogUpdateOne) SetBillingType(v int8) *UsageLogUpdateOne {
-	_u.mutation.ResetBillingType()
-	_u.mutation.SetBillingType(v)
-	return _u
-}
-
-// SetNillableBillingType sets the "billing_type" field if the given value is not nil.
-func (_u *UsageLogUpdateOne) SetNillableBillingType(v *int8) *UsageLogUpdateOne {
-	if v != nil {
-		_u.SetBillingType(*v)
-	}
-	return _u
-}
-
-// AddBillingType adds value to the "billing_type" field.
-func (_u *UsageLogUpdateOne) AddBillingType(v int8) *UsageLogUpdateOne {
-	_u.mutation.AddBillingType(v)
 	return _u
 }
 
@@ -2447,20 +1769,6 @@ func (_u *UsageLogUpdateOne) ClearVideoDurationSeconds() *UsageLogUpdateOne {
 	return _u
 }
 
-// SetCacheTTLOverridden sets the "cache_ttl_overridden" field.
-func (_u *UsageLogUpdateOne) SetCacheTTLOverridden(v bool) *UsageLogUpdateOne {
-	_u.mutation.SetCacheTTLOverridden(v)
-	return _u
-}
-
-// SetNillableCacheTTLOverridden sets the "cache_ttl_overridden" field if the given value is not nil.
-func (_u *UsageLogUpdateOne) SetNillableCacheTTLOverridden(v *bool) *UsageLogUpdateOne {
-	if v != nil {
-		_u.SetCacheTTLOverridden(*v)
-	}
-	return _u
-}
-
 // SetUser sets the "user" edge to the User entity.
 func (_u *UsageLogUpdateOne) SetUser(v *User) *UsageLogUpdateOne {
 	return _u.SetUserID(v.ID)
@@ -2479,11 +1787,6 @@ func (_u *UsageLogUpdateOne) SetAccount(v *Account) *UsageLogUpdateOne {
 // SetGroup sets the "group" edge to the Group entity.
 func (_u *UsageLogUpdateOne) SetGroup(v *Group) *UsageLogUpdateOne {
 	return _u.SetGroupID(v.ID)
-}
-
-// SetSubscription sets the "subscription" edge to the UserSubscription entity.
-func (_u *UsageLogUpdateOne) SetSubscription(v *UserSubscription) *UsageLogUpdateOne {
-	return _u.SetSubscriptionID(v.ID)
 }
 
 // Mutation returns the UsageLogMutation object of the builder.
@@ -2512,12 +1815,6 @@ func (_u *UsageLogUpdateOne) ClearAccount() *UsageLogUpdateOne {
 // ClearGroup clears the "group" edge to the Group entity.
 func (_u *UsageLogUpdateOne) ClearGroup() *UsageLogUpdateOne {
 	_u.mutation.ClearGroup()
-	return _u
-}
-
-// ClearSubscription clears the "subscription" edge to the UserSubscription entity.
-func (_u *UsageLogUpdateOne) ClearSubscription() *UsageLogUpdateOne {
-	_u.mutation.ClearSubscription()
 	return _u
 }
 
@@ -2591,16 +1888,6 @@ func (_u *UsageLogUpdateOne) check() error {
 	if v, ok := _u.mutation.ModelMappingChain(); ok {
 		if err := usagelog.ModelMappingChainValidator(v); err != nil {
 			return &ValidationError{Name: "model_mapping_chain", err: fmt.Errorf(`ent: validator failed for field "UsageLog.model_mapping_chain": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.BillingTier(); ok {
-		if err := usagelog.BillingTierValidator(v); err != nil {
-			return &ValidationError{Name: "billing_tier", err: fmt.Errorf(`ent: validator failed for field "UsageLog.billing_tier": %w`, err)}
-		}
-	}
-	if v, ok := _u.mutation.BillingMode(); ok {
-		if err := usagelog.BillingModeValidator(v); err != nil {
-			return &ValidationError{Name: "billing_mode", err: fmt.Errorf(`ent: validator failed for field "UsageLog.billing_mode": %w`, err)}
 		}
 	}
 	if v, ok := _u.mutation.UserAgent(); ok {
@@ -2724,18 +2011,6 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	if _u.mutation.ModelMappingChainCleared() {
 		_spec.ClearField(usagelog.FieldModelMappingChain, field.TypeString)
 	}
-	if value, ok := _u.mutation.BillingTier(); ok {
-		_spec.SetField(usagelog.FieldBillingTier, field.TypeString, value)
-	}
-	if _u.mutation.BillingTierCleared() {
-		_spec.ClearField(usagelog.FieldBillingTier, field.TypeString)
-	}
-	if value, ok := _u.mutation.BillingMode(); ok {
-		_spec.SetField(usagelog.FieldBillingMode, field.TypeString, value)
-	}
-	if _u.mutation.BillingModeCleared() {
-		_spec.ClearField(usagelog.FieldBillingMode, field.TypeString)
-	}
 	if value, ok := _u.mutation.InputTokens(); ok {
 		_spec.SetField(usagelog.FieldInputTokens, field.TypeInt, value)
 	}
@@ -2771,66 +2046,6 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if value, ok := _u.mutation.AddedCacheCreation1hTokens(); ok {
 		_spec.AddField(usagelog.FieldCacheCreation1hTokens, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.InputCost(); ok {
-		_spec.SetField(usagelog.FieldInputCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedInputCost(); ok {
-		_spec.AddField(usagelog.FieldInputCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.OutputCost(); ok {
-		_spec.SetField(usagelog.FieldOutputCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedOutputCost(); ok {
-		_spec.AddField(usagelog.FieldOutputCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.CacheCreationCost(); ok {
-		_spec.SetField(usagelog.FieldCacheCreationCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedCacheCreationCost(); ok {
-		_spec.AddField(usagelog.FieldCacheCreationCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.CacheReadCost(); ok {
-		_spec.SetField(usagelog.FieldCacheReadCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedCacheReadCost(); ok {
-		_spec.AddField(usagelog.FieldCacheReadCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.TotalCost(); ok {
-		_spec.SetField(usagelog.FieldTotalCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedTotalCost(); ok {
-		_spec.AddField(usagelog.FieldTotalCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.ActualCost(); ok {
-		_spec.SetField(usagelog.FieldActualCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedActualCost(); ok {
-		_spec.AddField(usagelog.FieldActualCost, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.RateMultiplier(); ok {
-		_spec.SetField(usagelog.FieldRateMultiplier, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedRateMultiplier(); ok {
-		_spec.AddField(usagelog.FieldRateMultiplier, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.LongContextBillingApplied(); ok {
-		_spec.SetField(usagelog.FieldLongContextBillingApplied, field.TypeBool, value)
-	}
-	if value, ok := _u.mutation.AccountRateMultiplier(); ok {
-		_spec.SetField(usagelog.FieldAccountRateMultiplier, field.TypeFloat64, value)
-	}
-	if value, ok := _u.mutation.AddedAccountRateMultiplier(); ok {
-		_spec.AddField(usagelog.FieldAccountRateMultiplier, field.TypeFloat64, value)
-	}
-	if _u.mutation.AccountRateMultiplierCleared() {
-		_spec.ClearField(usagelog.FieldAccountRateMultiplier, field.TypeFloat64)
-	}
-	if value, ok := _u.mutation.BillingType(); ok {
-		_spec.SetField(usagelog.FieldBillingType, field.TypeInt8, value)
-	}
-	if value, ok := _u.mutation.AddedBillingType(); ok {
-		_spec.AddField(usagelog.FieldBillingType, field.TypeInt8, value)
 	}
 	if value, ok := _u.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
@@ -2921,9 +2136,6 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if _u.mutation.VideoDurationSecondsCleared() {
 		_spec.ClearField(usagelog.FieldVideoDurationSeconds, field.TypeInt)
-	}
-	if value, ok := _u.mutation.CacheTTLOverridden(); ok {
-		_spec.SetField(usagelog.FieldCacheTTLOverridden, field.TypeBool, value)
 	}
 	if _u.mutation.UserCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -3034,35 +2246,6 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(group.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.SubscriptionCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   usagelog.SubscriptionTable,
-			Columns: []string{usagelog.SubscriptionColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.SubscriptionIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: true,
-			Table:   usagelog.SubscriptionTable,
-			Columns: []string{usagelog.SubscriptionColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(usersubscription.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

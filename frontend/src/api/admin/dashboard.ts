@@ -55,7 +55,6 @@ export interface TrendParams {
   group_id?: number
   request_type?: UsageRequestType
   stream?: boolean
-  billing_type?: number | null
 	upstream_model_mismatch?: boolean
 }
 
@@ -87,7 +86,6 @@ export interface ModelStatsParams {
   group_id?: number
   request_type?: UsageRequestType
   stream?: boolean
-  billing_type?: number | null
 	upstream_model_mismatch?: boolean
 }
 
@@ -116,7 +114,6 @@ export interface GroupStatsParams {
   group_id?: number
   request_type?: UsageRequestType
   stream?: boolean
-  billing_type?: number | null
 	upstream_model_mismatch?: boolean
 }
 
@@ -170,15 +167,13 @@ export interface UserBreakdownParams {
   endpoint?: string
   endpoint_type?: 'inbound' | 'upstream' | 'path'
   limit?: number
-  // Sort column for the ranking (allowlisted server-side; falls back to actual_cost)
-  sort_by?: 'total_tokens' | 'input_tokens' | 'output_tokens' | 'cache_tokens' | 'requests' | 'cost' | 'actual_cost'
+  sort_by?: 'total_tokens' | 'input_tokens' | 'output_tokens' | 'cache_tokens' | 'requests'
   // Additional filter conditions
   user_id?: number
   api_key_id?: number
   account_id?: number
   request_type?: UsageRequestType
   stream?: boolean
-  billing_type?: number | null
 }
 
 export interface UserBreakdownResponse {
@@ -273,14 +268,18 @@ export async function getUserSpendingRanking(
 
 export interface PlatformUsage {
   platform: string
-  today_actual_cost: number
-  total_actual_cost: number
+  today_requests: number
+  today_tokens: number
+  total_requests: number
+  total_tokens: number
 }
 
 export interface BatchUserUsageStats {
   user_id: number
-  today_actual_cost: number
-  total_actual_cost: number
+  today_requests: number
+  today_tokens: number
+  total_requests: number
+  total_tokens: number
   by_platform?: PlatformUsage[]
 }
 
@@ -302,8 +301,10 @@ export async function getBatchUsersUsage(userIds: number[]): Promise<BatchUsersU
 
 export interface BatchApiKeyUsageStats {
   api_key_id: number
-  today_actual_cost: number
-  total_actual_cost: number
+  today_requests: number
+  today_tokens: number
+  total_requests: number
+  total_tokens: number
 }
 
 export interface BatchApiKeysUsageResponse {

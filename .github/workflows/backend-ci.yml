@@ -4,22 +4,14 @@ on:
   push:
   pull_request:
 
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
-  shell:
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v6
-      - name: Check deployment scripts
-        run: |
-          /bin/bash -n deploy/apple-container.sh
-          /bin/bash deploy/tests/apple-container-test.sh
-          /bin/sh deploy/tests/docker-compose-security-test.sh
-          /bin/sh deploy/tests/docker-runtime-resources-test.sh
-          /bin/sh deploy/test-caddyfile-cache.sh
-
   test:
     runs-on: ubuntu-latest
     steps:
@@ -33,12 +25,9 @@ jobs:
       - name: Verify Go version
         run: |
           go version | grep -q 'go1.26.6'
-      - name: Unit tests
+      - name: Personal SQLite runtime tests
         working-directory: backend
-        run: make test-unit
-      - name: Integration tests
-        working-directory: backend
-        run: make test-integration
+        run: make test-personal
 
   frontend:
     runs-on: ubuntu-latest

@@ -2,7 +2,9 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
@@ -103,6 +105,36 @@ func (c *geminiCliCodeAssistClient) OnboardUser(ctx context.Context, accessToken
 		return nil, fmt.Errorf("onboardUser failed: status %d, body: %s", resp.StatusCode, sanitizedBody)
 	}
 	fmt.Printf("[CodeAssist] OnboardUser success: status %d, response: %+v\n", resp.StatusCode, out)
+	return &out, nil
+}
+
+func (c *geminiCliCodeAssistClient) GetOperation(ctx context.Context, accessToken, proxyURL, name string) (*geminicli.OnboardUserResponse, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, errors.New("operation name is required")
+	}
+	if strings.Contains(name, "://") || strings.Contains(name, "..") {
+		return nil, errors.New("invalid operation name")
+	}
+
+	var out geminicli.OnboardUserResponse
+	client, err := createGeminiCliReqClient(proxyURL)
+	if err != nil {
+		return nil, fmt.Errorf("create HTTP client: %w", err)
+	}
+	resp, err := client.R().
+		SetContext(ctx).
+		SetHeader("Authorization", "Bearer "+accessToken).
+		SetHeader("Content-Type", "application/json").
+		SetHeader("User-Agent", geminicli.GeminiCLIUserAgent).
+		SetSuccessResult(&out).
+		Get(c.baseURL + "/v1internal/" + strings.TrimLeft(name, "/"))
+	if err != nil {
+		return nil, fmt.Errorf("get operation request failed: %w", err)
+	}
+	if !resp.IsSuccessState() {
+		return nil, fmt.Errorf("get operation failed: status %d, body: %s", resp.StatusCode, geminicli.SanitizeBodyForLogs(resp.String()))
+	}
 	return &out, nil
 }
 

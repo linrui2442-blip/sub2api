@@ -41,7 +41,7 @@ func TestCleanPageImageRelativePath(t *testing.T) {
 }
 
 func TestResolvePageImagePath(t *testing.T) {
-	root := t.TempDir()
+	root := newPagePathTestRoot(t)
 	pagesDir := filepath.Join(root, "pages")
 	base := filepath.Join(pagesDir, "guide")
 	if err := os.MkdirAll(filepath.Join(base, "images"), 0755); err != nil {
@@ -78,7 +78,7 @@ func TestResolvePageImagePath(t *testing.T) {
 }
 
 func TestResolvePageImagePathRejectsSymlinkEscape(t *testing.T) {
-	root := t.TempDir()
+	root := newPagePathTestRoot(t)
 	pagesDir := filepath.Join(root, "pages")
 	base := filepath.Join(pagesDir, "guide")
 	outside := filepath.Join(root, "outside")
@@ -99,6 +99,17 @@ func TestResolvePageImagePathRejectsSymlinkEscape(t *testing.T) {
 	if got, ok := resolvePageImagePath(pagesDir, base, "images/secret.png"); ok {
 		t.Fatalf("expected symlink escape to be rejected, got %q", got)
 	}
+}
+
+func newPagePathTestRoot(t *testing.T) string {
+	t.Helper()
+
+	root, err := os.MkdirTemp(".", "page-path-")
+	if err != nil {
+		t.Fatalf("create page path test root: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(root) })
+	return root
 }
 
 func mustEvalSymlinks(t *testing.T, path string) string {

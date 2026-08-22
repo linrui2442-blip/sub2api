@@ -15,7 +15,6 @@ func TestOpenAIRecordUsageInputsCarryQuotaPlatform(t *testing.T) {
 		"openai_gateway_handler.go",
 		"openai_chat_completions.go",
 		"openai_embeddings.go",
-		"openai_images.go",
 	}
 
 	for _, name := range files {

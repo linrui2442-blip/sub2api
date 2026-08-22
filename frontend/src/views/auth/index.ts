@@ -1,7 +1,2 @@
-/**
- * Authentication Views
- * Export all authentication-related views
- */
-
+/** Personal Edition authentication views. */
 export { default as LoginView } from './LoginView.vue'
-export { default as RegisterView } from './RegisterView.vue'

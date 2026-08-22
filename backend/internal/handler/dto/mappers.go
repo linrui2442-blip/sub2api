@@ -2,7 +2,6 @@
 package dto
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -13,25 +12,18 @@ func UserFromServiceShallow(u *service.User) *User {
 		return nil
 	}
 	return &User{
-		ID:                         u.ID,
-		Email:                      u.Email,
-		Username:                   u.Username,
-		Role:                       u.Role,
-		Balance:                    u.Balance,
-		FrozenBalance:              u.FrozenBalance,
-		Concurrency:                u.Concurrency,
-		Status:                     u.Status,
-		AllowedGroups:              u.AllowedGroups,
-		LastActiveAt:               u.LastActiveAt,
-		CreatedAt:                  u.CreatedAt,
-		UpdatedAt:                  u.UpdatedAt,
-		BalanceNotifyEnabled:       u.BalanceNotifyEnabled,
-		BalanceNotifyThresholdType: u.BalanceNotifyThresholdType,
-		BalanceNotifyThreshold:     u.BalanceNotifyThreshold,
-		BalanceNotifyExtraEmails:   NotifyEmailEntriesFromService(u.BalanceNotifyExtraEmails),
-		TotalRecharged:             u.TotalRecharged,
-		RPMLimit:                   u.RPMLimit,
-		DeletedAt:                  u.DeletedAt,
+		ID:            u.ID,
+		Email:         u.Email,
+		Username:      u.Username,
+		Role:          u.Role,
+		Concurrency:   u.Concurrency,
+		Status:        u.Status,
+		AllowedGroups: u.AllowedGroups,
+		LastActiveAt:  u.LastActiveAt,
+		CreatedAt:     u.CreatedAt,
+		UpdatedAt:     u.UpdatedAt,
+		RPMLimit:      u.RPMLimit,
+		DeletedAt:     u.DeletedAt,
 	}
 }
 
@@ -45,13 +37,6 @@ func UserFromService(u *service.User) *User {
 		for i := range u.APIKeys {
 			k := u.APIKeys[i]
 			out.APIKeys = append(out.APIKeys, *APIKeyFromService(&k))
-		}
-	}
-	if len(u.Subscriptions) > 0 {
-		out.Subscriptions = make([]UserSubscription, 0, len(u.Subscriptions))
-		for i := range u.Subscriptions {
-			s := u.Subscriptions[i]
-			out.Subscriptions = append(out.Subscriptions, *UserSubscriptionFromService(&s))
 		}
 	}
 	return out
@@ -71,7 +56,6 @@ func UserFromServiceAdmin(u *service.User) *AdminUser {
 		User:       *base,
 		Notes:      u.Notes,
 		LastUsedAt: u.LastUsedAt,
-		GroupRates: u.GroupRates,
 	}
 }
 
@@ -146,10 +130,6 @@ func GroupFromServiceAdmin(g *service.Group) *AdminGroup {
 	}
 	out := &AdminGroup{
 		Group:                       groupFromServiceBase(g),
-		ProfitControlEnabled:        g.ProfitControlEnabled,
-		ProfitMinMargin:             g.ProfitMinMargin,
-		ProfitSafetyBuffer:          g.ProfitSafetyBuffer,
-		ModelPricing:                g.ModelPricing,
 		ModelRouting:                g.ModelRouting,
 		ModelRoutingEnabled:         g.ModelRoutingEnabled,
 		MCPXMLInject:                g.MCPXMLInject,
@@ -178,38 +158,8 @@ func groupFromServiceBase(g *service.Group) Group {
 		Name:                            g.Name,
 		Description:                     g.Description,
 		Platform:                        g.Platform,
-		RateMultiplier:                  g.RateMultiplier,
 		IsExclusive:                     g.IsExclusive,
 		Status:                          g.Status,
-		SubscriptionType:                g.SubscriptionType,
-		DailyLimitUSD:                   g.DailyLimitUSD,
-		WeeklyLimitUSD:                  g.WeeklyLimitUSD,
-		MonthlyLimitUSD:                 g.MonthlyLimitUSD,
-		LongContextPricingEnabled:       g.LongContextPricingEnabled,
-		AllowImageGeneration:            g.AllowImageGeneration,
-		AllowBatchImageGeneration:       g.AllowBatchImageGeneration,
-		ImageRateIndependent:            g.ImageRateIndependent,
-		ImageRateMultiplier:             g.ImageRateMultiplier,
-		BatchImageDiscountMultiplier:    g.BatchImageDiscountMultiplier,
-		BatchImageHoldMultiplier:        g.BatchImageHoldMultiplier,
-		VideoRateIndependent:            g.VideoRateIndependent,
-		VideoRateMultiplier:             g.VideoRateMultiplier,
-		PeakRateEnabled:                 g.PeakRateEnabled,
-		PeakStart:                       g.PeakStart,
-		PeakEnd:                         g.PeakEnd,
-		PeakRateMultiplier:              g.PeakRateMultiplier,
-		ImagePrice1K:                    g.ImagePrice1K,
-		ImagePrice2K:                    g.ImagePrice2K,
-		ImagePrice4K:                    g.ImagePrice4K,
-		VideoPrice480P:                  g.VideoPrice480P,
-		VideoPrice720P:                  g.VideoPrice720P,
-		VideoPrice1080P:                 g.VideoPrice1080P,
-		VideoModelPrices:                g.VideoModelPrices,
-		WebSearchPricePerCall:           g.WebSearchPricePerCall,
-		SearchPricePer1k:                g.SearchPricePer1k,
-		AudioRealtimePricePerMin:        g.AudioRealtimePricePerMin,
-		AudioTtsPricePerMillionChars:    g.AudioTTSPricePerMillionChars,
-		AudioSttPricePerHour:            g.AudioSTTPricePerHour,
 		ClaudeCodeOnly:                  g.ClaudeCodeOnly,
 		FallbackGroupID:                 g.FallbackGroupID,
 		FallbackGroupIDOnInvalidRequest: g.FallbackGroupIDOnInvalidRequest,
@@ -251,7 +201,6 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 		Concurrency:             a.Concurrency,
 		LoadFactor:              a.LoadFactor,
 		Priority:                a.Priority,
-		RateMultiplier:          a.BillingRateMultiplier(),
 		Status:                  a.Status,
 		ErrorMessage:            a.ErrorMessage,
 		LastUsedAt:              a.LastUsedAt,
@@ -378,25 +327,6 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 			}
 		}
 
-		// 配额通知配置
-		if enabled := a.GetQuotaNotifyDailyEnabled(); enabled {
-			out.QuotaNotifyDailyEnabled = &enabled
-		}
-		if threshold := a.GetQuotaNotifyDailyThreshold(); threshold > 0 {
-			out.QuotaNotifyDailyThreshold = &threshold
-		}
-		if enabled := a.GetQuotaNotifyWeeklyEnabled(); enabled {
-			out.QuotaNotifyWeeklyEnabled = &enabled
-		}
-		if threshold := a.GetQuotaNotifyWeeklyThreshold(); threshold > 0 {
-			out.QuotaNotifyWeeklyThreshold = &threshold
-		}
-		if enabled := a.GetQuotaNotifyTotalEnabled(); enabled {
-			out.QuotaNotifyTotalEnabled = &enabled
-		}
-		if threshold := a.GetQuotaNotifyTotalThreshold(); threshold > 0 {
-			out.QuotaNotifyTotalThreshold = &threshold
-		}
 	}
 
 	return out
@@ -566,57 +496,6 @@ func ProxyAccountSummaryFromService(a *service.ProxyAccountSummary) *ProxyAccoun
 	}
 }
 
-func RedeemCodeFromService(rc *service.RedeemCode) *RedeemCode {
-	if rc == nil {
-		return nil
-	}
-	out := redeemCodeFromServiceBase(rc)
-	return &out
-}
-
-// RedeemCodeFromServiceAdmin converts a service RedeemCode to DTO for admin users.
-// It includes notes - user-facing endpoints must not use this.
-func RedeemCodeFromServiceAdmin(rc *service.RedeemCode) *AdminRedeemCode {
-	if rc == nil {
-		return nil
-	}
-	return &AdminRedeemCode{
-		RedeemCode: redeemCodeFromServiceBase(rc),
-		Notes:      rc.Notes,
-	}
-}
-
-func redeemCodeFromServiceBase(rc *service.RedeemCode) RedeemCode {
-	out := RedeemCode{
-		ID:           rc.ID,
-		Code:         rc.Code,
-		Type:         rc.Type,
-		Value:        rc.Value,
-		Status:       rc.Status,
-		UsedBy:       rc.UsedBy,
-		UsedAt:       rc.UsedAt,
-		CreatedAt:    rc.CreatedAt,
-		ExpiresAt:    rc.ExpiresAt,
-		GroupID:      rc.GroupID,
-		ValidityDays: rc.ValidityDays,
-		User:         UserFromServiceShallow(rc.User),
-		Group:        GroupFromServiceShallow(rc.Group),
-	}
-	if rc.IsExpired() {
-		out.Status = service.StatusExpired
-	}
-
-	// For admin_balance/admin_concurrency types, include notes so users can see
-	// why they were charged or credited by admin
-	if (rc.Type == "admin_balance" || rc.Type == "admin_concurrency") && rc.Notes != "" {
-		out.Notes = &rc.Notes
-	}
-
-	return out
-}
-
-// AccountSummaryFromService returns a minimal AccountSummary for usage log display.
-// Only includes ID and Name - no sensitive fields like Credentials, Proxy, etc.
 func AccountSummaryFromService(a *service.Account) *AccountSummary {
 	if a == nil {
 		return nil
@@ -636,58 +515,43 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 		requestedModel = l.Model
 	}
 	return UsageLog{
-		ID:                        l.ID,
-		UserID:                    l.UserID,
-		APIKeyID:                  l.APIKeyID,
-		AccountID:                 l.AccountID,
-		RequestID:                 l.RequestID,
-		Model:                     requestedModel,
-		ServiceTier:               l.ServiceTier,
-		ReasoningEffort:           l.ReasoningEffort,
-		InboundEndpoint:           l.InboundEndpoint,
-		GroupID:                   l.GroupID,
-		SubscriptionID:            l.SubscriptionID,
-		InputTokens:               l.InputTokens,
-		OutputTokens:              l.OutputTokens,
-		CacheCreationTokens:       l.CacheCreationTokens,
-		CacheReadTokens:           l.CacheReadTokens,
-		CacheCreation5mTokens:     l.CacheCreation5mTokens,
-		CacheCreation1hTokens:     l.CacheCreation1hTokens,
-		InputCost:                 l.InputCost,
-		OutputCost:                l.OutputCost,
-		CacheCreationCost:         l.CacheCreationCost,
-		CacheReadCost:             l.CacheReadCost,
-		TotalCost:                 l.TotalCost,
-		ActualCost:                l.ActualCost,
-		RateMultiplier:            l.RateMultiplier,
-		LongContextBillingApplied: l.LongContextBillingApplied,
-		BillingType:               l.BillingType,
-		RequestType:               requestType.String(),
-		Stream:                    stream,
-		OpenAIWSMode:              openAIWSMode,
-		DurationMs:                l.DurationMs,
-		FirstTokenMs:              l.FirstTokenMs,
-		ImageCount:                l.ImageCount,
-		ImageSize:                 l.ImageSize,
-		ImageInputSize:            l.ImageInputSize,
-		ImageOutputSize:           l.ImageOutputSize,
-		ImageInputTokens:          l.ImageInputTokens,
-		ImageInputCost:            l.ImageInputCost,
-		ImageOutputTokens:         l.ImageOutputTokens,
-		ImageOutputCost:           l.ImageOutputCost,
-		ImageSizeSource:           l.ImageSizeSource,
-		ImageSizeBreakdown:        l.ImageSizeBreakdown,
-		MediaType:                 l.MediaType,
-		UserAgent:                 l.UserAgent,
-		IPAddress:                 l.IPAddress,
-		SessionID:                 l.SessionID,
-		CacheTTLOverridden:        l.CacheTTLOverridden,
-		BillingMode:               l.BillingMode,
-		CreatedAt:                 l.CreatedAt,
-		User:                      UserFromServiceShallow(l.User),
-		APIKey:                    APIKeyFromService(l.APIKey),
-		Group:                     GroupFromServiceShallow(l.Group),
-		Subscription:              UserSubscriptionFromService(l.Subscription),
+		ID:                    l.ID,
+		UserID:                l.UserID,
+		APIKeyID:              l.APIKeyID,
+		AccountID:             l.AccountID,
+		RequestID:             l.RequestID,
+		Model:                 requestedModel,
+		ServiceTier:           l.ServiceTier,
+		ReasoningEffort:       l.ReasoningEffort,
+		InboundEndpoint:       l.InboundEndpoint,
+		GroupID:               l.GroupID,
+		InputTokens:           l.InputTokens,
+		OutputTokens:          l.OutputTokens,
+		CacheCreationTokens:   l.CacheCreationTokens,
+		CacheReadTokens:       l.CacheReadTokens,
+		CacheCreation5mTokens: l.CacheCreation5mTokens,
+		CacheCreation1hTokens: l.CacheCreation1hTokens,
+		RequestType:           requestType.String(),
+		Stream:                stream,
+		OpenAIWSMode:          openAIWSMode,
+		DurationMs:            l.DurationMs,
+		FirstTokenMs:          l.FirstTokenMs,
+		ImageCount:            l.ImageCount,
+		ImageSize:             l.ImageSize,
+		ImageInputSize:        l.ImageInputSize,
+		ImageOutputSize:       l.ImageOutputSize,
+		ImageInputTokens:      l.ImageInputTokens,
+		ImageOutputTokens:     l.ImageOutputTokens,
+		ImageSizeSource:       l.ImageSizeSource,
+		ImageSizeBreakdown:    l.ImageSizeBreakdown,
+		MediaType:             l.MediaType,
+		UserAgent:             l.UserAgent,
+		IPAddress:             l.IPAddress,
+		SessionID:             l.SessionID,
+		CreatedAt:             l.CreatedAt,
+		User:                  UserFromServiceShallow(l.User),
+		APIKey:                APIKeyFromService(l.APIKey),
+		Group:                 GroupFromServiceShallow(l.Group),
 	}
 }
 
@@ -716,9 +580,6 @@ func UsageLogFromServiceAdmin(l *service.UsageLog) *AdminUsageLog {
 		UpstreamModelMismatch: l.UpstreamModelMismatch,
 		ChannelID:             l.ChannelID,
 		ModelMappingChain:     l.ModelMappingChain,
-		BillingTier:           l.BillingTier,
-		AccountRateMultiplier: l.AccountRateMultiplier,
-		AccountStatsCost:      l.AccountStatsCost,
 		IPAddress:             l.IPAddress,
 		Account:               AccountSummaryFromService(l.Account),
 	}
@@ -741,7 +602,6 @@ func UsageCleanupTaskFromService(task *service.UsageCleanupTask) *UsageCleanupTa
 			Model:       task.Filters.Model,
 			RequestType: requestTypeStringPtr(task.Filters.RequestType),
 			Stream:      task.Filters.Stream,
-			BillingType: task.Filters.BillingType,
 		},
 		CreatedBy:    task.CreatedBy,
 		DeletedRows:  task.DeletedRows,
@@ -772,105 +632,5 @@ func SettingFromService(s *service.Setting) *Setting {
 		Key:       s.Key,
 		Value:     s.Value,
 		UpdatedAt: s.UpdatedAt,
-	}
-}
-
-func UserSubscriptionFromService(sub *service.UserSubscription) *UserSubscription {
-	if sub == nil {
-		return nil
-	}
-	out := userSubscriptionFromServiceBase(sub)
-	return &out
-}
-
-// UserSubscriptionFromServiceAdmin converts a service UserSubscription to DTO for admin users.
-// It includes assignment metadata and notes.
-func UserSubscriptionFromServiceAdmin(sub *service.UserSubscription) *AdminUserSubscription {
-	if sub == nil {
-		return nil
-	}
-	return &AdminUserSubscription{
-		UserSubscription: userSubscriptionFromServiceBase(sub),
-		AssignedBy:       sub.AssignedBy,
-		AssignedAt:       sub.AssignedAt,
-		Notes:            sub.Notes,
-		AssignedByUser:   UserFromServiceShallow(sub.AssignedByUser),
-	}
-}
-
-func userSubscriptionFromServiceBase(sub *service.UserSubscription) UserSubscription {
-	return UserSubscription{
-		ID:                 sub.ID,
-		UserID:             sub.UserID,
-		GroupID:            sub.GroupID,
-		StartsAt:           sub.StartsAt,
-		ExpiresAt:          sub.ExpiresAt,
-		Status:             sub.Status,
-		DailyWindowStart:   sub.DailyWindowStart,
-		WeeklyWindowStart:  sub.WeeklyWindowStart,
-		MonthlyWindowStart: sub.MonthlyWindowStart,
-		DailyUsageUSD:      sub.DailyUsageUSD,
-		WeeklyUsageUSD:     sub.WeeklyUsageUSD,
-		MonthlyUsageUSD:    sub.MonthlyUsageUSD,
-		CreatedAt:          sub.CreatedAt,
-		UpdatedAt:          sub.UpdatedAt,
-		RevokedAt:          sub.DeletedAt,
-		User:               UserFromServiceShallow(sub.User),
-		Group:              GroupFromServiceShallow(sub.Group),
-	}
-}
-
-func BulkAssignResultFromService(r *service.BulkAssignResult) *BulkAssignResult {
-	if r == nil {
-		return nil
-	}
-	subs := make([]AdminUserSubscription, 0, len(r.Subscriptions))
-	for i := range r.Subscriptions {
-		subs = append(subs, *UserSubscriptionFromServiceAdmin(&r.Subscriptions[i]))
-	}
-	statuses := make(map[string]string, len(r.Statuses))
-	for userID, status := range r.Statuses {
-		statuses[strconv.FormatInt(userID, 10)] = status
-	}
-	return &BulkAssignResult{
-		SuccessCount:  r.SuccessCount,
-		CreatedCount:  r.CreatedCount,
-		ReusedCount:   r.ReusedCount,
-		FailedCount:   r.FailedCount,
-		Subscriptions: subs,
-		Errors:        r.Errors,
-		Statuses:      statuses,
-	}
-}
-
-func PromoCodeFromService(pc *service.PromoCode) *PromoCode {
-	if pc == nil {
-		return nil
-	}
-	return &PromoCode{
-		ID:          pc.ID,
-		Code:        pc.Code,
-		BonusAmount: pc.BonusAmount,
-		MaxUses:     pc.MaxUses,
-		UsedCount:   pc.UsedCount,
-		Status:      pc.Status,
-		ExpiresAt:   pc.ExpiresAt,
-		Notes:       pc.Notes,
-		CreatedAt:   pc.CreatedAt,
-		UpdatedAt:   pc.UpdatedAt,
-	}
-}
-
-func PromoCodeUsageFromService(u *service.PromoCodeUsage) *PromoCodeUsage {
-	if u == nil {
-		return nil
-	}
-	return &PromoCodeUsage{
-		ID:          u.ID,
-		PromoCodeID: u.PromoCodeID,
-		UserID:      u.UserID,
-		BonusAmount: u.BonusAmount,
-		UsedAt:      u.UsedAt,
-		User:        UserFromServiceShallow(u.User),
 	}
 }

@@ -56,7 +56,6 @@ func (s *userUsageRepoCapture) GetUsageTrendWithFilters(ctx context.Context, sta
 		Model:       model,
 		RequestType: requestType,
 		Stream:      stream,
-		BillingType: billingType,
 	}
 	return []usagestats.TrendDataPoint{}, nil
 }
@@ -73,7 +72,6 @@ func (s *userUsageRepoCapture) GetGroupStatsWithFilters(ctx context.Context, sta
 		GroupID:     groupID,
 		RequestType: requestType,
 		Stream:      stream,
-		BillingType: billingType,
 	}
 	return s.groupStats, nil
 }
@@ -135,7 +133,7 @@ func TestUserUsageListAdvancedFilters(t *testing.T) {
 	repo := &userUsageRepoCapture{}
 	router := newUserUsageRequestTypeTestRouter(repo)
 
-	req := httptest.NewRequest(http.MethodGet, "/usage?group_id=7&model=gpt-5&billing_type=1&billing_mode=image&start_date=2026-03-01&end_date=2026-03-02", nil)
+	req := httptest.NewRequest(http.MethodGet, "/usage?group_id=7&model=gpt-5&start_date=2026-03-01&end_date=2026-03-02", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -144,64 +142,25 @@ func TestUserUsageListAdvancedFilters(t *testing.T) {
 	require.Equal(t, int64(7), repo.listFilters.GroupID)
 	require.Equal(t, "gpt-5", repo.listFilters.Model)
 	require.Equal(t, usagestats.ModelSourceRequested, repo.listFilters.ModelFilterSource)
-	require.NotNil(t, repo.listFilters.BillingType)
-	require.Equal(t, int8(1), *repo.listFilters.BillingType)
-	require.Equal(t, "image", repo.listFilters.BillingMode)
 	require.NotNil(t, repo.listFilters.StartTime)
 	require.NotNil(t, repo.listFilters.EndTime)
 }
 
-func TestUserUsageListInvalidBillingMode(t *testing.T) {
-	repo := &userUsageRepoCapture{}
-	router := newUserUsageRequestTypeTestRouter(repo)
-
-	req := httptest.NewRequest(http.MethodGet, "/usage?billing_mode=bad", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	require.Equal(t, http.StatusBadRequest, rec.Code)
-}
-
-func TestUserUsageListAllowsVideoBillingMode(t *testing.T) {
-	repo := &userUsageRepoCapture{}
-	router := newUserUsageRequestTypeTestRouter(repo)
-
-	req := httptest.NewRequest(http.MethodGet, "/usage?billing_mode=video", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	require.Equal(t, http.StatusOK, rec.Code)
-	require.Equal(t, "video", repo.listFilters.BillingMode)
-}
-
-func TestUserUsageListKeepsUserBillingAndIPWithoutAdminCostFields(t *testing.T) {
+func TestUserUsageListKeepsOperationalMetadataWithoutAdminInternals(t *testing.T) {
 	ipAddress := "203.0.113.10"
 	upstreamModel := "upstream-private-model"
-	billingTier := "internal-tier"
 	channelID := int64(99)
-	accountRateMultiplier := 1.7
-	accountStatsCost := 0.12
 	repo := &userUsageRepoCapture{
 		listRows: []service.UsageLog{{
-			ID:                    1,
-			UserID:                42,
-			APIKeyID:              7,
-			AccountID:             5,
-			RequestID:             "req_user_billing",
-			Model:                 "gpt-5",
-			InputCost:             0.01,
-			OutputCost:            0.02,
-			CacheCreationCost:     0.03,
-			CacheReadCost:         0.04,
-			TotalCost:             0.10,
-			ActualCost:            0.08,
-			RateMultiplier:        0.8,
-			IPAddress:             &ipAddress,
-			UpstreamModel:         &upstreamModel,
-			BillingTier:           &billingTier,
-			ChannelID:             &channelID,
-			AccountRateMultiplier: &accountRateMultiplier,
-			AccountStatsCost:      &accountStatsCost,
+			ID:            1,
+			UserID:        42,
+			APIKeyID:      7,
+			AccountID:     5,
+			RequestID:     "req_user_usage",
+			Model:         "gpt-5",
+			IPAddress:     &ipAddress,
+			UpstreamModel: &upstreamModel,
+			ChannelID:     &channelID,
 		}},
 	}
 	router := newUserUsageRequestTypeTestRouter(repo)
@@ -212,13 +171,6 @@ func TestUserUsageListKeepsUserBillingAndIPWithoutAdminCostFields(t *testing.T) 
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	body := rec.Body.String()
-	require.Contains(t, body, `"input_cost":0.01`)
-	require.Contains(t, body, `"output_cost":0.02`)
-	require.Contains(t, body, `"cache_creation_cost":0.03`)
-	require.Contains(t, body, `"cache_read_cost":0.04`)
-	require.Contains(t, body, `"total_cost":0.1`)
-	require.Contains(t, body, `"actual_cost":0.08`)
-	require.Contains(t, body, `"rate_multiplier":0.8`)
 	require.Contains(t, body, `"ip_address":"203.0.113.10"`)
 	require.NotContains(t, body, "upstream_endpoint")
 	require.NotContains(t, body, "account_rate_multiplier")
@@ -232,12 +184,8 @@ func TestUserUsageListKeepsUserBillingAndIPWithoutAdminCostFields(t *testing.T) 
 }
 
 func TestUserUsageStatsUsesScopedFilters(t *testing.T) {
-	accountCost := 0.12
 	repo := &userUsageRepoCapture{
 		stats: &usagestats.UsageStats{
-			TotalCost:        0.10,
-			TotalActualCost:  0.08,
-			TotalAccountCost: &accountCost,
 			UpstreamEndpoints: []usagestats.EndpointStat{{
 				Endpoint: "/v1/responses",
 			}},
@@ -248,7 +196,7 @@ func TestUserUsageStatsUsesScopedFilters(t *testing.T) {
 	}
 	router := newUserUsageRequestTypeTestRouter(repo)
 
-	req := httptest.NewRequest(http.MethodGet, "/usage/stats?group_id=9&request_type=sync&billing_mode=token&start_date=2026-03-01&end_date=2026-03-02", nil)
+	req := httptest.NewRequest(http.MethodGet, "/usage/stats?group_id=9&request_type=sync&start_date=2026-03-01&end_date=2026-03-02", nil)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -258,10 +206,8 @@ func TestUserUsageStatsUsesScopedFilters(t *testing.T) {
 	require.Equal(t, usagestats.ModelSourceRequested, repo.statsFilters.ModelFilterSource)
 	require.NotNil(t, repo.statsFilters.RequestType)
 	require.Equal(t, int16(service.RequestTypeSync), *repo.statsFilters.RequestType)
-	require.Equal(t, "token", repo.statsFilters.BillingMode)
-	require.Contains(t, rec.Body.String(), `"total_cost":0.1`)
-	require.Contains(t, rec.Body.String(), `"total_actual_cost":0.08`)
-	require.NotContains(t, rec.Body.String(), "total_account_cost")
+	require.NotContains(t, rec.Body.String(), "total_cost")
+	require.NotContains(t, rec.Body.String(), "total_actual_cost")
 	require.NotContains(t, rec.Body.String(), "upstream_endpoints")
 	require.NotContains(t, rec.Body.String(), "endpoint_paths")
 }
@@ -272,9 +218,6 @@ func TestUserUsageDashboardModelsOmitsAccountCost(t *testing.T) {
 			Model:       "gpt-5",
 			Requests:    2,
 			TotalTokens: 30,
-			Cost:        0.10,
-			ActualCost:  0.08,
-			AccountCost: 0.07,
 		}},
 	}
 	router := newUserUsageRequestTypeTestRouter(repo)
@@ -285,8 +228,8 @@ func TestUserUsageDashboardModelsOmitsAccountCost(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	body := rec.Body.String()
-	require.Contains(t, body, `"cost":0.1`)
-	require.Contains(t, body, `"actual_cost":0.08`)
+	require.NotContains(t, body, `"cost"`)
+	require.NotContains(t, body, `"actual_cost"`)
 	require.NotContains(t, body, "account_cost")
 }
 
@@ -303,8 +246,8 @@ func TestUserUsageDashboardModelsRejectsAdminModelSources(t *testing.T) {
 
 func TestUserUsageSnapshotUsesScopedFilters(t *testing.T) {
 	repo := &userUsageRepoCapture{
-		modelStats: []usagestats.ModelStat{{Model: "gpt-5", AccountCost: 0.07}},
-		groupStats: []usagestats.GroupStat{{GroupID: 1, GroupName: "default", AccountCost: 0.06}},
+		modelStats: []usagestats.ModelStat{{Model: "gpt-5"}},
+		groupStats: []usagestats.GroupStat{{GroupID: 1, GroupName: "default"}},
 	}
 	router := newUserUsageRequestTypeTestRouter(repo)
 

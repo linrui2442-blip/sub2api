@@ -4,7 +4,6 @@ package ent
 
 import (
 	"context"
-	"database/sql/driver"
 	"fmt"
 	"math"
 
@@ -14,8 +13,6 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
-	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
-	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 )
@@ -23,14 +20,12 @@ import (
 // AuthIdentityQuery is the builder for querying AuthIdentity entities.
 type AuthIdentityQuery struct {
 	config
-	ctx                   *QueryContext
-	order                 []authidentity.OrderOption
-	inters                []Interceptor
-	predicates            []predicate.AuthIdentity
-	withUser              *UserQuery
-	withChannels          *AuthIdentityChannelQuery
-	withAdoptionDecisions *IdentityAdoptionDecisionQuery
-	modifiers             []func(*sql.Selector)
+	ctx        *QueryContext
+	order      []authidentity.OrderOption
+	inters     []Interceptor
+	predicates []predicate.AuthIdentity
+	withUser   *UserQuery
+	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -82,50 +77,6 @@ func (_q *AuthIdentityQuery) QueryUser() *UserQuery {
 			sqlgraph.From(authidentity.Table, authidentity.FieldID, selector),
 			sqlgraph.To(user.Table, user.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, authidentity.UserTable, authidentity.UserColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
-// QueryChannels chains the current query on the "channels" edge.
-func (_q *AuthIdentityQuery) QueryChannels() *AuthIdentityChannelQuery {
-	query := (&AuthIdentityChannelClient{config: _q.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := _q.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := _q.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(authidentity.Table, authidentity.FieldID, selector),
-			sqlgraph.To(authidentitychannel.Table, authidentitychannel.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, authidentity.ChannelsTable, authidentity.ChannelsColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
-// QueryAdoptionDecisions chains the current query on the "adoption_decisions" edge.
-func (_q *AuthIdentityQuery) QueryAdoptionDecisions() *IdentityAdoptionDecisionQuery {
-	query := (&IdentityAdoptionDecisionClient{config: _q.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := _q.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := _q.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(authidentity.Table, authidentity.FieldID, selector),
-			sqlgraph.To(identityadoptiondecision.Table, identityadoptiondecision.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, authidentity.AdoptionDecisionsTable, authidentity.AdoptionDecisionsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -320,14 +271,12 @@ func (_q *AuthIdentityQuery) Clone() *AuthIdentityQuery {
 		return nil
 	}
 	return &AuthIdentityQuery{
-		config:                _q.config,
-		ctx:                   _q.ctx.Clone(),
-		order:                 append([]authidentity.OrderOption{}, _q.order...),
-		inters:                append([]Interceptor{}, _q.inters...),
-		predicates:            append([]predicate.AuthIdentity{}, _q.predicates...),
-		withUser:              _q.withUser.Clone(),
-		withChannels:          _q.withChannels.Clone(),
-		withAdoptionDecisions: _q.withAdoptionDecisions.Clone(),
+		config:     _q.config,
+		ctx:        _q.ctx.Clone(),
+		order:      append([]authidentity.OrderOption{}, _q.order...),
+		inters:     append([]Interceptor{}, _q.inters...),
+		predicates: append([]predicate.AuthIdentity{}, _q.predicates...),
+		withUser:   _q.withUser.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -342,28 +291,6 @@ func (_q *AuthIdentityQuery) WithUser(opts ...func(*UserQuery)) *AuthIdentityQue
 		opt(query)
 	}
 	_q.withUser = query
-	return _q
-}
-
-// WithChannels tells the query-builder to eager-load the nodes that are connected to
-// the "channels" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *AuthIdentityQuery) WithChannels(opts ...func(*AuthIdentityChannelQuery)) *AuthIdentityQuery {
-	query := (&AuthIdentityChannelClient{config: _q.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	_q.withChannels = query
-	return _q
-}
-
-// WithAdoptionDecisions tells the query-builder to eager-load the nodes that are connected to
-// the "adoption_decisions" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *AuthIdentityQuery) WithAdoptionDecisions(opts ...func(*IdentityAdoptionDecisionQuery)) *AuthIdentityQuery {
-	query := (&IdentityAdoptionDecisionClient{config: _q.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	_q.withAdoptionDecisions = query
 	return _q
 }
 
@@ -445,10 +372,8 @@ func (_q *AuthIdentityQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 	var (
 		nodes       = []*AuthIdentity{}
 		_spec       = _q.querySpec()
-		loadedTypes = [3]bool{
+		loadedTypes = [1]bool{
 			_q.withUser != nil,
-			_q.withChannels != nil,
-			_q.withAdoptionDecisions != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -475,22 +400,6 @@ func (_q *AuthIdentityQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 	if query := _q.withUser; query != nil {
 		if err := _q.loadUser(ctx, query, nodes, nil,
 			func(n *AuthIdentity, e *User) { n.Edges.User = e }); err != nil {
-			return nil, err
-		}
-	}
-	if query := _q.withChannels; query != nil {
-		if err := _q.loadChannels(ctx, query, nodes,
-			func(n *AuthIdentity) { n.Edges.Channels = []*AuthIdentityChannel{} },
-			func(n *AuthIdentity, e *AuthIdentityChannel) { n.Edges.Channels = append(n.Edges.Channels, e) }); err != nil {
-			return nil, err
-		}
-	}
-	if query := _q.withAdoptionDecisions; query != nil {
-		if err := _q.loadAdoptionDecisions(ctx, query, nodes,
-			func(n *AuthIdentity) { n.Edges.AdoptionDecisions = []*IdentityAdoptionDecision{} },
-			func(n *AuthIdentity, e *IdentityAdoptionDecision) {
-				n.Edges.AdoptionDecisions = append(n.Edges.AdoptionDecisions, e)
-			}); err != nil {
 			return nil, err
 		}
 	}
@@ -523,69 +432,6 @@ func (_q *AuthIdentityQuery) loadUser(ctx context.Context, query *UserQuery, nod
 		for i := range nodes {
 			assign(nodes[i], n)
 		}
-	}
-	return nil
-}
-func (_q *AuthIdentityQuery) loadChannels(ctx context.Context, query *AuthIdentityChannelQuery, nodes []*AuthIdentity, init func(*AuthIdentity), assign func(*AuthIdentity, *AuthIdentityChannel)) error {
-	fks := make([]driver.Value, 0, len(nodes))
-	nodeids := make(map[int64]*AuthIdentity)
-	for i := range nodes {
-		fks = append(fks, nodes[i].ID)
-		nodeids[nodes[i].ID] = nodes[i]
-		if init != nil {
-			init(nodes[i])
-		}
-	}
-	if len(query.ctx.Fields) > 0 {
-		query.ctx.AppendFieldOnce(authidentitychannel.FieldIdentityID)
-	}
-	query.Where(predicate.AuthIdentityChannel(func(s *sql.Selector) {
-		s.Where(sql.InValues(s.C(authidentity.ChannelsColumn), fks...))
-	}))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		fk := n.IdentityID
-		node, ok := nodeids[fk]
-		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "identity_id" returned %v for node %v`, fk, n.ID)
-		}
-		assign(node, n)
-	}
-	return nil
-}
-func (_q *AuthIdentityQuery) loadAdoptionDecisions(ctx context.Context, query *IdentityAdoptionDecisionQuery, nodes []*AuthIdentity, init func(*AuthIdentity), assign func(*AuthIdentity, *IdentityAdoptionDecision)) error {
-	fks := make([]driver.Value, 0, len(nodes))
-	nodeids := make(map[int64]*AuthIdentity)
-	for i := range nodes {
-		fks = append(fks, nodes[i].ID)
-		nodeids[nodes[i].ID] = nodes[i]
-		if init != nil {
-			init(nodes[i])
-		}
-	}
-	if len(query.ctx.Fields) > 0 {
-		query.ctx.AppendFieldOnce(identityadoptiondecision.FieldIdentityID)
-	}
-	query.Where(predicate.IdentityAdoptionDecision(func(s *sql.Selector) {
-		s.Where(sql.InValues(s.C(authidentity.AdoptionDecisionsColumn), fks...))
-	}))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		fk := n.IdentityID
-		if fk == nil {
-			return fmt.Errorf(`foreign-key "identity_id" is nil for node %v`, n.ID)
-		}
-		node, ok := nodeids[*fk]
-		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "identity_id" returned %v for node %v`, *fk, n.ID)
-		}
-		assign(node, n)
 	}
 	return nil
 }

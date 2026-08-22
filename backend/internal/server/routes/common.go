@@ -3,6 +3,7 @@ package routes
 import (
 	"net/http"
 
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,15 +19,21 @@ func RegisterCommonRoutes(r *gin.Engine) {
 		c.Status(http.StatusOK)
 	})
 
-	// Setup status endpoint (always returns needs_setup: false in normal mode)
-	// This is used by the frontend to detect when the service has restarted after setup
+	// Setup status endpoint (always returns needs_setup: false in normal mode).
+	// Personal Edition adds an explicit marker so a later manual /setup visit is
+	// redirected by the frontend instead of ever falling back to the upstream
+	// PostgreSQL/Redis setup wizard.
 	r.GET("/setup/status", func(c *gin.Context) {
+		data := gin.H{
+			"needs_setup": false,
+			"step":        "completed",
+		}
+		if personal.Enabled() {
+			data["personal"] = true
+		}
 		c.JSON(http.StatusOK, gin.H{
 			"code": 0,
-			"data": gin.H{
-				"needs_setup": false,
-				"step":        "completed",
-			},
+			"data": data,
 		})
 	})
 }

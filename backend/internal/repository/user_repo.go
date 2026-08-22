@@ -12,17 +12,13 @@ import (
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
-	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
 	dbgroup "github.com/Wei-Shaw/sub2api/ent/group"
-	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
-	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
-	"github.com/lib/pq"
 
 	entsql "entgo.io/ent/dialect/sql"
 )
@@ -31,8 +27,6 @@ type userRepository struct {
 	client *dbent.Client
 	sql    sqlExecutor
 }
-
-var _ service.RedeemUserAdjustmentRepository = (*userRepository)(nil)
 
 func NewUserRepository(client *dbent.Client, sqlDB *sql.DB) service.UserRepository {
 	return newUserRepositoryWithSQL(client, sqlDB)
@@ -146,7 +140,6 @@ func (r *userRepository) create(ctx context.Context, userIn *service.User, guard
 		SetNotes(userIn.Notes).
 		SetPasswordHash(userIn.PasswordHash).
 		SetRole(userIn.Role).
-		SetBalance(userIn.Balance).
 		SetConcurrency(userIn.Concurrency).
 		SetStatus(userIn.Status).
 		SetSignupSource(userSignupSourceOrDefault(userIn.SignupSource)).
@@ -316,18 +309,6 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User, field
 	if fields.Status {
 		updateOp = updateOp.SetStatus(userIn.Status)
 	}
-	if fields.BalanceNotifySettings {
-		updateOp = updateOp.
-			SetBalanceNotifyEnabled(userIn.BalanceNotifyEnabled).
-			SetBalanceNotifyThresholdType(userIn.BalanceNotifyThresholdType).
-			SetNillableBalanceNotifyThreshold(userIn.BalanceNotifyThreshold)
-		if userIn.BalanceNotifyThreshold == nil {
-			updateOp = updateOp.ClearBalanceNotifyThreshold()
-		}
-	}
-	if fields.BalanceNotifyExtraEmails {
-		updateOp = updateOp.SetBalanceNotifyExtraEmails(marshalExtraEmails(userIn.BalanceNotifyExtraEmails))
-	}
 	if fields.SignupSource && userIn.SignupSource != "" {
 		updateOp = updateOp.SetSignupSource(userIn.SignupSource)
 	}
@@ -439,12 +420,6 @@ func normalizeEmailAuthIdentitySubject(email string) string {
 	if normalized == "" {
 		return ""
 	}
-	if strings.HasSuffix(normalized, service.LinuxDoConnectSyntheticEmailDomain) ||
-		strings.HasSuffix(normalized, service.OIDCConnectSyntheticEmailDomain) ||
-		strings.HasSuffix(normalized, service.WeChatConnectSyntheticEmailDomain) ||
-		strings.HasSuffix(normalized, service.DingTalkConnectSyntheticEmailDomain) {
-		return ""
-	}
 	return normalized
 }
 
@@ -487,17 +462,6 @@ func (r *userRepository) deleteUser(ctx context.Context, exec *dbent.Client, id 
 		return translatePersistenceError(err, service.ErrUserNotFound, nil)
 	}
 	if len(identityIDs) > 0 {
-		if _, err := exec.IdentityAdoptionDecision.Update().
-			Where(identityadoptiondecision.IdentityIDIn(identityIDs...)).
-			ClearIdentityID().
-			Save(ctx); err != nil {
-			return translatePersistenceError(err, service.ErrUserNotFound, nil)
-		}
-		if _, err := exec.AuthIdentityChannel.Delete().
-			Where(authidentitychannel.IdentityIDIn(identityIDs...)).
-			Exec(ctx); err != nil {
-			return translatePersistenceError(err, service.ErrUserNotFound, nil)
-		}
 		if _, err := exec.AuthIdentity.Delete().
 			Where(authidentity.UserIDEQ(id)).
 			Exec(ctx); err != nil {
@@ -562,21 +526,6 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 		))
 	}
 
-	// If attribute filters are specified, we need to filter by user IDs first
-	var allowedUserIDs []int64
-	if len(filters.Attributes) > 0 {
-		var attrErr error
-		allowedUserIDs, attrErr = r.filterUsersByAttributes(ctx, filters.Attributes)
-		if attrErr != nil {
-			return nil, nil, attrErr
-		}
-		if len(allowedUserIDs) == 0 {
-			// No users match the attribute filters
-			return []service.User{}, paginationResultFromTotal(0, params), nil
-		}
-		q = q.Where(dbuser.IDIn(allowedUserIDs...))
-	}
-
 	total, err := q.Clone().Count(userCtx)
 	if err != nil {
 		return nil, nil, err
@@ -606,27 +555,6 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 		u := userEntityToService(users[i])
 		outUsers = append(outUsers, *u)
 		userMap[u.ID] = &outUsers[len(outUsers)-1]
-	}
-
-	shouldLoadSubscriptions := filters.IncludeSubscriptions == nil || *filters.IncludeSubscriptions
-	if shouldLoadSubscriptions {
-		// Batch load active subscriptions with groups to avoid N+1.
-		subs, err := r.client.UserSubscription.Query().
-			Where(
-				usersubscription.UserIDIn(userIDs...),
-				usersubscription.StatusEQ(service.SubscriptionStatusActive),
-			).
-			WithGroup().
-			All(ctx)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		for i := range subs {
-			if u, ok := userMap[subs[i].UserID]; ok {
-				u.Subscriptions = append(u.Subscriptions, *userSubscriptionEntityToService(subs[i]))
-			}
-		}
 	}
 
 	allowedGroupsByUser, err := r.loadAllowedGroups(ctx, userIDs)
@@ -662,9 +590,6 @@ func userListOrder(params pagination.PaginationParams) []func(*entsql.Selector) 
 		defaultField = false
 	case "role":
 		field = dbuser.FieldRole
-		defaultField = false
-	case "balance":
-		field = dbuser.FieldBalance
 		defaultField = false
 	case "concurrency":
 		field = dbuser.FieldConcurrency
@@ -719,11 +644,11 @@ func (r *userRepository) GetLatestUsedAtByUserIDs(ctx context.Context, userIDs [
 	const query = `
 		SELECT user_id, MAX(created_at) AS last_used_at
 		FROM usage_logs
-		WHERE user_id = ANY($1)
+		WHERE user_id IN (SELECT value FROM json_each($1))
 		GROUP BY user_id
 	`
 
-	rows, err := r.sql.QueryContext(ctx, query, pq.Array(userIDs))
+	rows, err := r.sql.QueryContext(ctx, query, sqliteJSONList(userIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -773,266 +698,6 @@ func userLastUsedAtOrder(sortOrder string) []func(*entsql.Selector) {
 	}
 }
 
-// filterUsersByAttributes returns user IDs that match ALL the given attribute filters
-func (r *userRepository) filterUsersByAttributes(ctx context.Context, attrs map[int64]string) ([]int64, error) {
-	if len(attrs) == 0 {
-		return nil, nil
-	}
-
-	if r.sql == nil {
-		return nil, fmt.Errorf("sql executor is not configured")
-	}
-
-	clauses := make([]string, 0, len(attrs))
-	args := make([]any, 0, len(attrs)*2+1)
-	argIndex := 1
-	for attrID, value := range attrs {
-		clauses = append(clauses, fmt.Sprintf("(attribute_id = $%d AND value ILIKE $%d)", argIndex, argIndex+1))
-		args = append(args, attrID, "%"+value+"%")
-		argIndex += 2
-	}
-
-	query := fmt.Sprintf(
-		`SELECT user_id
-		 FROM user_attribute_values
-		 WHERE %s
-		 GROUP BY user_id
-		 HAVING COUNT(DISTINCT attribute_id) = $%d`,
-		strings.Join(clauses, " OR "),
-		argIndex,
-	)
-	args = append(args, len(attrs))
-
-	rows, err := r.sql.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	result := make([]int64, 0)
-	for rows.Next() {
-		var userID int64
-		if scanErr := rows.Scan(&userID); scanErr != nil {
-			return nil, scanErr
-		}
-		result = append(result, userID)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return result, nil
-}
-
-func (r *userRepository) UpdateBalance(ctx context.Context, id int64, amount float64) error {
-	client := clientFromContext(ctx, r.client)
-	update := client.User.Update().Where(dbuser.IDEQ(id)).AddBalance(amount)
-	// Track cumulative recharge amount for percentage-based notifications
-	if amount > 0 {
-		update = update.AddTotalRecharged(amount)
-	}
-	n, err := update.Save(ctx)
-	if err != nil {
-		return translatePersistenceError(err, service.ErrUserNotFound, nil)
-	}
-	if n == 0 {
-		return service.ErrUserNotFound
-	}
-	return nil
-}
-
-func (r *userRepository) ApplyRedeemBalanceAdjustment(ctx context.Context, id int64, delta float64) error {
-	const updateSQL = `
-		UPDATE users
-		SET balance = GREATEST(balance + $1, 0), updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL
-	`
-	client := clientFromContext(ctx, r.client)
-	result, err := client.ExecContext(ctx, updateSQL, delta, id)
-	if err != nil {
-		return err
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if affected == 0 {
-		return service.ErrUserNotFound
-	}
-	return nil
-}
-
-// DeductBalance 扣除用户余额
-// 透支策略：允许余额变为负数，确保当前请求能够完成
-// 中间件会阻止余额 <= 0 的用户发起后续请求
-func (r *userRepository) DeductBalance(ctx context.Context, id int64, amount float64) error {
-	client := clientFromContext(ctx, r.client)
-	n, err := client.User.Update().
-		Where(dbuser.IDEQ(id), dbuser.BalanceGTE(amount)).
-		AddBalance(-amount).
-		Save(ctx)
-	if err != nil {
-		return err
-	}
-	if n > 0 {
-		return nil
-	}
-
-	n, err = client.User.Update().
-		Where(dbuser.IDEQ(id)).
-		AddBalance(-amount).
-		Save(ctx)
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return service.ErrUserNotFound
-	}
-	return nil
-}
-
-// DeductAvailableBalance atomically deducts min(amount, max(balance, 0)).
-// Unlike DeductBalance, this refund-specific operation never increases an
-// existing deficit or permits a concurrent deduction to cause an overdraft.
-func (r *userRepository) DeductAvailableBalance(ctx context.Context, id int64, amount float64) (deducted float64, err error) {
-	if amount < 0 {
-		return 0, fmt.Errorf("deduction amount must be nonnegative")
-	}
-	const updateSQL = `
-		WITH target AS (
-			SELECT id, balance
-			FROM users
-			WHERE id = $2 AND deleted_at IS NULL
-			FOR UPDATE
-		), updated AS (
-			UPDATE users AS u
-			SET balance = target.balance - LEAST($1, GREATEST(target.balance, 0)), updated_at = NOW()
-			FROM target
-			WHERE u.id = target.id AND u.deleted_at IS NULL
-			RETURNING target.balance - u.balance AS deducted
-		)
-		SELECT deducted FROM updated
-	`
-	rows, err := clientFromContext(ctx, r.client).QueryContext(ctx, updateSQL, amount, id)
-	if err != nil {
-		return 0, err
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil && err == nil {
-			err = closeErr
-		}
-	}()
-	if !rows.Next() {
-		if rowsErr := rows.Err(); rowsErr != nil {
-			return 0, rowsErr
-		}
-		return 0, service.ErrUserNotFound
-	}
-	if err := rows.Scan(&deducted); err != nil {
-		return 0, err
-	}
-	return deducted, rows.Err()
-}
-
-// AdjustBalance 原子地把 delta 累加到余额上，结果为负时整条语句不生效。
-// 相比"读余额 → 算新值 → 整行写回"，这里把读与写压进同一条 UPDATE，
-// 并发的计费扣款不会被旧快照覆盖。
-func (r *userRepository) AdjustBalance(ctx context.Context, id int64, delta float64) (service.BalanceChange, error) {
-	const updateSQL = `
-		UPDATE users
-		SET balance = balance + $1, updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL AND balance + $1 >= 0
-		RETURNING balance - $1, balance
-	`
-	change, ok, err := scanBalanceChange(ctx, clientFromContext(ctx, r.client), updateSQL, delta, id)
-	if err != nil {
-		return service.BalanceChange{}, err
-	}
-	if ok {
-		return change, nil
-	}
-
-	// 0 行既可能是用户不存在，也可能是余额不足以承受这次扣减，需要区分。
-	current, err := r.currentBalance(ctx, id)
-	if err != nil {
-		return service.BalanceChange{}, err
-	}
-	return service.BalanceChange{Old: current, New: current + delta}, service.ErrBalanceNegative
-}
-
-// SetBalance 原子地把余额置为 value，并返回变更前后的值。
-func (r *userRepository) SetBalance(ctx context.Context, id int64, value float64) (service.BalanceChange, error) {
-	if value < 0 {
-		// 连同当前余额一起返回，便于上层给出可读的错误信息。
-		current, err := r.currentBalance(ctx, id)
-		if err != nil {
-			return service.BalanceChange{}, err
-		}
-		return service.BalanceChange{Old: current, New: value}, service.ErrBalanceNegative
-	}
-	const updateSQL = `
-		UPDATE users AS u
-		SET balance = $1, updated_at = NOW()
-		FROM (SELECT id, balance FROM users WHERE id = $2 AND deleted_at IS NULL) AS prev
-		WHERE u.id = prev.id AND u.deleted_at IS NULL
-		RETURNING prev.balance, u.balance
-	`
-	change, ok, err := scanBalanceChange(ctx, clientFromContext(ctx, r.client), updateSQL, value, id)
-	if err != nil {
-		return service.BalanceChange{}, err
-	}
-	if !ok {
-		return service.BalanceChange{}, service.ErrUserNotFound
-	}
-	return change, nil
-}
-
-// currentBalance 读取用户当前余额，用户不存在时返回 ErrUserNotFound。
-func (r *userRepository) currentBalance(ctx context.Context, id int64) (balance float64, err error) {
-	rows, err := clientFromContext(ctx, r.client).QueryContext(ctx,
-		`SELECT balance FROM users WHERE id = $1 AND deleted_at IS NULL`, id)
-	if err != nil {
-		return 0, err
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil && err == nil {
-			err = closeErr
-		}
-	}()
-	if !rows.Next() {
-		if rowsErr := rows.Err(); rowsErr != nil {
-			return 0, rowsErr
-		}
-		return 0, service.ErrUserNotFound
-	}
-	if err := rows.Scan(&balance); err != nil {
-		return 0, err
-	}
-	return balance, rows.Err()
-}
-
-// scanBalanceChange 执行一条 RETURNING 旧余额、新余额的语句。ok 为 false 表示语句未命中任何行。
-func scanBalanceChange(ctx context.Context, client *dbent.Client, query string, args ...any) (change service.BalanceChange, ok bool, err error) {
-	rows, err := client.QueryContext(ctx, query, args...)
-	if err != nil {
-		return service.BalanceChange{}, false, err
-	}
-	defer func() {
-		if closeErr := rows.Close(); closeErr != nil && err == nil {
-			err = closeErr
-		}
-	}()
-	if !rows.Next() {
-		if rowsErr := rows.Err(); rowsErr != nil {
-			return service.BalanceChange{}, false, rowsErr
-		}
-		return service.BalanceChange{}, false, nil
-	}
-	if err := rows.Scan(&change.Old, &change.New); err != nil {
-		return service.BalanceChange{}, false, err
-	}
-	return change, true, rows.Err()
-}
-
 func (r *userRepository) UpdateConcurrency(ctx context.Context, id int64, amount int) error {
 	client := clientFromContext(ctx, r.client)
 	n, err := client.User.Update().Where(dbuser.IDEQ(id)).AddConcurrency(amount).Save(ctx)
@@ -1040,27 +705,6 @@ func (r *userRepository) UpdateConcurrency(ctx context.Context, id int64, amount
 		return translatePersistenceError(err, service.ErrUserNotFound, nil)
 	}
 	if n == 0 {
-		return service.ErrUserNotFound
-	}
-	return nil
-}
-
-func (r *userRepository) ApplyRedeemConcurrencyAdjustment(ctx context.Context, id int64, delta int) error {
-	const updateSQL = `
-		UPDATE users
-		SET concurrency = GREATEST(concurrency + $1, 0), updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL
-	`
-	client := clientFromContext(ctx, r.client)
-	result, err := client.ExecContext(ctx, updateSQL, delta, id)
-	if err != nil {
-		return err
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if affected == 0 {
 		return service.ErrUserNotFound
 	}
 	return nil
@@ -1074,8 +718,8 @@ func (r *userRepository) BatchSetConcurrency(ctx context.Context, userIDs []int6
 		value = 0
 	}
 	res, err := r.sql.ExecContext(ctx,
-		"UPDATE users SET concurrency = $1, updated_at = NOW() WHERE id = ANY($2) AND deleted_at IS NULL",
-		value, pq.Array(userIDs))
+		"UPDATE users SET concurrency = $1, updated_at = CURRENT_TIMESTAMP WHERE id IN (SELECT value FROM json_each($2)) AND deleted_at IS NULL",
+		value, sqliteJSONList(userIDs))
 	if err != nil {
 		return 0, fmt.Errorf("batch set concurrency: %w", err)
 	}
@@ -1088,8 +732,8 @@ func (r *userRepository) BatchAddConcurrency(ctx context.Context, userIDs []int6
 		return 0, nil
 	}
 	res, err := r.sql.ExecContext(ctx,
-		"UPDATE users SET concurrency = GREATEST(concurrency + $1, 0), updated_at = NOW() WHERE id = ANY($2) AND deleted_at IS NULL",
-		delta, pq.Array(userIDs))
+		"UPDATE users SET concurrency = MAX(concurrency + $1, 0), updated_at = CURRENT_TIMESTAMP WHERE id IN (SELECT value FROM json_each($2)) AND deleted_at IS NULL",
+		delta, sqliteJSONList(userIDs))
 	if err != nil {
 		return 0, fmt.Errorf("batch add concurrency: %w", err)
 	}
@@ -1114,11 +758,11 @@ func (r *userRepository) BatchUpdateLimits(ctx context.Context, userIDs []int64,
 		args = append(args, value)
 		setClauses = append(setClauses, fmt.Sprintf("rpm_limit = $%d", len(args)))
 	}
-	setClauses = append(setClauses, "updated_at = NOW()")
-	args = append(args, pq.Array(userIDs))
+	setClauses = append(setClauses, "updated_at = CURRENT_TIMESTAMP")
+	args = append(args, sqliteJSONList(userIDs))
 
 	query := fmt.Sprintf(
-		"UPDATE users SET %s WHERE id = ANY($%d) AND deleted_at IS NULL",
+		"UPDATE users SET %s WHERE id IN (SELECT value FROM json_each($%d)) AND deleted_at IS NULL",
 		strings.Join(setClauses, ", "),
 		len(args),
 	)
@@ -1472,16 +1116,9 @@ func userSignupSourceOrDefault(signupSource string) string {
 	switch strings.TrimSpace(strings.ToLower(signupSource)) {
 	case "", "email":
 		return "email"
-	case "linuxdo", "wechat", "oidc", "dingtalk":
-		return strings.TrimSpace(strings.ToLower(signupSource))
 	default:
 		return "email"
 	}
-}
-
-// marshalExtraEmails serializes notify email entries to JSON for storage.
-func marshalExtraEmails(entries []service.NotifyEmailEntry) string {
-	return service.MarshalNotifyEmails(entries)
 }
 
 // UpdateTotpSecret 更新用户的 TOTP 加密密钥

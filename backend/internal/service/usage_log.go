@@ -6,11 +6,6 @@ import (
 	"time"
 )
 
-const (
-	BillingTypeBalance      int8 = 0 // 钱包余额
-	BillingTypeSubscription int8 = 1 // 订阅套餐
-)
-
 type RequestType int16
 
 const (
@@ -124,11 +119,7 @@ type UsageLog struct {
 	ChannelID *int64
 	// ModelMappingChain 模型映射链，如 "a→b→c"
 	ModelMappingChain *string
-	// BillingTier 计费层级标签（per_request/image 模式）
-	BillingTier *string
-	// BillingMode 计费模式：token/image
-	BillingMode *string
-	// ServiceTier records the OpenAI service tier used for billing, e.g. "priority" / "flex".
+	// ServiceTier records the OpenAI service tier reported for the request, e.g. "priority" / "flex".
 	ServiceTier *string
 	// ReasoningEffort is the request's reasoning effort level.
 	// OpenAI: "low" / "medium" / "high" / "xhigh"; Claude: "low" / "medium" / "high" / "max".
@@ -139,8 +130,7 @@ type UsageLog struct {
 	// UpstreamEndpoint is the normalized upstream endpoint path, e.g. /v1/responses.
 	UpstreamEndpoint *string
 
-	GroupID        *int64
-	SubscriptionID *int64
+	GroupID *int64
 
 	InputTokens         int
 	OutputTokens        int
@@ -151,24 +141,8 @@ type UsageLog struct {
 	CacheCreation1hTokens int `gorm:"column:cache_creation_1h_tokens"`
 
 	ImageInputTokens  int
-	ImageInputCost    float64
 	ImageOutputTokens int
-	ImageOutputCost   float64
 
-	InputCost                 float64
-	OutputCost                float64
-	CacheCreationCost         float64
-	CacheReadCost             float64
-	TotalCost                 float64
-	ActualCost                float64
-	RateMultiplier            float64
-	LongContextBillingApplied bool
-	// AccountRateMultiplier 账号计费倍率快照（nil 表示历史数据，按 1.0 处理）
-	AccountRateMultiplier *float64
-	// AccountStatsCost 账号统计定价预计算费用（nil = 使用默认公式 total_cost × account_rate_multiplier）
-	AccountStatsCost *float64
-
-	BillingType  int8
 	RequestType  RequestType
 	Stream       bool
 	OpenAIWSMode bool
@@ -181,9 +155,6 @@ type UsageLog struct {
 	// valid session header. It is never derived from prompt_cache_key or content.
 	SessionID *string
 
-	// Cache TTL Override 标记（管理员强制替换了缓存 TTL 计费）
-	CacheTTLOverridden bool
-
 	// 图片生成字段
 	ImageCount         int
 	ImageSize          *string
@@ -193,18 +164,17 @@ type UsageLog struct {
 	ImageSizeBreakdown map[string]int
 	MediaType          *string
 
-	// 视频生成字段（Grok 视频按秒计费；video_count>0 的行不要求 image_size）
+	// 视频生成字段（video_count>0 的行不要求 image_size）
 	VideoCount           int
 	VideoResolution      *string
 	VideoDurationSeconds *int
 
 	CreatedAt time.Time
 
-	User         *User
-	APIKey       *APIKey
-	Account      *Account
-	Group        *Group
-	Subscription *UserSubscription
+	User    *User
+	APIKey  *APIKey
+	Account *Account
+	Group   *Group
 }
 
 func (u *UsageLog) TotalTokens() int {

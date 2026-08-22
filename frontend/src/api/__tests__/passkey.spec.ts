@@ -120,38 +120,6 @@ describe('passkey api', () => {
     })
   })
 
-  it('sends Tencent captcha proof only with the passkey begin request', async () => {
-    post
-      .mockResolvedValueOnce({
-        data: {
-          session_token: 'one-time-session',
-          options: {
-            publicKey: {
-              challenge: 'AQID',
-              rpId: 'sub2api.example.com',
-              userVerification: 'required'
-            }
-          }
-        }
-      })
-      .mockResolvedValueOnce({ data: { access_token: 'access', token_type: 'Bearer', user: { id: 1 } } })
-    credentialGet.mockResolvedValue(new FakePublicKeyCredential())
-
-    await passkeyAPI.login({
-      tencent_captcha_ticket: 'ticket-value',
-      tencent_captcha_randstr: '@rand-value'
-    })
-
-    expect(post).toHaveBeenNthCalledWith(1, '/auth/passkey/login/begin', {
-      tencent_captcha_ticket: 'ticket-value',
-      tencent_captcha_randstr: '@rand-value'
-    })
-    expect(post.mock.calls[1][1]).not.toEqual(expect.objectContaining({
-      tencent_captcha_ticket: expect.anything(),
-      tencent_captcha_randstr: expect.anything()
-    }))
-  })
-
   it('sends the account password when beginning registration', async () => {
     post
       .mockResolvedValueOnce({

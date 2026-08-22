@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -14,6 +15,146 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 )
+
+func emptyProjectResolver(context.Context, string, string) (string, int, error) {
+	return "", 0, fmt.Errorf("no ACTIVE projects found")
+}
+
+func TestGeminiProjectResolution_ExactRealStandardTierShapeRequiresManualProject(t *testing.T) {
+	var realShape geminicli.LoadCodeAssistResponse
+	err := json.Unmarshal([]byte(`{
+		"currentTier": null,
+		"paidTier": null,
+		"cloudaicompanionProject": "",
+		"allowedTiers": [{"id":"standard-tier","isDefault":true}]
+	}`), &realShape)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	loadCalls := 0
+	onboardCalls := 0
+	client := &mockGeminiCodeAssistClient{
+		loadCodeAssistFunc: func(context.Context, string, string, *geminicli.LoadCodeAssistRequest) (*geminicli.LoadCodeAssistResponse, error) {
+			loadCalls++
+			return &realShape, nil
+		},
+		onboardUserFunc: func(_ context.Context, _, _ string, req *geminicli.OnboardUserRequest) (*geminicli.OnboardUserResponse, error) {
+			onboardCalls++
+			if req.TierID != "standard-tier" {
+				t.Fatalf("tier = %q, want standard-tier", req.TierID)
+			}
+			return &geminicli.OnboardUserResponse{Done: true}, nil
+		},
+	}
+	svc := NewGeminiOAuthService(nil, nil, client, nil, &config.Config{})
+	defer svc.Stop()
+	svc.resolveResourceManagerProject = emptyProjectResolver
+
+	_, tier, err := svc.fetchProjectID(context.Background(), "access-token", "")
+	if err == nil || !strings.Contains(err.Error(), "missing project_id") || !strings.Contains(err.Error(), "user-owned") {
+		t.Fatalf("expected clear manual project error, got %v", err)
+	}
+	if tier != "standard-tier" || onboardCalls != 1 || loadCalls != 2 {
+		t.Fatalf("tier=%q onboardCalls=%d loadCalls=%d", tier, onboardCalls, loadCalls)
+	}
+}
+
+func TestGeminiProjectResolution_PollsLongRunningOperation(t *testing.T) {
+	polls := 0
+	client := &mockGeminiCodeAssistClient{
+		loadCodeAssistFunc: func(context.Context, string, string, *geminicli.LoadCodeAssistRequest) (*geminicli.LoadCodeAssistResponse, error) {
+			return &geminicli.LoadCodeAssistResponse{AllowedTiers: []geminicli.AllowedTier{{ID: "free-tier", IsDefault: true}}}, nil
+		},
+		onboardUserFunc: func(context.Context, string, string, *geminicli.OnboardUserRequest) (*geminicli.OnboardUserResponse, error) {
+			return &geminicli.OnboardUserResponse{Name: "operations/onboard-1"}, nil
+		},
+		getOperationFunc: func(_ context.Context, _, _, name string) (*geminicli.OnboardUserResponse, error) {
+			polls++
+			if name != "operations/onboard-1" {
+				t.Fatalf("operation name = %q", name)
+			}
+			return &geminicli.OnboardUserResponse{Done: true, Response: &geminicli.OnboardUserResultData{
+				CloudAICompanionProject: &geminicli.CloudAICompanionProject{ID: "managed-project"},
+			}}, nil
+		},
+	}
+	svc := NewGeminiOAuthService(nil, nil, client, nil, &config.Config{})
+	defer svc.Stop()
+	svc.sleep = func(time.Duration) {}
+	svc.resolveResourceManagerProject = emptyProjectResolver
+
+	project, tier, err := svc.fetchProjectID(context.Background(), "access-token", "")
+	if err != nil || project != "managed-project" || tier != "free-tier" || polls != 1 {
+		t.Fatalf("project=%q tier=%q polls=%d err=%v", project, tier, polls, err)
+	}
+}
+
+func TestGeminiProjectResolution_ReloadsAfterCompletedOnboarding(t *testing.T) {
+	loads := 0
+	client := &mockGeminiCodeAssistClient{
+		loadCodeAssistFunc: func(context.Context, string, string, *geminicli.LoadCodeAssistRequest) (*geminicli.LoadCodeAssistResponse, error) {
+			loads++
+			if loads == 1 {
+				return &geminicli.LoadCodeAssistResponse{AllowedTiers: []geminicli.AllowedTier{{ID: "free-tier", IsDefault: true}}}, nil
+			}
+			return &geminicli.LoadCodeAssistResponse{CurrentTier: &geminicli.TierInfo{ID: "free-tier"}, CloudAICompanionProject: "provisioned-project"}, nil
+		},
+		onboardUserFunc: func(context.Context, string, string, *geminicli.OnboardUserRequest) (*geminicli.OnboardUserResponse, error) {
+			return &geminicli.OnboardUserResponse{Done: true}, nil
+		},
+	}
+	svc := NewGeminiOAuthService(nil, nil, client, nil, &config.Config{})
+	defer svc.Stop()
+	svc.resolveResourceManagerProject = emptyProjectResolver
+
+	project, _, err := svc.fetchProjectID(context.Background(), "access-token", "")
+	if err != nil || project != "provisioned-project" || loads != 2 {
+		t.Fatalf("project=%q loads=%d err=%v", project, loads, err)
+	}
+}
+
+func TestGeminiProjectResolution_IneligibleAccountReturnsReason(t *testing.T) {
+	client := &mockGeminiCodeAssistClient{
+		loadCodeAssistFunc: func(context.Context, string, string, *geminicli.LoadCodeAssistRequest) (*geminicli.LoadCodeAssistResponse, error) {
+			return &geminicli.LoadCodeAssistResponse{
+				CurrentTier:     &geminicli.TierInfo{ID: "standard-tier"},
+				IneligibleTiers: []geminicli.IneligibleTier{{ReasonCode: "INELIGIBLE_ACCOUNT", ReasonMessage: "Free tier is unavailable for this account"}},
+			}, nil
+		},
+	}
+	svc := NewGeminiOAuthService(nil, nil, client, nil, &config.Config{})
+	defer svc.Stop()
+	svc.resolveResourceManagerProject = emptyProjectResolver
+
+	_, _, err := svc.fetchProjectID(context.Background(), "access-token", "")
+	if err == nil || !strings.Contains(err.Error(), "Free tier is unavailable") {
+		t.Fatalf("expected eligibility reason, got %v", err)
+	}
+}
+
+func TestGeminiProjectResolution_RegisteredPaidAndFreeAccounts(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		resp *geminicli.LoadCodeAssistResponse
+		tier string
+	}{
+		{"paid", &geminicli.LoadCodeAssistResponse{CurrentTier: &geminicli.TierInfo{ID: "standard-tier"}, PaidTier: &geminicli.TierInfo{ID: "google-one-paid"}, CloudAICompanionProject: "paid-project"}, "google-one-paid"},
+		{"free", &geminicli.LoadCodeAssistResponse{CurrentTier: &geminicli.TierInfo{ID: "free-tier"}, CloudAICompanionProject: "free-project"}, "free-tier"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			client := &mockGeminiCodeAssistClient{loadCodeAssistFunc: func(context.Context, string, string, *geminicli.LoadCodeAssistRequest) (*geminicli.LoadCodeAssistResponse, error) {
+				return tt.resp, nil
+			}}
+			svc := NewGeminiOAuthService(nil, nil, client, nil, &config.Config{})
+			defer svc.Stop()
+			project, tier, err := svc.fetchProjectID(context.Background(), "access-token", "")
+			if err != nil || project == "" || tier != tt.tier {
+				t.Fatalf("project=%q tier=%q err=%v", project, tier, err)
+			}
+		})
+	}
+}
 
 // =====================
 // 保留原有测试
@@ -747,6 +888,14 @@ func (m *mockGeminiOAuthClient) RefreshToken(ctx context.Context, oauthType, ref
 type mockGeminiCodeAssistClient struct {
 	loadCodeAssistFunc func(ctx context.Context, accessToken, proxyURL string, req *geminicli.LoadCodeAssistRequest) (*geminicli.LoadCodeAssistResponse, error)
 	onboardUserFunc    func(ctx context.Context, accessToken, proxyURL string, req *geminicli.OnboardUserRequest) (*geminicli.OnboardUserResponse, error)
+	getOperationFunc   func(ctx context.Context, accessToken, proxyURL, name string) (*geminicli.OnboardUserResponse, error)
+}
+
+func (m *mockGeminiCodeAssistClient) GetOperation(ctx context.Context, accessToken, proxyURL, name string) (*geminicli.OnboardUserResponse, error) {
+	if m.getOperationFunc != nil {
+		return m.getOperationFunc(ctx, accessToken, proxyURL, name)
+	}
+	panic("GetOperation not implemented")
 }
 
 func (m *mockGeminiCodeAssistClient) LoadCodeAssist(ctx context.Context, accessToken, proxyURL string, req *geminicli.LoadCodeAssistRequest) (*geminicli.LoadCodeAssistResponse, error) {

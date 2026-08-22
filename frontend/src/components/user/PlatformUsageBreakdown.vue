@@ -2,7 +2,7 @@
   <div class="group/usage relative text-sm">
     <div class="flex items-center gap-1.5">
       <span class="text-gray-500 dark:text-gray-400">{{ t('admin.users.today') }}:</span>
-      <span class="font-medium text-gray-900 dark:text-white">${{ today.toFixed(4) }}</span>
+      <span class="font-medium text-gray-900 dark:text-white">{{ today.toLocaleString() }}</span>
       <Icon
         v-if="hasBreakdown"
         name="infoCircle"
@@ -12,7 +12,7 @@
     </div>
     <div class="mt-0.5 flex items-center gap-1.5">
       <span class="text-gray-500 dark:text-gray-400">{{ t('admin.users.total') }}:</span>
-      <span class="font-medium text-gray-900 dark:text-white">${{ total.toFixed(4) }}</span>
+      <span class="font-medium text-gray-900 dark:text-white">{{ total.toLocaleString() }}</span>
     </div>
 
     <div
@@ -33,9 +33,9 @@
           {{ item.isOther ? t('admin.users.platformOther') : platformLabel(item.platform) }}
         </span>
         <span class="font-mono">
-          ${{ item.today_actual_cost.toFixed(4) }}
+          {{ item.today_requests.toLocaleString() }}
           <span class="opacity-50">/</span>
-          ${{ item.total_actual_cost.toFixed(4) }}
+          {{ item.total_requests.toLocaleString() }}
         </span>
       </div>
     </div>
@@ -58,30 +58,32 @@ const { t } = useI18n()
 
 // 与 UserDashboardStats 保持一致：把"总值 - 各平台之和"的差作为"其他"行展示，
 // 避免 tooltip 内各平台费用加总与列首总值对不上。
-const OTHER_THRESHOLD = 0.0001
-
 interface BreakdownRow {
   platform: string
-  today_actual_cost: number
-  total_actual_cost: number
+  today_requests: number
+  today_tokens: number
+  total_requests: number
+  total_tokens: number
   isOther?: boolean
 }
 
 const sortedBreakdown = computed<BreakdownRow[]>(() => {
   const list = props.byPlatform ?? []
   const rows: BreakdownRow[] = [...list]
-    .sort((a, b) => b.total_actual_cost - a.total_actual_cost)
+    .sort((a, b) => b.total_requests - a.total_requests)
     .map((p) => ({ ...p }))
 
-  const sumTotal = rows.reduce((s, r) => s + r.total_actual_cost, 0)
-  const sumToday = rows.reduce((s, r) => s + r.today_actual_cost, 0)
+  const sumTotal = rows.reduce((s, r) => s + r.total_requests, 0)
+  const sumToday = rows.reduce((s, r) => s + r.today_requests, 0)
   const diffTotal = Math.max(0, props.total - sumTotal)
   const diffToday = Math.max(0, props.today - sumToday)
-  if (diffTotal > OTHER_THRESHOLD || diffToday > OTHER_THRESHOLD) {
+  if (diffTotal > 0 || diffToday > 0) {
     rows.push({
       platform: '__other__',
-      today_actual_cost: diffToday,
-      total_actual_cost: diffTotal,
+      today_requests: diffToday,
+      total_requests: diffTotal,
+      today_tokens: 0,
+      total_tokens: 0,
       isOther: true
     })
   }

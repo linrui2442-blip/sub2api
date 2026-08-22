@@ -64,9 +64,6 @@ const createAdminUser = (overrides: Partial<AdminUser> = {}): AdminUser => ({
   concurrency: 1,
   status: 'active',
   allowed_groups: [],
-  balance_notify_enabled: false,
-  balance_notify_threshold: null,
-  balance_notify_extra_emails: [],
   created_at: '2026-04-17T00:00:00Z',
   updated_at: '2026-04-17T00:00:00Z',
   notes: '',
@@ -166,11 +163,8 @@ describe('admin UsersView', () => {
           UserCreateModal: true,
           UserEditModal: true,
           BulkEditUserModal: BulkEditUserModalStub,
-          UserPlatformQuotaModal: true,
           UserApiKeysModal: true,
           UserAllowedGroupsModal: true,
-          UserBalanceModal: true,
-          UserBalanceHistoryModal: true,
           GroupReplaceModal: true,
           Icon: true,
           Teleport: true
@@ -229,8 +223,8 @@ describe('admin UsersView', () => {
     })
     getBatchUsersUsage.mockResolvedValue({
       stats: {
-        1: { user_id: 1, today_actual_cost: 1, total_actual_cost: 1, by_platform: [] },
-        2: { user_id: 2, today_actual_cost: 9, total_actual_cost: 9, by_platform: [] }
+        1: { user_id: 1, today_requests: 1, today_tokens: 10, total_requests: 1, total_tokens: 10, by_platform: [] },
+        2: { user_id: 2, today_requests: 9, today_tokens: 90, total_requests: 9, total_tokens: 90, by_platform: [] }
       }
     })
 
@@ -252,11 +246,8 @@ describe('admin UsersView', () => {
           UserCreateModal: true,
           UserEditModal: true,
           BulkEditUserModal: BulkEditUserModalStub,
-          UserPlatformQuotaModal: true,
           UserApiKeysModal: true,
           UserAllowedGroupsModal: true,
-          UserBalanceModal: true,
-          UserBalanceHistoryModal: true,
           GroupReplaceModal: true,
           Icon: true,
           Teleport: true
@@ -330,11 +321,8 @@ describe('admin UsersView', () => {
           UserCreateModal: true,
           UserEditModal: true,
           BulkEditUserModal: BulkEditUserModalStub,
-          UserPlatformQuotaModal: true,
           UserApiKeysModal: true,
           UserAllowedGroupsModal: true,
-          UserBalanceModal: true,
-          UserBalanceHistoryModal: true,
           GroupReplaceModal: true,
           Icon: true,
           Teleport: true

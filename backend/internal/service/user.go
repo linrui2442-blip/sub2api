@@ -18,8 +18,6 @@ type User struct {
 	AvatarSHA256   string
 	PasswordHash   string
 	Role           string
-	Balance        float64
-	FrozenBalance  float64
 	Concurrency    int
 	Status         string
 	AllowedGroups  []int64
@@ -35,21 +33,10 @@ type User struct {
 	UpdatedAt            time.Time
 	DeletedAt            *time.Time // 非 nil 表示用户已软删除
 
-	// GroupRates 用户专属分组倍率配置
-	// map[groupID]rateMultiplier
-	GroupRates map[int64]float64
-
 	// TOTP 双因素认证字段
 	TotpSecretEncrypted *string    // AES-256-GCM 加密的 TOTP 密钥
 	TotpEnabled         bool       // 是否启用 TOTP
 	TotpEnabledAt       *time.Time // TOTP 启用时间
-
-	// 余额不足通知
-	BalanceNotifyEnabled       bool
-	BalanceNotifyThresholdType string // "fixed" (default) | "percentage"
-	BalanceNotifyThreshold     *float64
-	BalanceNotifyExtraEmails   []NotifyEmailEntry
-	TotalRecharged             float64
 
 	// RPMLimit 用户级每分钟请求数上限（0 = 不限制）。仅在所用分组未设置 rpm_limit
 	// 且该 (用户, 分组) 无 rpm_override 时作为全局兜底生效，计数键 rpm:u:{userID}:{min}。
@@ -60,8 +47,7 @@ type User struct {
 	// 避免每请求查 DB。字段不持久化到数据库。
 	UserGroupRPMOverride *int
 
-	APIKeys       []APIKey
-	Subscriptions []UserSubscription
+	APIKeys []APIKey
 }
 
 func (u *User) IsAdmin() bool {

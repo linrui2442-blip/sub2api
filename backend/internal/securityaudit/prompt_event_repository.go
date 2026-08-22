@@ -10,8 +10,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/lib/pq"
 )
 
 type EventFilter struct {
@@ -60,7 +58,7 @@ type EventRepository interface {
 	DeleteEventsByFilter(ctx context.Context, filter EventFilter, snapshotMaxID int64, batchSize int) (*DeleteResult, error)
 }
 
-func (r *PostgreSQLRepository) ListEvents(ctx context.Context, filter EventFilter, page, pageSize int) (*EventPage, error) {
+func (r *SQLRepository) ListEvents(ctx context.Context, filter EventFilter, page, pageSize int) (*EventPage, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -102,7 +100,7 @@ func (r *PostgreSQLRepository) ListEvents(ctx context.Context, filter EventFilte
 	return &EventPage{Items: items, Total: total, Page: page, PageSize: pageSize, Pages: pages}, nil
 }
 
-func (r *PostgreSQLRepository) GetEvent(ctx context.Context, id int64) (*Event, error) {
+func (r *SQLRepository) GetEvent(ctx context.Context, id int64) (*Event, error) {
 	event, err := scanEvent(r.db.QueryRowContext(ctx, `SELECT `+eventDetailColumns("e")+` FROM prompt_audit_events e WHERE e.id=$1`, id), true)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrEventNotFound
@@ -110,11 +108,11 @@ func (r *PostgreSQLRepository) GetEvent(ctx context.Context, id int64) (*Event, 
 	return event, err
 }
 
-func (r *PostgreSQLRepository) DeleteEvent(ctx context.Context, id int64) (*DeleteResult, error) {
+func (r *SQLRepository) DeleteEvent(ctx context.Context, id int64) (*DeleteResult, error) {
 	return r.DeleteEventsByIDs(ctx, []int64{id})
 }
 
-func (r *PostgreSQLRepository) DeleteEventsByIDs(ctx context.Context, ids []int64) (*DeleteResult, error) {
+func (r *SQLRepository) DeleteEventsByIDs(ctx context.Context, ids []int64) (*DeleteResult, error) {
 	ids = canonicalInt64s(ids)
 	if len(ids) == 0 {
 		return &DeleteResult{}, nil
@@ -127,7 +125,8 @@ func (r *PostgreSQLRepository) DeleteEventsByIDs(ctx context.Context, ids []int6
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	rows, err := tx.QueryContext(ctx, `DELETE FROM prompt_audit_events WHERE id=ANY($1) RETURNING job_id`, pq.Array(ids))
+	placeholders, values := sqliteInt64Placeholders(ids, 1)
+	rows, err := tx.QueryContext(ctx, `DELETE FROM prompt_audit_events WHERE id IN (`+placeholders+`) RETURNING job_id`, values...)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +144,7 @@ func (r *PostgreSQLRepository) DeleteEventsByIDs(ctx context.Context, ids []int6
 	return &DeleteResult{DeletedEvents: int64(len(jobIDs)), DeletedJobs: deletedJobs, JobIDs: canonicalInt64s(jobIDs)}, nil
 }
 
-func (r *PostgreSQLRepository) PreviewDelete(ctx context.Context, filter EventFilter) (*DeletePreview, error) {
+func (r *SQLRepository) PreviewDelete(ctx context.Context, filter EventFilter) (*DeletePreview, error) {
 	if err := validateDeleteFilter(filter); err != nil {
 		return nil, err
 	}
@@ -166,7 +165,7 @@ func (r *PostgreSQLRepository) PreviewDelete(ctx context.Context, filter EventFi
 	return &DeletePreview{MatchedCount: count, FilterSummary: canonical, SnapshotMaxID: maxID, FilterHash: FilterHash(canonical, maxID)}, nil
 }
 
-func (r *PostgreSQLRepository) DeleteEventsByFilter(ctx context.Context, filter EventFilter, snapshotMaxID int64, batchSize int) (*DeleteResult, error) {
+func (r *SQLRepository) DeleteEventsByFilter(ctx context.Context, filter EventFilter, snapshotMaxID int64, batchSize int) (*DeleteResult, error) {
 	if err := validateDeleteFilter(filter); err != nil {
 		return nil, err
 	}
@@ -187,13 +186,23 @@ func (r *PostgreSQLRepository) DeleteEventsByFilter(ctx context.Context, filter 
 		maxIndex := len(args) + 1
 		limitIndex := maxIndex + 1
 		args = append(args, snapshotMaxID, batchSize)
-		rows, err := tx.QueryContext(ctx, `
-			WITH selected AS (
-				SELECT e.id FROM prompt_audit_events e`+where+
-			fmt.Sprintf(` AND e.id <= $%d ORDER BY e.id LIMIT $%d FOR UPDATE SKIP LOCKED`, maxIndex, limitIndex)+`
-			), deleted AS (
-				DELETE FROM prompt_audit_events e USING selected s WHERE e.id=s.id RETURNING e.job_id
-			) SELECT job_id FROM deleted`, args...)
+		selectedRows, err := tx.QueryContext(ctx, `SELECT e.id FROM prompt_audit_events e`+where+
+			fmt.Sprintf(` AND e.id <= $%d ORDER BY e.id LIMIT $%d`, maxIndex, limitIndex), args...)
+		if err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+		selectedIDs, err := scanReturnedJobIDs(selectedRows)
+		if err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+		if len(selectedIDs) == 0 {
+			_ = tx.Rollback()
+			break
+		}
+		placeholders, values := sqliteInt64Placeholders(selectedIDs, 1)
+		rows, err := tx.QueryContext(ctx, `DELETE FROM prompt_audit_events WHERE id IN (`+placeholders+`) RETURNING job_id`, values...)
 		if err != nil {
 			_ = tx.Rollback()
 			return nil, err
@@ -295,11 +304,11 @@ func buildEventWhere(filter EventFilter, firstIndex int) (string, []any) {
 		add(" AND e.prompt_hash=$%d", filter.PromptHash)
 	}
 	if filter.Keyword != "" {
-		add(` AND (e.request_id ILIKE $%d OR e.prompt_hash ILIKE $%d OR e.redacted_preview ILIKE $%d
-			OR e.username_snapshot ILIKE $%d OR e.user_email_snapshot ILIKE $%d OR e.api_key_name_snapshot ILIKE $%d)`, "%"+TrimRunes(filter.Keyword, 128)+"%")
+		add(` AND (e.request_id LIKE $%d OR e.prompt_hash LIKE $%d OR e.redacted_preview LIKE $%d
+			OR e.username_snapshot LIKE $%d OR e.user_email_snapshot LIKE $%d OR e.api_key_name_snapshot LIKE $%d)`, "%"+TrimRunes(filter.Keyword, 128)+"%")
 		// The clause has six placeholders but add only supplied one. Rebuild it with one shared placeholder.
-		clauses[len(clauses)-1] = fmt.Sprintf(` AND (e.request_id ILIKE $%[1]d OR e.prompt_hash ILIKE $%[1]d OR e.redacted_preview ILIKE $%[1]d
-			OR e.username_snapshot ILIKE $%[1]d OR e.user_email_snapshot ILIKE $%[1]d OR e.api_key_name_snapshot ILIKE $%[1]d)`, firstIndex+len(args)-1)
+		clauses[len(clauses)-1] = fmt.Sprintf(` AND (e.request_id LIKE $%[1]d OR e.prompt_hash LIKE $%[1]d OR e.redacted_preview LIKE $%[1]d
+			OR e.username_snapshot LIKE $%[1]d OR e.user_email_snapshot LIKE $%[1]d OR e.api_key_name_snapshot LIKE $%[1]d)`, firstIndex+len(args)-1)
 	}
 	if filter.StartAt != nil {
 		add(" AND e.created_at >= $%d", filter.StartAt.UTC())
@@ -377,11 +386,22 @@ func deleteOrphanJobs(ctx context.Context, tx *sql.Tx, jobIDs []int64) (int64, e
 	if len(jobIDs) == 0 {
 		return 0, nil
 	}
-	result, err := tx.ExecContext(ctx, `DELETE FROM prompt_audit_jobs j
-		WHERE j.id=ANY($1) AND j.status <> 'processing'
-		AND NOT EXISTS (SELECT 1 FROM prompt_audit_events e WHERE e.job_id=j.id)`, pq.Array(jobIDs))
+	placeholders, values := sqliteInt64Placeholders(jobIDs, 1)
+	result, err := tx.ExecContext(ctx, `DELETE FROM prompt_audit_jobs
+		WHERE id IN (`+placeholders+`) AND status <> 'processing'
+		AND NOT EXISTS (SELECT 1 FROM prompt_audit_events e WHERE e.job_id=prompt_audit_jobs.id)`, values...)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+func sqliteInt64Placeholders(values []int64, first int) (string, []any) {
+	placeholders := make([]string, len(values))
+	args := make([]any, len(values))
+	for i, value := range values {
+		placeholders[i] = fmt.Sprintf("$%d", first+i)
+		args[i] = value
+	}
+	return strings.Join(placeholders, ","), args
 }

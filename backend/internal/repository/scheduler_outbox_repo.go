@@ -8,8 +8,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
@@ -21,6 +23,12 @@ type schedulerOutboxCleanupLease struct {
 	conn *sql.Conn
 }
 
+type personalSchedulerOutboxCleanupLease struct {
+	once sync.Once
+}
+
+var personalSchedulerOutboxCleanupMu sync.Mutex
+
 const schedulerOutboxDefaultCleanSize = 5000
 
 func NewSchedulerOutboxRepository(db *sql.DB) service.SchedulerOutboxRepository {
@@ -31,6 +39,10 @@ func (r *schedulerOutboxRepository) ListAfterAndReleaseDedup(ctx context.Context
 	if limit <= 0 {
 		limit = 100
 	}
+	if personal.Enabled() {
+		return r.listAfterAndReleaseDedupPersonal(ctx, afterID, limit)
+	}
+
 	rows, err := r.db.QueryContext(ctx, `
 		WITH selected AS MATERIALIZED (
 			SELECT id, event_type, account_id, group_id, payload, created_at
@@ -55,11 +67,53 @@ func (r *schedulerOutboxRepository) ListAfterAndReleaseDedup(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		_ = rows.Close()
-	}()
+	defer func() { _ = rows.Close() }()
+	return scanSchedulerOutboxEvents(rows, limit)
+}
 
-	events := make([]service.SchedulerOutboxEvent, 0, limit)
+// listAfterAndReleaseDedupPersonal preserves the outbox contract without
+// PostgreSQL FOR UPDATE / UPDATE FROM. Personal Edition is a single-process
+// runtime, so one SQLite transaction is sufficient to read the next batch and
+// release their dedup keys atomically relative to other writers on the same DB.
+func (r *schedulerOutboxRepository) listAfterAndReleaseDedupPersonal(ctx context.Context, afterID int64, limit int) ([]service.SchedulerOutboxEvent, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, event_type, account_id, group_id, payload, created_at
+		FROM scheduler_outbox
+		WHERE id > $1
+		ORDER BY id ASC
+		LIMIT $2
+	`, afterID, limit)
+	if err != nil {
+		return nil, err
+	}
+	events, err := scanSchedulerOutboxEvents(rows, limit)
+	_ = rows.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range events {
+		if _, err := tx.ExecContext(ctx,
+			"UPDATE scheduler_outbox SET dedup_key = NULL WHERE id = $1 AND dedup_key IS NOT NULL",
+			events[i].ID,
+		); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return events, nil
+}
+
+func scanSchedulerOutboxEvents(rows *sql.Rows, capacity int) ([]service.SchedulerOutboxEvent, error) {
+	events := make([]service.SchedulerOutboxEvent, 0, capacity)
 	for rows.Next() {
 		var (
 			payloadRaw []byte
@@ -126,10 +180,27 @@ func (r *schedulerOutboxRepository) DeleteConsumedUpTo(ctx context.Context, wate
 	if limit <= 0 {
 		limit = schedulerOutboxDefaultCleanSize
 	}
-	// created_at < NOW() - INTERVAL '10 seconds' 防御 PG 序列号在事务内提前分配但
-	// 提交延迟的竞争：若某 Tx 在 watermark 推进前持有 id=N（未提交），watermark
-	// 跨过 N 后该 Tx 才提交，此时 row N 已经"低于 watermark"但从未被 poll；10s
-	// 宽限期让此类慢事务有机会提交后被消费，再被 cleanup 删除。
+
+	if personal.Enabled() {
+		result, err := r.db.ExecContext(ctx, `
+			DELETE FROM scheduler_outbox
+			WHERE id IN (
+				SELECT id
+				FROM scheduler_outbox
+				WHERE id <= $1
+					AND created_at < datetime('now', '-10 seconds')
+				ORDER BY id ASC
+				LIMIT $2
+			)
+		`, watermark, limit)
+		if err != nil {
+			return 0, err
+		}
+		return result.RowsAffected()
+	}
+
+	// created_at < NOW() - INTERVAL '10 seconds' defends against PostgreSQL
+	// sequence IDs allocated before a slow transaction commits.
 	result, err := r.db.ExecContext(ctx, `
 		WITH doomed AS (
 			SELECT id
@@ -150,6 +221,13 @@ func (r *schedulerOutboxRepository) DeleteConsumedUpTo(ctx context.Context, wate
 }
 
 func (r *schedulerOutboxRepository) TryAcquireCleanupLock(ctx context.Context) (service.SchedulerOutboxCleanupLease, bool, error) {
+	if personal.Enabled() {
+		if !personalSchedulerOutboxCleanupMu.TryLock() {
+			return nil, false, nil
+		}
+		return &personalSchedulerOutboxCleanupLease{}, true, nil
+	}
+
 	conn, err := r.db.Conn(ctx)
 	if err != nil {
 		return nil, false, err
@@ -176,6 +254,13 @@ func (l *schedulerOutboxCleanupLease) Release() {
 	_, _ = l.conn.ExecContext(ctx, "SELECT pg_advisory_unlock(hashtext('scheduler_outbox_cleanup'))")
 	_ = l.conn.Close()
 	l.conn = nil
+}
+
+func (l *personalSchedulerOutboxCleanupLease) Release() {
+	if l == nil {
+		return
+	}
+	l.once.Do(func() { personalSchedulerOutboxCleanupMu.Unlock() })
 }
 
 func enqueueSchedulerOutbox(ctx context.Context, exec sqlExecutor, eventType string, accountID *int64, groupID *int64, payload any) error {

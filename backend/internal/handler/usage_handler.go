@@ -24,24 +24,20 @@ type userUsageFilters struct {
 }
 
 type userModelStat struct {
-	Model               string  `json:"model"`
-	Requests            int64   `json:"requests"`
-	InputTokens         int64   `json:"input_tokens"`
-	OutputTokens        int64   `json:"output_tokens"`
-	CacheCreationTokens int64   `json:"cache_creation_tokens"`
-	CacheReadTokens     int64   `json:"cache_read_tokens"`
-	TotalTokens         int64   `json:"total_tokens"`
-	Cost                float64 `json:"cost"`
-	ActualCost          float64 `json:"actual_cost"`
+	Model               string `json:"model"`
+	Requests            int64  `json:"requests"`
+	InputTokens         int64  `json:"input_tokens"`
+	OutputTokens        int64  `json:"output_tokens"`
+	CacheCreationTokens int64  `json:"cache_creation_tokens"`
+	CacheReadTokens     int64  `json:"cache_read_tokens"`
+	TotalTokens         int64  `json:"total_tokens"`
 }
 
 type userGroupStat struct {
-	GroupID     int64   `json:"group_id"`
-	GroupName   string  `json:"group_name"`
-	Requests    int64   `json:"requests"`
-	TotalTokens int64   `json:"total_tokens"`
-	Cost        float64 `json:"cost"`
-	ActualCost  float64 `json:"actual_cost"`
+	GroupID     int64  `json:"group_id"`
+	GroupName   string `json:"group_name"`
+	Requests    int64  `json:"requests"`
+	TotalTokens int64  `json:"total_tokens"`
 }
 
 // UsageHandler handles usage-related requests
@@ -126,23 +122,6 @@ func (h *UsageHandler) parseUserUsageFilters(c *gin.Context, requireRange bool) 
 		stream = &val
 	}
 
-	var billingType *int8
-	if billingTypeStr := strings.TrimSpace(c.Query("billing_type")); billingTypeStr != "" {
-		val, err := strconv.ParseInt(billingTypeStr, 10, 8)
-		if err != nil {
-			response.BadRequest(c, "Invalid billing_type")
-			return nil, false
-		}
-		bt := int8(val)
-		billingType = &bt
-	}
-
-	billingMode := strings.TrimSpace(c.Query("billing_mode"))
-	if billingMode != "" && !service.BillingMode(billingMode).IsValidUsageFilter() {
-		response.BadRequest(c, "Invalid billing_mode")
-		return nil, false
-	}
-
 	userTZ := c.Query("timezone")
 	now := timezone.NowInUserLocation(userTZ)
 	var startTime, endTime time.Time
@@ -202,8 +181,6 @@ func (h *UsageHandler) parseUserUsageFilters(c *gin.Context, requireRange bool) 
 			ModelFilterSource: usagestats.ModelSourceRequested,
 			RequestType:       requestType,
 			Stream:            stream,
-			BillingType:       billingType,
-			BillingMode:       billingMode,
 			StartTime:         startPtr,
 			EndTime:           endPtr,
 		},
@@ -405,7 +382,6 @@ func (h *UsageHandler) Stats(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
-	stats.TotalAccountCost = nil
 	stats.UpstreamEndpoints = nil
 	stats.EndpointPaths = nil
 
@@ -574,8 +550,6 @@ func userModelStatsFromUsageStats(stats []usagestats.ModelStat) []userModelStat 
 			CacheCreationTokens: stat.CacheCreationTokens,
 			CacheReadTokens:     stat.CacheReadTokens,
 			TotalTokens:         stat.TotalTokens,
-			Cost:                stat.Cost,
-			ActualCost:          stat.ActualCost,
 		})
 	}
 	return out
@@ -589,8 +563,6 @@ func userGroupStatsFromUsageStats(stats []usagestats.GroupStat) []userGroupStat 
 			GroupName:   stat.GroupName,
 			Requests:    stat.Requests,
 			TotalTokens: stat.TotalTokens,
-			Cost:        stat.Cost,
-			ActualCost:  stat.ActualCost,
 		})
 	}
 	return out

@@ -45,6 +45,16 @@ func NewPanelRateLimiter(redisClient *redis.Client, settingService *service.Sett
 	}
 }
 
+// NewPersonalPanelRateLimiter uses the in-process limiter because a Personal
+// runtime is a single local executable rather than a horizontally scaled SaaS
+// deployment.
+func NewPersonalPanelRateLimiter(settingService *service.SettingService) *PanelRateLimiter {
+	return &PanelRateLimiter{
+		limiter:        middleware.NewLocalRateLimiter(),
+		settingService: settingService,
+	}
+}
+
 // Global 认证面板接口的全局按用户限流（宽松档，覆盖所有登录后端点）。
 func (p *PanelRateLimiter) Global() gin.HandlerFunc {
 	return p.userScoped("global", func(s service.PanelRateLimitSettings) int { return s.UserRPM })

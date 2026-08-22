@@ -18,10 +18,8 @@ type usageStatsCacheKeyData struct {
 	AccountID             int64  `json:"account_id"`
 	GroupID               int64  `json:"group_id"`
 	Model                 string `json:"model"`
-	BillingMode           string `json:"billing_mode"`
 	RequestType           *int16 `json:"request_type"`
 	Stream                *bool  `json:"stream"`
-	BillingType           *int8  `json:"billing_type"`
 	UpstreamModelMismatch *bool  `json:"upstream_model_mismatch"`
 }
 
@@ -42,10 +40,8 @@ func usageStatsCacheKey(filters usagestats.UsageLogFilters) string {
 		AccountID:             filters.AccountID,
 		GroupID:               filters.GroupID,
 		Model:                 filters.Model,
-		BillingMode:           filters.BillingMode,
 		RequestType:           filters.RequestType,
 		Stream:                filters.Stream,
-		BillingType:           filters.BillingType,
 		UpstreamModelMismatch: filters.UpstreamModelMismatch,
 	})
 }

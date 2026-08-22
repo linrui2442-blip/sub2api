@@ -321,8 +321,7 @@ func TestOpenAIGatewayService_Forward_WSv2_ImageGenerationCountsOutputs(t *testi
 	c.Set("api_key", &APIKey{
 		GroupID: &groupID,
 		Group: &Group{
-			ID:                   groupID,
-			AllowImageGeneration: true,
+			ID: groupID,
 		},
 	})
 

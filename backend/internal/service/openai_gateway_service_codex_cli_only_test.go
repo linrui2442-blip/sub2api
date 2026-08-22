@@ -370,15 +370,14 @@ func TestOpenAIGatewayService_Forward_LogsInstructionsRequiredDetails(t *testing
 		httpUpstream: upstream,
 	}
 	account := &Account{
-		ID:             1001,
-		Name:           "codex max套餐",
-		Platform:       PlatformOpenAI,
-		Type:           AccountTypeAPIKey,
-		Concurrency:    1,
-		Credentials:    map[string]any{"api_key": "sk-test"},
-		Status:         StatusActive,
-		Schedulable:    true,
-		RateMultiplier: f64p(1),
+		ID:          1001,
+		Name:        "codex max套餐",
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Concurrency: 1,
+		Credentials: map[string]any{"api_key": "sk-test"},
+		Status:      StatusActive,
+		Schedulable: true,
 	}
 	body := []byte(`{"model":"gpt-5.1-codex","stream":false,"input":[{"type":"text","text":"hello"}],"prompt_cache_key":"pc-forward","access_token":"secret-token"}`)
 
@@ -426,15 +425,14 @@ func TestOpenAIGatewayService_Forward_TransientProcessingErrorTriggersFailover(t
 		httpUpstream: upstream,
 	}
 	account := &Account{
-		ID:             1001,
-		Name:           "codex max套餐",
-		Platform:       PlatformOpenAI,
-		Type:           AccountTypeAPIKey,
-		Concurrency:    1,
-		Credentials:    map[string]any{"api_key": "sk-test"},
-		Status:         StatusActive,
-		Schedulable:    true,
-		RateMultiplier: f64p(1),
+		ID:          1001,
+		Name:        "codex max套餐",
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Concurrency: 1,
+		Credentials: map[string]any{"api_key": "sk-test"},
+		Status:      StatusActive,
+		Schedulable: true,
 	}
 	body := []byte(`{"model":"gpt-5.1-codex","stream":false,"input":[{"type":"text","text":"hello"}]}`)
 
@@ -483,9 +481,8 @@ func TestOpenAIGatewayService_Forward_ModelCapacityErrorTriggersFailoverAndSameA
 			"api_key":   "sk-test",
 			"pool_mode": true,
 		},
-		Status:         StatusActive,
-		Schedulable:    true,
-		RateMultiplier: f64p(1),
+		Status:      StatusActive,
+		Schedulable: true,
 	}
 	body := []byte(`{"model":"gpt-5.4","stream":false,"input":[{"type":"text","text":"hello"}]}`)
 

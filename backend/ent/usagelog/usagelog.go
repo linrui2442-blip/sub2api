@@ -36,14 +36,8 @@ const (
 	FieldChannelID = "channel_id"
 	// FieldModelMappingChain holds the string denoting the model_mapping_chain field in the database.
 	FieldModelMappingChain = "model_mapping_chain"
-	// FieldBillingTier holds the string denoting the billing_tier field in the database.
-	FieldBillingTier = "billing_tier"
-	// FieldBillingMode holds the string denoting the billing_mode field in the database.
-	FieldBillingMode = "billing_mode"
 	// FieldGroupID holds the string denoting the group_id field in the database.
 	FieldGroupID = "group_id"
-	// FieldSubscriptionID holds the string denoting the subscription_id field in the database.
-	FieldSubscriptionID = "subscription_id"
 	// FieldInputTokens holds the string denoting the input_tokens field in the database.
 	FieldInputTokens = "input_tokens"
 	// FieldOutputTokens holds the string denoting the output_tokens field in the database.
@@ -56,26 +50,6 @@ const (
 	FieldCacheCreation5mTokens = "cache_creation_5m_tokens"
 	// FieldCacheCreation1hTokens holds the string denoting the cache_creation_1h_tokens field in the database.
 	FieldCacheCreation1hTokens = "cache_creation_1h_tokens"
-	// FieldInputCost holds the string denoting the input_cost field in the database.
-	FieldInputCost = "input_cost"
-	// FieldOutputCost holds the string denoting the output_cost field in the database.
-	FieldOutputCost = "output_cost"
-	// FieldCacheCreationCost holds the string denoting the cache_creation_cost field in the database.
-	FieldCacheCreationCost = "cache_creation_cost"
-	// FieldCacheReadCost holds the string denoting the cache_read_cost field in the database.
-	FieldCacheReadCost = "cache_read_cost"
-	// FieldTotalCost holds the string denoting the total_cost field in the database.
-	FieldTotalCost = "total_cost"
-	// FieldActualCost holds the string denoting the actual_cost field in the database.
-	FieldActualCost = "actual_cost"
-	// FieldRateMultiplier holds the string denoting the rate_multiplier field in the database.
-	FieldRateMultiplier = "rate_multiplier"
-	// FieldLongContextBillingApplied holds the string denoting the long_context_billing_applied field in the database.
-	FieldLongContextBillingApplied = "long_context_billing_applied"
-	// FieldAccountRateMultiplier holds the string denoting the account_rate_multiplier field in the database.
-	FieldAccountRateMultiplier = "account_rate_multiplier"
-	// FieldBillingType holds the string denoting the billing_type field in the database.
-	FieldBillingType = "billing_type"
 	// FieldStream holds the string denoting the stream field in the database.
 	FieldStream = "stream"
 	// FieldDurationMs holds the string denoting the duration_ms field in the database.
@@ -104,8 +78,6 @@ const (
 	FieldVideoResolution = "video_resolution"
 	// FieldVideoDurationSeconds holds the string denoting the video_duration_seconds field in the database.
 	FieldVideoDurationSeconds = "video_duration_seconds"
-	// FieldCacheTTLOverridden holds the string denoting the cache_ttl_overridden field in the database.
-	FieldCacheTTLOverridden = "cache_ttl_overridden"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// EdgeUser holds the string denoting the user edge name in mutations.
@@ -116,8 +88,6 @@ const (
 	EdgeAccount = "account"
 	// EdgeGroup holds the string denoting the group edge name in mutations.
 	EdgeGroup = "group"
-	// EdgeSubscription holds the string denoting the subscription edge name in mutations.
-	EdgeSubscription = "subscription"
 	// Table holds the table name of the usagelog in the database.
 	Table = "usage_logs"
 	// UserTable is the table that holds the user relation/edge.
@@ -148,13 +118,6 @@ const (
 	GroupInverseTable = "groups"
 	// GroupColumn is the table column denoting the group relation/edge.
 	GroupColumn = "group_id"
-	// SubscriptionTable is the table that holds the subscription relation/edge.
-	SubscriptionTable = "usage_logs"
-	// SubscriptionInverseTable is the table name for the UserSubscription entity.
-	// It exists in this package in order to avoid circular dependency with the "usersubscription" package.
-	SubscriptionInverseTable = "user_subscriptions"
-	// SubscriptionColumn is the table column denoting the subscription relation/edge.
-	SubscriptionColumn = "subscription_id"
 )
 
 // Columns holds all SQL columns for usagelog fields.
@@ -171,26 +134,13 @@ var Columns = []string{
 	FieldUpstreamModelMismatch,
 	FieldChannelID,
 	FieldModelMappingChain,
-	FieldBillingTier,
-	FieldBillingMode,
 	FieldGroupID,
-	FieldSubscriptionID,
 	FieldInputTokens,
 	FieldOutputTokens,
 	FieldCacheCreationTokens,
 	FieldCacheReadTokens,
 	FieldCacheCreation5mTokens,
 	FieldCacheCreation1hTokens,
-	FieldInputCost,
-	FieldOutputCost,
-	FieldCacheCreationCost,
-	FieldCacheReadCost,
-	FieldTotalCost,
-	FieldActualCost,
-	FieldRateMultiplier,
-	FieldLongContextBillingApplied,
-	FieldAccountRateMultiplier,
-	FieldBillingType,
 	FieldStream,
 	FieldDurationMs,
 	FieldFirstTokenMs,
@@ -205,7 +155,6 @@ var Columns = []string{
 	FieldVideoCount,
 	FieldVideoResolution,
 	FieldVideoDurationSeconds,
-	FieldCacheTTLOverridden,
 	FieldCreatedAt,
 }
 
@@ -232,10 +181,6 @@ var (
 	UpstreamResponseModelValidator func(string) error
 	// ModelMappingChainValidator is a validator for the "model_mapping_chain" field. It is called by the builders before save.
 	ModelMappingChainValidator func(string) error
-	// BillingTierValidator is a validator for the "billing_tier" field. It is called by the builders before save.
-	BillingTierValidator func(string) error
-	// BillingModeValidator is a validator for the "billing_mode" field. It is called by the builders before save.
-	BillingModeValidator func(string) error
 	// DefaultInputTokens holds the default value on creation for the "input_tokens" field.
 	DefaultInputTokens int
 	// DefaultOutputTokens holds the default value on creation for the "output_tokens" field.
@@ -248,24 +193,6 @@ var (
 	DefaultCacheCreation5mTokens int
 	// DefaultCacheCreation1hTokens holds the default value on creation for the "cache_creation_1h_tokens" field.
 	DefaultCacheCreation1hTokens int
-	// DefaultInputCost holds the default value on creation for the "input_cost" field.
-	DefaultInputCost float64
-	// DefaultOutputCost holds the default value on creation for the "output_cost" field.
-	DefaultOutputCost float64
-	// DefaultCacheCreationCost holds the default value on creation for the "cache_creation_cost" field.
-	DefaultCacheCreationCost float64
-	// DefaultCacheReadCost holds the default value on creation for the "cache_read_cost" field.
-	DefaultCacheReadCost float64
-	// DefaultTotalCost holds the default value on creation for the "total_cost" field.
-	DefaultTotalCost float64
-	// DefaultActualCost holds the default value on creation for the "actual_cost" field.
-	DefaultActualCost float64
-	// DefaultRateMultiplier holds the default value on creation for the "rate_multiplier" field.
-	DefaultRateMultiplier float64
-	// DefaultLongContextBillingApplied holds the default value on creation for the "long_context_billing_applied" field.
-	DefaultLongContextBillingApplied bool
-	// DefaultBillingType holds the default value on creation for the "billing_type" field.
-	DefaultBillingType int8
 	// DefaultStream holds the default value on creation for the "stream" field.
 	DefaultStream bool
 	// UserAgentValidator is a validator for the "user_agent" field. It is called by the builders before save.
@@ -286,8 +213,6 @@ var (
 	DefaultVideoCount int
 	// VideoResolutionValidator is a validator for the "video_resolution" field. It is called by the builders before save.
 	VideoResolutionValidator func(string) error
-	// DefaultCacheTTLOverridden holds the default value on creation for the "cache_ttl_overridden" field.
-	DefaultCacheTTLOverridden bool
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 )
@@ -355,24 +280,9 @@ func ByModelMappingChain(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldModelMappingChain, opts...).ToFunc()
 }
 
-// ByBillingTier orders the results by the billing_tier field.
-func ByBillingTier(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldBillingTier, opts...).ToFunc()
-}
-
-// ByBillingMode orders the results by the billing_mode field.
-func ByBillingMode(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldBillingMode, opts...).ToFunc()
-}
-
 // ByGroupID orders the results by the group_id field.
 func ByGroupID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldGroupID, opts...).ToFunc()
-}
-
-// BySubscriptionID orders the results by the subscription_id field.
-func BySubscriptionID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldSubscriptionID, opts...).ToFunc()
 }
 
 // ByInputTokens orders the results by the input_tokens field.
@@ -403,56 +313,6 @@ func ByCacheCreation5mTokens(opts ...sql.OrderTermOption) OrderOption {
 // ByCacheCreation1hTokens orders the results by the cache_creation_1h_tokens field.
 func ByCacheCreation1hTokens(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCacheCreation1hTokens, opts...).ToFunc()
-}
-
-// ByInputCost orders the results by the input_cost field.
-func ByInputCost(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldInputCost, opts...).ToFunc()
-}
-
-// ByOutputCost orders the results by the output_cost field.
-func ByOutputCost(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldOutputCost, opts...).ToFunc()
-}
-
-// ByCacheCreationCost orders the results by the cache_creation_cost field.
-func ByCacheCreationCost(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldCacheCreationCost, opts...).ToFunc()
-}
-
-// ByCacheReadCost orders the results by the cache_read_cost field.
-func ByCacheReadCost(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldCacheReadCost, opts...).ToFunc()
-}
-
-// ByTotalCost orders the results by the total_cost field.
-func ByTotalCost(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldTotalCost, opts...).ToFunc()
-}
-
-// ByActualCost orders the results by the actual_cost field.
-func ByActualCost(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldActualCost, opts...).ToFunc()
-}
-
-// ByRateMultiplier orders the results by the rate_multiplier field.
-func ByRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldRateMultiplier, opts...).ToFunc()
-}
-
-// ByLongContextBillingApplied orders the results by the long_context_billing_applied field.
-func ByLongContextBillingApplied(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldLongContextBillingApplied, opts...).ToFunc()
-}
-
-// ByAccountRateMultiplier orders the results by the account_rate_multiplier field.
-func ByAccountRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldAccountRateMultiplier, opts...).ToFunc()
-}
-
-// ByBillingType orders the results by the billing_type field.
-func ByBillingType(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldBillingType, opts...).ToFunc()
 }
 
 // ByStream orders the results by the stream field.
@@ -520,11 +380,6 @@ func ByVideoDurationSeconds(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldVideoDurationSeconds, opts...).ToFunc()
 }
 
-// ByCacheTTLOverridden orders the results by the cache_ttl_overridden field.
-func ByCacheTTLOverridden(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldCacheTTLOverridden, opts...).ToFunc()
-}
-
 // ByCreatedAt orders the results by the created_at field.
 func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCreatedAt, opts...).ToFunc()
@@ -557,13 +412,6 @@ func ByGroupField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newGroupStep(), sql.OrderByField(field, opts...))
 	}
 }
-
-// BySubscriptionField orders the results by subscription field.
-func BySubscriptionField(field string, opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newSubscriptionStep(), sql.OrderByField(field, opts...))
-	}
-}
 func newUserStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -590,12 +438,5 @@ func newGroupStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(GroupInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, GroupTable, GroupColumn),
-	)
-}
-func newSubscriptionStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(SubscriptionInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, true, SubscriptionTable, SubscriptionColumn),
 	)
 }

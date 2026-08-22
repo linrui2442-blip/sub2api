@@ -26,26 +26,26 @@ func (r *authCacheInvalidationOutboxRepository) Claim(ctx context.Context, worke
 	if limit <= 0 {
 		limit = 100
 	}
-	leaseSeconds := int64(lease / time.Second)
-	if leaseSeconds < 1 {
-		leaseSeconds = 30
+	if lease < time.Second {
+		lease = 30 * time.Second
 	}
+	now := time.Now().UTC()
+	leaseExpiredAt := now.Add(-lease)
 	rows, err := r.db.QueryContext(ctx, `
-		WITH candidates AS (
+		UPDATE auth_cache_invalidation_outbox
+		SET claimed_at = ?, claimed_by = ?
+		WHERE id IN (
 			SELECT id
 			FROM auth_cache_invalidation_outbox
-			WHERE available_at <= NOW()
-			  AND (claimed_at IS NULL OR claimed_at < NOW() - ($3 * INTERVAL '1 second'))
+			WHERE available_at <= ?
+			  AND (claimed_at IS NULL OR claimed_at < ?)
 			ORDER BY id ASC
-			LIMIT $2
-			FOR UPDATE SKIP LOCKED
+			LIMIT ?
 		)
-		UPDATE auth_cache_invalidation_outbox AS o
-		SET claimed_at = NOW(), claimed_by = $1
-		FROM candidates AS c
-		WHERE o.id = c.id
-		RETURNING o.id, o.cache_key, o.attempts, o.delivery_stage, o.created_at
-	`, workerID, limit, leaseSeconds)
+		  AND available_at <= ?
+		  AND (claimed_at IS NULL OR claimed_at < ?)
+		RETURNING id, cache_key, attempts, delivery_stage, created_at
+	`, now, workerID, now, leaseExpiredAt, limit, now, leaseExpiredAt)
 	if err != nil {
 		return nil, err
 	}

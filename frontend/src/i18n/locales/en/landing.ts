@@ -1,8 +1,4 @@
 export default {
-  batchImageGuide: {
-    title: 'Batch Image Generation',
-    description: 'Submit multiple prompts in one job and download the generated images when complete'
-  },
   // Home Page
   home: {
     viewOnGithub: 'View on GitHub',
@@ -117,7 +113,7 @@ export default {
   // Key Usage Query Page
   keyUsage: {
     title: 'API Key Usage',
-    subtitle: 'Enter your API Key to view real-time spending and usage status',
+    subtitle: 'Enter your API Key to view its usage and access status',
     placeholder: 'sk-ant-mirror-xxxxxxxxxxxx',
     query: 'Query',
     querying: 'Querying...',
@@ -147,14 +143,12 @@ export default {
     cost: 'Cost',
     // Status
     quotaMode: 'Key Quota Mode',
-    walletBalance: 'Wallet Balance',
+    personalEdition: 'Personal Private Edition',
     // Ring card titles
     totalQuota: 'Total Quota',
     limit5h: '5-Hour Limit',
     limitDaily: 'Daily Limit',
     limit7d: '7-Day Limit',
-    limitWeekly: 'Weekly Limit',
-    limitMonthly: 'Monthly Limit',
     // Detail rows
     remainingQuota: 'Remaining Quota',
     expiresAt: 'Expires At',
@@ -162,8 +156,8 @@ export default {
     daysLeft: '({days} days)',
     usedQuota: 'Used Quota',
     resetNow: 'Resetting soon',
-    subscriptionType: 'Subscription Type',
-    subscriptionExpires: 'Subscription Expires',
+    accessMode: 'Access Mode',
+    group: 'Group',
     // Usage stat cells
     todayRequests: 'Today Requests',
     todayInputTokens: 'Today Input',

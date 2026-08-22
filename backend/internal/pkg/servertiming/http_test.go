@@ -64,7 +64,7 @@ func TestWrapRoundTripperRecordsResponseHeaderLatency(t *testing.T) {
 
 func TestWrapRoundTripperUsesContextModuleOverride(t *testing.T) {
 	collector := New(time.Now())
-	ctx := WithDependencyModule(WithCollector(context.Background(), collector), "data-managementd")
+	ctx := WithDependencyModule(WithCollector(context.Background(), collector), "local-runtime")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://private.example.test/path", nil)
 	if err != nil {
 		t.Fatal(err)
@@ -77,7 +77,7 @@ func TestWrapRoundTripperUsesContextModuleOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 	header := collector.HeaderValue(time.Now(), "bypass")
-	if !strings.Contains(header, "dep_data_managementd") {
+	if !strings.Contains(header, "dep_local_runtime") {
 		t.Fatalf("module override missing from header: %q", header)
 	}
 	if strings.Contains(header, "private.example") {
@@ -132,7 +132,6 @@ func TestDependencyModuleClassification(t *testing.T) {
 		"https://generativelanguage.googleapis.com/v1/models": "gemini",
 		"https://cloudcode-pa.googleapis.com/v1internal":      "antigravity",
 		"https://storage.googleapis.com/bucket/object":        "google",
-		"https://bucket.s3.amazonaws.com/object":              "s3",
 		"https://api.stripe.com/v1/refunds":                   "payment",
 		"https://dependency.example.test/path":                "http",
 	}

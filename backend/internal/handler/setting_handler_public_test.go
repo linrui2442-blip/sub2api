@@ -57,9 +57,7 @@ func TestSettingHandler_GetPublicSettings_ExposesForceEmailOnThirdPartySignup(t 
 	gin.SetMode(gin.TestMode)
 
 	repo := &settingHandlerPublicRepoStub{
-		values: map[string]string{
-			service.SettingKeyForceEmailOnThirdPartySignup: "true",
-		},
+		values: map[string]string{},
 	}
 	h := NewSettingHandler(service.NewSettingService(repo, &config.Config{}), "test-version")
 
@@ -80,78 +78,4 @@ func TestSettingHandler_GetPublicSettings_ExposesForceEmailOnThirdPartySignup(t 
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &resp))
 	require.Equal(t, 0, resp.Code)
 	require.True(t, resp.Data.ForceEmailOnThirdPartySignup)
-}
-
-func TestSettingHandler_GetPublicSettings_ExposesTencentCaptchaConfiguration(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	repo := &settingHandlerPublicRepoStub{
-		values: map[string]string{
-			service.SettingKeyTencentCaptchaEnabled: "true",
-			service.SettingKeyTencentCaptchaAppID:   "123456789",
-			service.SettingKeyTencentCaptchaRegion:  service.TencentCaptchaRegionINTL,
-		},
-	}
-	h := NewSettingHandler(service.NewSettingService(repo, &config.Config{}), "test-version")
-
-	recorder := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(recorder)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/settings/public", nil)
-
-	h.GetPublicSettings(c)
-
-	require.Equal(t, http.StatusOK, recorder.Code)
-
-	var resp struct {
-		Code int `json:"code"`
-		Data struct {
-			TencentCaptchaEnabled bool   `json:"tencent_captcha_enabled"`
-			TencentCaptchaAppID   string `json:"tencent_captcha_app_id"`
-			TencentCaptchaRegion  string `json:"tencent_captcha_region"`
-		} `json:"data"`
-	}
-	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &resp))
-	require.Equal(t, 0, resp.Code)
-	require.True(t, resp.Data.TencentCaptchaEnabled)
-	require.Equal(t, "123456789", resp.Data.TencentCaptchaAppID)
-	require.Equal(t, service.TencentCaptchaRegionINTL, resp.Data.TencentCaptchaRegion)
-}
-
-func TestSettingHandler_GetPublicSettings_ExposesWeChatOAuthModeCapabilities(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	h := NewSettingHandler(service.NewSettingService(&settingHandlerPublicRepoStub{
-		values: map[string]string{
-			service.SettingKeyWeChatConnectEnabled:             "true",
-			service.SettingKeyWeChatConnectAppID:               "wx-mp-app",
-			service.SettingKeyWeChatConnectAppSecret:           "wx-mp-secret",
-			service.SettingKeyWeChatConnectMode:                "mp",
-			service.SettingKeyWeChatConnectScopes:              "snsapi_base",
-			service.SettingKeyWeChatConnectOpenEnabled:         "true",
-			service.SettingKeyWeChatConnectMPEnabled:           "true",
-			service.SettingKeyWeChatConnectRedirectURL:         "https://api.example.com/api/v1/auth/oauth/wechat/callback",
-			service.SettingKeyWeChatConnectFrontendRedirectURL: "/auth/wechat/callback",
-		},
-	}, &config.Config{}), "test-version")
-
-	recorder := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(recorder)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/settings/public", nil)
-
-	h.GetPublicSettings(c)
-
-	require.Equal(t, http.StatusOK, recorder.Code)
-
-	var resp struct {
-		Code int `json:"code"`
-		Data struct {
-			WeChatOAuthEnabled     bool `json:"wechat_oauth_enabled"`
-			WeChatOAuthOpenEnabled bool `json:"wechat_oauth_open_enabled"`
-			WeChatOAuthMPEnabled   bool `json:"wechat_oauth_mp_enabled"`
-		} `json:"data"`
-	}
-	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &resp))
-	require.Equal(t, 0, resp.Code)
-	require.True(t, resp.Data.WeChatOAuthEnabled)
-	require.True(t, resp.Data.WeChatOAuthOpenEnabled)
-	require.True(t, resp.Data.WeChatOAuthMPEnabled)
 }

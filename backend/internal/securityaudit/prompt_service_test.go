@@ -42,7 +42,7 @@ func TestPromptServiceHasExplicitIdempotentLifecycle(t *testing.T) {
 	}}, nil, prefixEncryptor{}, testTotpKeyConfig())
 	service := NewPromptService(
 		config,
-		NewPostgreSQLRepository(nil),
+		NewSQLRepository(nil),
 		NewRedisPayloadStore(nil),
 		NewOpenAICompatibleScanner(),
 		NewAtomicMetrics(),

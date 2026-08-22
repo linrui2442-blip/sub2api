@@ -57,7 +57,7 @@ func TestPromptRuntimeAggregatesConfigWorkersQueueRedisEndpointsAndGuardMetrics(
 	metrics.IncDropped()
 	service := NewPromptService(
 		config,
-		NewPostgreSQLRepository(db),
+		NewSQLRepository(db),
 		NewRedisPayloadStore(client),
 		NewOpenAICompatibleScanner(),
 		metrics,

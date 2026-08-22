@@ -14,8 +14,6 @@ type User struct {
 	Email         string     `json:"email"`
 	Username      string     `json:"username"`
 	Role          string     `json:"role"`
-	Balance       float64    `json:"balance"`
-	FrozenBalance float64    `json:"frozen_balance"`
 	Concurrency   int        `json:"concurrency"`
 	Status        string     `json:"status"`
 	AllowedGroups []int64    `json:"allowed_groups"`
@@ -24,18 +22,10 @@ type User struct {
 	UpdatedAt     time.Time  `json:"updated_at"`
 	DeletedAt     *time.Time `json:"deleted_at,omitempty"`
 
-	// 余额不足通知
-	BalanceNotifyEnabled       bool               `json:"balance_notify_enabled"`
-	BalanceNotifyThresholdType string             `json:"balance_notify_threshold_type"`
-	BalanceNotifyThreshold     *float64           `json:"balance_notify_threshold"`
-	BalanceNotifyExtraEmails   []NotifyEmailEntry `json:"balance_notify_extra_emails"`
-	TotalRecharged             float64            `json:"total_recharged"`
-
 	// RPMLimit 用户级每分钟请求数上限（0 = 不限制），仅在所用分组未设置 rpm_limit 时作为兜底生效。
 	RPMLimit int `json:"rpm_limit"`
 
-	APIKeys       []APIKey           `json:"api_keys,omitempty"`
-	Subscriptions []UserSubscription `json:"subscriptions,omitempty"`
+	APIKeys []APIKey `json:"api_keys,omitempty"`
 }
 
 // AdminUser 是管理员接口使用的 user DTO（包含敏感/内部字段）。
@@ -45,9 +35,6 @@ type AdminUser struct {
 
 	Notes      string     `json:"notes"`
 	LastUsedAt *time.Time `json:"last_used_at"`
-	// GroupRates 用户专属分组倍率配置
-	// map[groupID]rateMultiplier
-	GroupRates map[int64]float64 `json:"group_rates,omitempty"`
 }
 
 type APIKey struct {
@@ -88,48 +75,12 @@ type APIKey struct {
 }
 
 type Group struct {
-	ID             int64   `json:"id"`
-	Name           string  `json:"name"`
-	Description    string  `json:"description"`
-	Platform       string  `json:"platform"`
-	RateMultiplier float64 `json:"rate_multiplier"`
-	IsExclusive    bool    `json:"is_exclusive"`
-	Status         string  `json:"status"`
-
-	SubscriptionType          string   `json:"subscription_type"`
-	DailyLimitUSD             *float64 `json:"daily_limit_usd"`
-	WeeklyLimitUSD            *float64 `json:"weekly_limit_usd"`
-	MonthlyLimitUSD           *float64 `json:"monthly_limit_usd"`
-	LongContextPricingEnabled bool     `json:"long_context_pricing_enabled"`
-
-	// 图片生成计费配置（仅 antigravity 平台使用）
-	AllowImageGeneration         bool    `json:"allow_image_generation"`
-	AllowBatchImageGeneration    bool    `json:"allow_batch_image_generation"`
-	ImageRateIndependent         bool    `json:"image_rate_independent"`
-	ImageRateMultiplier          float64 `json:"image_rate_multiplier"`
-	BatchImageDiscountMultiplier float64 `json:"batch_image_discount_multiplier"`
-	BatchImageHoldMultiplier     float64 `json:"batch_image_hold_multiplier"`
-	VideoRateIndependent         bool    `json:"video_rate_independent"`
-	VideoRateMultiplier          float64 `json:"video_rate_multiplier"`
-	// 高峰时段倍率配置
-	PeakRateEnabled    bool     `json:"peak_rate_enabled"`
-	PeakStart          string   `json:"peak_start"`
-	PeakEnd            string   `json:"peak_end"`
-	PeakRateMultiplier float64  `json:"peak_rate_multiplier"`
-	ImagePrice1K       *float64 `json:"image_price_1k"`
-	ImagePrice2K       *float64 `json:"image_price_2k"`
-	ImagePrice4K       *float64 `json:"image_price_4k"`
-	VideoPrice480P     *float64 `json:"video_price_480p"`
-	VideoPrice720P     *float64 `json:"video_price_720p"`
-	VideoPrice1080P    *float64 `json:"video_price_1080p"`
-	// VideoModelPrices 可选按模型族×分辨率覆盖视频每秒单价 (USD/s)。
-	VideoModelPrices map[string]map[string]float64 `json:"video_model_prices,omitempty"`
-	// Codex alpha/search 网页搜索单次价格（USD/次）；null 表示使用默认价 0.01
-	WebSearchPricePerCall        *float64 `json:"web_search_price_per_call"`
-	SearchPricePer1k             *float64 `json:"search_price_per_1k"`
-	AudioRealtimePricePerMin     *float64 `json:"audio_realtime_price_per_min"`
-	AudioTtsPricePerMillionChars *float64 `json:"audio_tts_price_per_million_chars"`
-	AudioSttPricePerHour         *float64 `json:"audio_stt_price_per_hour"`
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Platform    string `json:"platform"`
+	IsExclusive bool   `json:"is_exclusive"`
+	Status      string `json:"status"`
 
 	// Claude Code 客户端限制
 	ClaudeCodeOnly  bool   `json:"claude_code_only"`
@@ -161,14 +112,6 @@ type Group struct {
 // 注意：普通用户接口不得返回 model_routing/account_count/account_groups 等内部信息。
 type AdminGroup struct {
 	Group
-
-	// 分组利润控制（五个 token 平台分组可启用；margin/buffer 为小数存储）。
-	// 仅管理员可见：这三个字段与同响应中的 rate_multiplier 相乘即可反推出
-	// 运营方的上游成本上限，属于内部经营信息，不得下放到 dto.Group。
-	ProfitControlEnabled bool                          `json:"profit_control_enabled"`
-	ProfitMinMargin      float64                       `json:"profit_min_margin"`
-	ProfitSafetyBuffer   float64                       `json:"profit_safety_buffer"`
-	ModelPricing         []service.ChannelModelPricing `json:"model_pricing"`
 
 	// 模型路由配置（仅 anthropic 平台使用）
 	ModelRouting        map[string][]int64 `json:"model_routing"`
@@ -211,7 +154,6 @@ type Account struct {
 	Concurrency             int                            `json:"concurrency"`
 	LoadFactor              *int                           `json:"load_factor,omitempty"`
 	Priority                int                            `json:"priority"`
-	RateMultiplier          float64                        `json:"rate_multiplier"`
 	Status                  string                         `json:"status"`
 	ErrorMessage            string                         `json:"error_message"`
 	LastUsedAt              *time.Time                     `json:"last_used_at"`
@@ -286,14 +228,6 @@ type Account struct {
 	QuotaResetTimezone   *string `json:"quota_reset_timezone,omitempty"`
 	QuotaDailyResetAt    *string `json:"quota_daily_reset_at,omitempty"`
 	QuotaWeeklyResetAt   *string `json:"quota_weekly_reset_at,omitempty"`
-
-	// 配额通知配置
-	QuotaNotifyDailyEnabled    *bool    `json:"quota_notify_daily_enabled,omitempty"`
-	QuotaNotifyDailyThreshold  *float64 `json:"quota_notify_daily_threshold,omitempty"`
-	QuotaNotifyWeeklyEnabled   *bool    `json:"quota_notify_weekly_enabled,omitempty"`
-	QuotaNotifyWeeklyThreshold *float64 `json:"quota_notify_weekly_threshold,omitempty"`
-	QuotaNotifyTotalEnabled    *bool    `json:"quota_notify_total_enabled,omitempty"`
-	QuotaNotifyTotalThreshold  *float64 `json:"quota_notify_total_threshold,omitempty"`
 
 	// 影子账号关系（spark 维度影子）
 	ParentAccountID *int64 `json:"parent_account_id,omitempty"`
@@ -393,36 +327,6 @@ type ProxyAccountSummary struct {
 	Notes    *string `json:"notes,omitempty"`
 }
 
-type RedeemCode struct {
-	ID        int64      `json:"id"`
-	Code      string     `json:"code"`
-	Type      string     `json:"type"`
-	Value     float64    `json:"value"`
-	Status    string     `json:"status"`
-	UsedBy    *int64     `json:"used_by"`
-	UsedAt    *time.Time `json:"used_at"`
-	CreatedAt time.Time  `json:"created_at"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-
-	GroupID      *int64 `json:"group_id"`
-	ValidityDays int    `json:"validity_days"`
-
-	// Notes is only populated for admin_balance/admin_concurrency types
-	// so users can see why they were charged or credited
-	Notes *string `json:"notes,omitempty"`
-
-	User  *User  `json:"user,omitempty"`
-	Group *Group `json:"group,omitempty"`
-}
-
-// AdminRedeemCode 是管理员接口使用的 redeem code DTO（包含 notes 等字段）。
-// 注意：普通用户接口不得返回 notes 等内部信息。
-type AdminRedeemCode struct {
-	RedeemCode
-
-	Notes string `json:"notes"`
-}
-
 type NullableTimeField struct {
 	Set   bool
 	Value *time.Time
@@ -461,21 +365,6 @@ func (f *NullableInt64Field) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type BatchUpdateRedeemCodeFields struct {
-	Status    *string            `json:"status,omitempty"`
-	ExpiresAt NullableTimeField  `json:"expires_at,omitempty"`
-	Notes     *string            `json:"notes,omitempty"`
-	GroupID   NullableInt64Field `json:"group_id,omitempty"`
-
-	Type  *string  `json:"type,omitempty"`
-	Value *float64 `json:"value,omitempty"`
-}
-
-type BatchUpdateRedeemCodesRequest struct {
-	IDs    []int64                     `json:"ids" binding:"required,min=1"`
-	Fields BatchUpdateRedeemCodeFields `json:"fields" binding:"required"`
-}
-
 // UsageLog 是普通用户接口使用的 usage log DTO（不包含管理员字段）。
 type UsageLog struct {
 	ID        int64  `json:"id"`
@@ -484,7 +373,7 @@ type UsageLog struct {
 	AccountID int64  `json:"account_id"`
 	RequestID string `json:"request_id"`
 	Model     string `json:"model"`
-	// ServiceTier records the OpenAI service tier used for billing, e.g. "priority" / "flex".
+	// ServiceTier records the OpenAI service tier reported for the request, e.g. "priority" / "flex".
 	ServiceTier *string `json:"service_tier,omitempty"`
 	// ReasoningEffort is the request's reasoning effort level.
 	// OpenAI: "low"/"medium"/"high"/"xhigh"; Claude: "low"/"medium"/"high"/"max".
@@ -494,8 +383,7 @@ type UsageLog struct {
 	// UpstreamEndpoint is the normalized upstream endpoint path, e.g. /v1/responses.
 	UpstreamEndpoint *string `json:"upstream_endpoint,omitempty"`
 
-	GroupID        *int64 `json:"group_id"`
-	SubscriptionID *int64 `json:"subscription_id"`
+	GroupID *int64 `json:"group_id"`
 
 	InputTokens         int `json:"input_tokens"`
 	OutputTokens        int `json:"output_tokens"`
@@ -505,16 +393,6 @@ type UsageLog struct {
 	CacheCreation5mTokens int `json:"cache_creation_5m_tokens"`
 	CacheCreation1hTokens int `json:"cache_creation_1h_tokens"`
 
-	InputCost                 float64 `json:"input_cost"`
-	OutputCost                float64 `json:"output_cost"`
-	CacheCreationCost         float64 `json:"cache_creation_cost"`
-	CacheReadCost             float64 `json:"cache_read_cost"`
-	TotalCost                 float64 `json:"total_cost"`
-	ActualCost                float64 `json:"actual_cost"`
-	RateMultiplier            float64 `json:"rate_multiplier"`
-	LongContextBillingApplied bool    `json:"long_context_billing_applied"`
-
-	BillingType  int8   `json:"billing_type"`
 	RequestType  string `json:"request_type"`
 	Stream       bool   `json:"stream"`
 	OpenAIWSMode bool   `json:"openai_ws_mode"`
@@ -527,9 +405,7 @@ type UsageLog struct {
 	ImageInputSize     *string        `json:"image_input_size"`
 	ImageOutputSize    *string        `json:"image_output_size"`
 	ImageInputTokens   int            `json:"image_input_tokens"`
-	ImageInputCost     float64        `json:"image_input_cost"`
 	ImageOutputTokens  int            `json:"image_output_tokens"`
-	ImageOutputCost    float64        `json:"image_output_cost"`
 	ImageSizeSource    *string        `json:"image_size_source"`
 	ImageSizeBreakdown map[string]int `json:"image_size_breakdown"`
 	MediaType          *string        `json:"media_type"`
@@ -542,18 +418,11 @@ type UsageLog struct {
 	// (e.g. the session_id / X-Session-Id headers). Omitted when absent.
 	SessionID *string `json:"session_id,omitempty"`
 
-	// Cache TTL Override 标记
-	CacheTTLOverridden bool `json:"cache_ttl_overridden"`
-
-	// BillingMode 计费模式：token/image
-	BillingMode *string `json:"billing_mode,omitempty"`
-
 	CreatedAt time.Time `json:"created_at"`
 
-	User         *User             `json:"user,omitempty"`
-	APIKey       *APIKey           `json:"api_key,omitempty"`
-	Group        *Group            `json:"group,omitempty"`
-	Subscription *UserSubscription `json:"subscription,omitempty"`
+	User   *User   `json:"user,omitempty"`
+	APIKey *APIKey `json:"api_key,omitempty"`
+	Group  *Group  `json:"group,omitempty"`
 }
 
 // AdminUsageLog 是管理员接口使用的 usage log DTO（包含管理员字段）。
@@ -572,14 +441,6 @@ type AdminUsageLog struct {
 	ChannelID *int64 `json:"channel_id,omitempty"`
 	// ModelMappingChain 模型映射链，如 "a→b→c"
 	ModelMappingChain *string `json:"model_mapping_chain,omitempty"`
-	// BillingTier 计费层级标签（per_request/image 模式）
-	BillingTier *string `json:"billing_tier,omitempty"`
-
-	// AccountRateMultiplier 账号计费倍率快照（nil 表示按 1.0 处理）
-	AccountRateMultiplier *float64 `json:"account_rate_multiplier"`
-	// AccountStatsCost 自定义定价规则计算的账号统计费用（nil 表示使用默认公式）
-	AccountStatsCost *float64 `json:"account_stats_cost,omitempty"`
-
 	// IPAddress 用户请求 IP
 	IPAddress *string `json:"ip_address,omitempty"`
 
@@ -597,7 +458,6 @@ type UsageCleanupFilters struct {
 	Model       *string   `json:"model,omitempty"`
 	RequestType *string   `json:"request_type,omitempty"`
 	Stream      *bool     `json:"stream,omitempty"`
-	BillingType *int8     `json:"billing_type,omitempty"`
 }
 
 type UsageCleanupTask struct {
@@ -627,76 +487,4 @@ type Setting struct {
 	Key       string    `json:"key"`
 	Value     string    `json:"value"`
 	UpdatedAt time.Time `json:"updated_at"`
-}
-
-type UserSubscription struct {
-	ID      int64 `json:"id"`
-	UserID  int64 `json:"user_id"`
-	GroupID int64 `json:"group_id"`
-
-	StartsAt  time.Time `json:"starts_at"`
-	ExpiresAt time.Time `json:"expires_at"`
-	Status    string    `json:"status"`
-
-	DailyWindowStart   *time.Time `json:"daily_window_start"`
-	WeeklyWindowStart  *time.Time `json:"weekly_window_start"`
-	MonthlyWindowStart *time.Time `json:"monthly_window_start"`
-
-	DailyUsageUSD   float64 `json:"daily_usage_usd"`
-	WeeklyUsageUSD  float64 `json:"weekly_usage_usd"`
-	MonthlyUsageUSD float64 `json:"monthly_usage_usd"`
-
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	RevokedAt *time.Time `json:"revoked_at,omitempty"`
-
-	User  *User  `json:"user,omitempty"`
-	Group *Group `json:"group,omitempty"`
-}
-
-// AdminUserSubscription 是管理员接口使用的订阅 DTO（包含分配信息/备注等字段）。
-// 注意：普通用户接口不得返回 assigned_by/assigned_at/notes/assigned_by_user 等管理员字段。
-type AdminUserSubscription struct {
-	UserSubscription
-
-	AssignedBy *int64    `json:"assigned_by"`
-	AssignedAt time.Time `json:"assigned_at"`
-	Notes      string    `json:"notes"`
-
-	AssignedByUser *User `json:"assigned_by_user,omitempty"`
-}
-
-type BulkAssignResult struct {
-	SuccessCount  int                     `json:"success_count"`
-	CreatedCount  int                     `json:"created_count"`
-	ReusedCount   int                     `json:"reused_count"`
-	FailedCount   int                     `json:"failed_count"`
-	Subscriptions []AdminUserSubscription `json:"subscriptions"`
-	Errors        []string                `json:"errors"`
-	Statuses      map[string]string       `json:"statuses,omitempty"`
-}
-
-// PromoCode 注册优惠码
-type PromoCode struct {
-	ID          int64      `json:"id"`
-	Code        string     `json:"code"`
-	BonusAmount float64    `json:"bonus_amount"`
-	MaxUses     int        `json:"max_uses"`
-	UsedCount   int        `json:"used_count"`
-	Status      string     `json:"status"`
-	ExpiresAt   *time.Time `json:"expires_at"`
-	Notes       string     `json:"notes"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
-}
-
-// PromoCodeUsage 优惠码使用记录
-type PromoCodeUsage struct {
-	ID          int64     `json:"id"`
-	PromoCodeID int64     `json:"promo_code_id"`
-	UserID      int64     `json:"user_id"`
-	BonusAmount float64   `json:"bonus_amount"`
-	UsedAt      time.Time `json:"used_at"`
-
-	User *User `json:"user,omitempty"`
 }

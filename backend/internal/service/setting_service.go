@@ -12,7 +12,6 @@ import (
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 	"golang.org/x/sync/singleflight"
-	"sync"
 )
 
 const (
@@ -106,24 +105,12 @@ type SettingRepository interface {
 	Delete(ctx context.Context, key string) error
 }
 
-// DefaultSubscriptionGroupReader validates group references used by default subscriptions.
-type DefaultSubscriptionGroupReader interface {
-	GetByID(ctx context.Context, id int64) (*Group, error)
-}
-
-// WebSearchManagerBuilder creates a websearch.Manager from config (injected by infra layer).
-// proxyURLs maps proxy ID to resolved URL for provider-level proxy support.
-type WebSearchManagerBuilder func(cfg *WebSearchEmulationConfig, proxyURLs map[int64]string)
-
 // SettingService 系统设置服务
 type SettingService struct {
 	settingRepo                 SettingRepository
-	defaultSubGroupReader       DefaultSubscriptionGroupReader
-	proxyRepo                   ProxyRepository // for resolving websearch provider proxy URLs
 	cfg                         *config.Config
-	onUpdate                    func() // Callback when settings are updated (for cache invalidation)
-	version                     string // Application version
-	webSearchManagerBuilder     WebSearchManagerBuilder
+	onUpdate                    func()       // Callback when settings are updated (for cache invalidation)
+	version                     string       // Application version
 	antigravityUAVersionCache   atomic.Value // *cachedAntigravityUserAgentVersion
 	antigravityUAVersionSF      singleflight.Group
 	openAICodexUACache          atomic.Value // *cachedOpenAICodexUserAgent
@@ -149,135 +136,11 @@ type SettingService struct {
 	// instance owns its own cache, no shared package-level state.
 	openAIQuotaAutoPauseSettingsCache atomic.Value // *cachedOpenAIQuotaAutoPauseSettings
 	openAIQuotaAutoPauseSettingsSF    singleflight.Group
-
-	channelMonitorRuntimeListenersMu sync.Mutex
-	channelMonitorRuntimeListeners   []func()
 }
-
-// DefaultPlatformQuotaSetting 单 platform 三档限额（nil = 沿用上层；0 = 显式禁用；>0 = 上限）
-type DefaultPlatformQuotaSetting struct {
-	DailyLimitUSD   *float64 `json:"daily"`
-	WeeklyLimitUSD  *float64 `json:"weekly"`
-	MonthlyLimitUSD *float64 `json:"monthly"`
-}
-
-type ProviderDefaultGrantSettings struct {
-	Balance          float64
-	Concurrency      int
-	Subscriptions    []DefaultSubscriptionSetting
-	GrantOnSignup    bool
-	GrantOnFirstBind bool
-	PlatformQuotas   map[string]*DefaultPlatformQuotaSetting // key = platform name
-}
-
-type AuthSourceDefaultSettings struct {
-	Email                        ProviderDefaultGrantSettings
-	LinuxDo                      ProviderDefaultGrantSettings
-	OIDC                         ProviderDefaultGrantSettings
-	WeChat                       ProviderDefaultGrantSettings
-	GitHub                       ProviderDefaultGrantSettings
-	Google                       ProviderDefaultGrantSettings
-	DingTalk                     ProviderDefaultGrantSettings
-	ForceEmailOnThirdPartySignup bool
-}
-
-type authSourceDefaultKeySet struct {
-	// source 是 auth source 标识（如 "email"、"github"），仅用于 parse 时
-	// slog.Warn 诊断输出，不再参与 key 拼接（platformQuotas 字段已存完整 key）。
-	source           string
-	balance          string
-	concurrency      string
-	subscriptions    string
-	grantOnSignup    string
-	grantOnFirstBind string
-	platformQuotas   string // SettingKeyAuthSourcePlatformQuotas(source)
-}
-
-var (
-	emailAuthSourceDefaultKeys = authSourceDefaultKeySet{
-		source:           "email",
-		balance:          SettingKeyAuthSourceDefaultEmailBalance,
-		concurrency:      SettingKeyAuthSourceDefaultEmailConcurrency,
-		subscriptions:    SettingKeyAuthSourceDefaultEmailSubscriptions,
-		grantOnSignup:    SettingKeyAuthSourceDefaultEmailGrantOnSignup,
-		grantOnFirstBind: SettingKeyAuthSourceDefaultEmailGrantOnFirstBind,
-		platformQuotas:   SettingKeyAuthSourcePlatformQuotas("email"),
-	}
-	linuxDoAuthSourceDefaultKeys = authSourceDefaultKeySet{
-		source:           "linuxdo",
-		balance:          SettingKeyAuthSourceDefaultLinuxDoBalance,
-		concurrency:      SettingKeyAuthSourceDefaultLinuxDoConcurrency,
-		subscriptions:    SettingKeyAuthSourceDefaultLinuxDoSubscriptions,
-		grantOnSignup:    SettingKeyAuthSourceDefaultLinuxDoGrantOnSignup,
-		grantOnFirstBind: SettingKeyAuthSourceDefaultLinuxDoGrantOnFirstBind,
-		platformQuotas:   SettingKeyAuthSourcePlatformQuotas("linuxdo"),
-	}
-	oidcAuthSourceDefaultKeys = authSourceDefaultKeySet{
-		source:           "oidc",
-		balance:          SettingKeyAuthSourceDefaultOIDCBalance,
-		concurrency:      SettingKeyAuthSourceDefaultOIDCConcurrency,
-		subscriptions:    SettingKeyAuthSourceDefaultOIDCSubscriptions,
-		grantOnSignup:    SettingKeyAuthSourceDefaultOIDCGrantOnSignup,
-		grantOnFirstBind: SettingKeyAuthSourceDefaultOIDCGrantOnFirstBind,
-		platformQuotas:   SettingKeyAuthSourcePlatformQuotas("oidc"),
-	}
-	weChatAuthSourceDefaultKeys = authSourceDefaultKeySet{
-		source:           "wechat",
-		balance:          SettingKeyAuthSourceDefaultWeChatBalance,
-		concurrency:      SettingKeyAuthSourceDefaultWeChatConcurrency,
-		subscriptions:    SettingKeyAuthSourceDefaultWeChatSubscriptions,
-		grantOnSignup:    SettingKeyAuthSourceDefaultWeChatGrantOnSignup,
-		grantOnFirstBind: SettingKeyAuthSourceDefaultWeChatGrantOnFirstBind,
-		platformQuotas:   SettingKeyAuthSourcePlatformQuotas("wechat"),
-	}
-	gitHubAuthSourceDefaultKeys = authSourceDefaultKeySet{
-		source:           "github",
-		balance:          SettingKeyAuthSourceDefaultGitHubBalance,
-		concurrency:      SettingKeyAuthSourceDefaultGitHubConcurrency,
-		subscriptions:    SettingKeyAuthSourceDefaultGitHubSubscriptions,
-		grantOnSignup:    SettingKeyAuthSourceDefaultGitHubGrantOnSignup,
-		grantOnFirstBind: SettingKeyAuthSourceDefaultGitHubGrantOnFirstBind,
-		platformQuotas:   SettingKeyAuthSourcePlatformQuotas("github"),
-	}
-	googleAuthSourceDefaultKeys = authSourceDefaultKeySet{
-		source:           "google",
-		balance:          SettingKeyAuthSourceDefaultGoogleBalance,
-		concurrency:      SettingKeyAuthSourceDefaultGoogleConcurrency,
-		subscriptions:    SettingKeyAuthSourceDefaultGoogleSubscriptions,
-		grantOnSignup:    SettingKeyAuthSourceDefaultGoogleGrantOnSignup,
-		grantOnFirstBind: SettingKeyAuthSourceDefaultGoogleGrantOnFirstBind,
-		platformQuotas:   SettingKeyAuthSourcePlatformQuotas("google"),
-	}
-	dingTalkAuthSourceDefaultKeys = authSourceDefaultKeySet{
-		source:           "dingtalk",
-		balance:          SettingKeyAuthSourceDefaultDingTalkBalance,
-		concurrency:      SettingKeyAuthSourceDefaultDingTalkConcurrency,
-		subscriptions:    SettingKeyAuthSourceDefaultDingTalkSubscriptions,
-		grantOnSignup:    SettingKeyAuthSourceDefaultDingTalkGrantOnSignup,
-		grantOnFirstBind: SettingKeyAuthSourceDefaultDingTalkGrantOnFirstBind,
-		platformQuotas:   SettingKeyAuthSourcePlatformQuotas("dingtalk"),
-	}
-)
 
 const (
-	defaultAuthSourceBalance     = 0
-	defaultAuthSourceConcurrency = 5
-	defaultWeChatConnectMode     = "open"
-	defaultWeChatConnectScopes   = "snsapi_login"
-	defaultWeChatConnectFrontend = "/auth/wechat/callback"
-	defaultGitHubOAuthAuthorize  = "https://github.com/login/oauth/authorize"
-	defaultGitHubOAuthToken      = "https://github.com/login/oauth/access_token"
-	defaultGitHubOAuthUserInfo   = "https://api.github.com/user"
-	defaultGitHubOAuthEmails     = "https://api.github.com/user/emails"
-	defaultGitHubOAuthScopes     = "read:user user:email"
-	defaultGitHubOAuthFrontend   = "/auth/oauth/callback"
-	defaultGoogleOAuthAuthorize  = "https://accounts.google.com/o/oauth2/v2/auth"
-	defaultGoogleOAuthToken      = "https://oauth2.googleapis.com/token"
-	defaultGoogleOAuthUserInfo   = "https://openidconnect.googleapis.com/v1/userinfo"
-	defaultGoogleOAuthScopes     = "openid email profile"
-	defaultGoogleOAuthFrontend   = "/auth/oauth/callback"
-	defaultLoginAgreementMode    = "modal"
-	defaultLoginAgreementDate    = "2026-03-31"
+	defaultLoginAgreementMode = "modal"
+	defaultLoginAgreementDate = "2026-03-31"
 )
 
 // NewSettingService 创建系统设置服务实例
@@ -286,16 +149,6 @@ func NewSettingService(settingRepo SettingRepository, cfg *config.Config) *Setti
 		settingRepo: settingRepo,
 		cfg:         cfg,
 	}
-}
-
-// SetDefaultSubscriptionGroupReader injects an optional group reader for default subscription validation.
-func (s *SettingService) SetDefaultSubscriptionGroupReader(reader DefaultSubscriptionGroupReader) {
-	s.defaultSubGroupReader = reader
-}
-
-// SetProxyRepository injects a proxy repo for resolving websearch provider proxy URLs.
-func (s *SettingService) SetProxyRepository(repo ProxyRepository) {
-	s.proxyRepo = repo
 }
 
 func (s *SettingService) LoadForwardedClientIPSettings(ctx context.Context) error {
@@ -374,52 +227,6 @@ func (s *SettingService) GetAllSettings(ctx context.Context) (*SystemSettings, e
 // This is used for cache invalidation (e.g., HTML cache in frontend server)
 func (s *SettingService) SetOnUpdateCallback(callback func()) {
 	s.onUpdate = callback
-}
-
-// SubscribeChannelMonitorRuntime registers a listener that is invoked after
-// settings are successfully persisted (and process caches refreshed).
-// Used by ChannelMonitorRunner / ChannelMonitorV2Aggregator for immediate
-// mode flips without waiting for poll intervals.
-func (s *SettingService) SubscribeChannelMonitorRuntime(listener func()) (unsubscribe func()) {
-	if s == nil || listener == nil {
-		return func() {}
-	}
-	s.channelMonitorRuntimeListenersMu.Lock()
-	s.channelMonitorRuntimeListeners = append(s.channelMonitorRuntimeListeners, listener)
-	idx := len(s.channelMonitorRuntimeListeners) - 1
-	s.channelMonitorRuntimeListenersMu.Unlock()
-	return func() {
-		s.channelMonitorRuntimeListenersMu.Lock()
-		defer s.channelMonitorRuntimeListenersMu.Unlock()
-		if idx < 0 || idx >= len(s.channelMonitorRuntimeListeners) {
-			return
-		}
-		s.channelMonitorRuntimeListeners[idx] = nil
-	}
-}
-
-func (s *SettingService) notifyChannelMonitorRuntimeListeners() {
-	if s == nil {
-		return
-	}
-	s.channelMonitorRuntimeListenersMu.Lock()
-	listeners := make([]func(), 0, len(s.channelMonitorRuntimeListeners))
-	for _, l := range s.channelMonitorRuntimeListeners {
-		if l != nil {
-			listeners = append(listeners, l)
-		}
-	}
-	s.channelMonitorRuntimeListenersMu.Unlock()
-	for _, l := range listeners {
-		func(fn func()) {
-			defer func() {
-				if recovered := recover(); recovered != nil {
-					_ = recovered // keep settings path healthy
-				}
-			}()
-			fn()
-		}(l)
-	}
 }
 
 // SetVersion sets the application version for injection into public settings

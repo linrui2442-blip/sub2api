@@ -35,8 +35,6 @@ func (r *dashboardUsageRepoCacheProbe) GetUsageTrendWithFilters(
 		Date:        "2026-03-11",
 		Requests:    1,
 		TotalTokens: 2,
-		Cost:        3,
-		ActualCost:  4,
 	}}, nil
 }
 
@@ -48,13 +46,11 @@ func (r *dashboardUsageRepoCacheProbe) GetUserUsageTrend(
 ) ([]usagestats.UserUsageTrendPoint, error) {
 	r.usersTrendCalls.Add(1)
 	return []usagestats.UserUsageTrendPoint{{
-		Date:       "2026-03-11",
-		UserID:     1,
-		Email:      "cache@test.dev",
-		Requests:   2,
-		Tokens:     20,
-		Cost:       2,
-		ActualCost: 1,
+		Date:     "2026-03-11",
+		UserID:   1,
+		Email:    "cache@test.dev",
+		Requests: 2,
+		Tokens:   20,
 	}}, nil
 }
 

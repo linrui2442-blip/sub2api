@@ -286,8 +286,7 @@ type APIKeyService struct {
 	apiKeyRepo                APIKeyRepository
 	userRepo                  UserRepository
 	groupRepo                 GroupRepository
-	userSubRepo               UserSubscriptionRepository
-	userGroupRateRepo         UserGroupRateRepository
+	userGroupRPMOverrideRepo  UserGroupRPMOverrideRepository
 	cache                     APIKeyCache
 	rateLimitCacheInvalid     RateLimitCacheInvalidator // optional: invalidate Redis rate limit cache
 	concurrencyService        *ConcurrencyService
@@ -335,19 +334,17 @@ func NewAPIKeyService(
 	apiKeyRepo APIKeyRepository,
 	userRepo UserRepository,
 	groupRepo GroupRepository,
-	userSubRepo UserSubscriptionRepository,
-	userGroupRateRepo UserGroupRateRepository,
+	userGroupRPMOverrideRepo UserGroupRPMOverrideRepository,
 	cache APIKeyCache,
 	cfg *config.Config,
 ) *APIKeyService {
 	svc := &APIKeyService{
-		apiKeyRepo:        apiKeyRepo,
-		userRepo:          userRepo,
-		groupRepo:         groupRepo,
-		userSubRepo:       userSubRepo,
-		userGroupRateRepo: userGroupRateRepo,
-		cache:             cache,
-		cfg:               cfg,
+		apiKeyRepo:               apiKeyRepo,
+		userRepo:                 userRepo,
+		groupRepo:                groupRepo,
+		userGroupRPMOverrideRepo: userGroupRPMOverrideRepo,
+		cache:                    cache,
+		cfg:                      cfg,
 	}
 	svc.initAuthCache(cfg)
 	lookupConcurrency := defaultAuthLookupConcurrency
@@ -357,6 +354,20 @@ func NewAPIKeyService(
 	svc.authLookupSlots = make(chan struct{}, lookupConcurrency)
 	svc.invalidAuthAbuse = newInvalidAuthAbuseLimiter(cfg)
 	return svc
+}
+
+// NewPersonalAPIKeyService builds the Personal Edition API-key service without
+// the SaaS subscription repository. Group access is determined exclusively by
+// local user permissions and allowed-group membership.
+func NewPersonalAPIKeyService(
+	apiKeyRepo APIKeyRepository,
+	userRepo UserRepository,
+	groupRepo GroupRepository,
+	userGroupRPMOverrideRepo UserGroupRPMOverrideRepository,
+	cache APIKeyCache,
+	cfg *config.Config,
+) *APIKeyService {
+	return NewAPIKeyService(apiKeyRepo, userRepo, groupRepo, userGroupRPMOverrideRepo, cache, cfg)
 }
 
 // SetRateLimitCacheInvalidator sets the optional rate limit cache invalidator.
@@ -444,16 +455,9 @@ func (s *APIKeyService) incrementAPIKeyErrorCount(ctx context.Context, userID in
 	_ = s.cache.IncrementCreateAttemptCount(ctx, userID)
 }
 
-// canUserBindGroup 检查用户是否可以绑定指定分组
-// 对于订阅类型分组：检查用户是否有有效订阅
-// 对于标准类型分组：使用原有的 AllowedGroups 和 IsExclusive 逻辑
+// canUserBindGroup checks whether the local user may bind the group. Personal
+// Private Edition uses local allowed-group membership as the authority.
 func (s *APIKeyService) canUserBindGroup(ctx context.Context, user *User, group *Group) bool {
-	// 订阅类型分组：需要有效订阅
-	if group.IsSubscriptionType() {
-		_, err := s.userSubRepo.GetActiveByUserIDAndGroupID(ctx, user.ID, group.ID)
-		return err == nil // 有有效订阅则允许
-	}
-	// 标准类型分组：使用原有逻辑
 	return user.CanBindGroup(group.ID, group.IsExclusive)
 }
 
@@ -1016,7 +1020,7 @@ func (s *APIKeyService) IncrementUsage(ctx context.Context, keyID int64) error {
 // GetAvailableGroups 获取用户有权限绑定的分组列表
 // 返回用户可以选择的分组：
 // - 标准类型分组：公开的（非专属）或用户被明确允许的
-// - 订阅类型分组：用户有有效订阅的
+// - 任何分组都遵循本地公开/专属与 allowed_groups 权限
 func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([]Group, error) {
 	// 获取用户信息
 	user, err := s.userRepo.GetByID(ctx, userID)
@@ -1030,22 +1034,10 @@ func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([
 		return nil, fmt.Errorf("list active groups: %w", err)
 	}
 
-	// 获取用户的所有有效订阅
-	activeSubscriptions, err := s.userSubRepo.ListActiveByUserID(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("list active subscriptions: %w", err)
-	}
-
-	// 构建订阅分组 ID 集合
-	subscribedGroupIDs := make(map[int64]bool)
-	for _, sub := range activeSubscriptions {
-		subscribedGroupIDs[sub.GroupID] = true
-	}
-
 	// 过滤出用户有权限的分组
 	availableGroups := make([]Group, 0)
 	for _, group := range allGroups {
-		if s.canUserBindGroupInternal(user, &group, subscribedGroupIDs) {
+		if s.canUserBindGroupInternal(user, &group) {
 			availableGroups = append(availableGroups, group)
 		}
 	}
@@ -1054,12 +1046,7 @@ func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([
 }
 
 // canUserBindGroupInternal 内部方法，检查用户是否可以绑定分组（使用预加载的订阅数据）
-func (s *APIKeyService) canUserBindGroupInternal(user *User, group *Group, subscribedGroupIDs map[int64]bool) bool {
-	// 订阅类型分组：需要有效订阅
-	if group.IsSubscriptionType() {
-		return subscribedGroupIDs[group.ID]
-	}
-	// 标准类型分组：使用原有逻辑
+func (s *APIKeyService) canUserBindGroupInternal(user *User, group *Group) bool {
 	return user.CanBindGroup(group.ID, group.IsExclusive)
 }
 
@@ -1085,19 +1072,6 @@ func (s *APIKeyService) GetUserAllowedGroupIDSet(ctx context.Context, userID int
 		allowed[id] = struct{}{}
 	}
 	return allowed, nil
-}
-
-// GetUserGroupRates 获取用户的专属分组倍率配置
-// 返回 map[groupID]rateMultiplier
-func (s *APIKeyService) GetUserGroupRates(ctx context.Context, userID int64) (map[int64]float64, error) {
-	if s.userGroupRateRepo == nil {
-		return nil, nil
-	}
-	rates, err := s.userGroupRateRepo.GetByUserID(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("get user group rates: %w", err)
-	}
-	return rates, nil
 }
 
 // CheckAPIKeyQuotaAndExpiry checks if the API key is valid for use (not expired, quota not exhausted)

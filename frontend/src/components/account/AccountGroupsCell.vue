@@ -7,9 +7,6 @@
         :key="group.id"
         :name="group.name"
         :platform="group.platform"
-        :subscription-type="group.subscription_type"
-        :rate-multiplier="group.rate_multiplier"
-        :show-rate="false"
         class="max-w-24"
       />
       <!-- 更多数量徽章 -->
@@ -58,9 +55,6 @@
               :key="group.id"
               :name="group.name"
               :platform="group.platform"
-              :subscription-type="group.subscription_type"
-              :rate-multiplier="group.rate_multiplier"
-              :show-rate="false"
             />
           </div>
         </div>

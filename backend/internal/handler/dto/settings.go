@@ -3,8 +3,6 @@ package dto
 import (
 	"encoding/json"
 	"strings"
-
-	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
 // CustomMenuItem represents a user-configured custom menu entry.
@@ -31,7 +29,6 @@ type SystemSettings struct {
 	EmailVerifyEnabled                  bool                     `json:"email_verify_enabled"`
 	RegistrationEmailSuffixWhitelist    []string                 `json:"registration_email_suffix_whitelist"`
 	RegistrationEmailDomainQuotaEnabled bool                     `json:"registration_email_domain_quota_enabled"`
-	PromoCodeEnabled                    bool                     `json:"promo_code_enabled"`
 	PasswordResetEnabled                bool                     `json:"password_reset_enabled"`
 	FrontendURL                         string                   `json:"frontend_url"`
 	InvitationCodeEnabled               bool                     `json:"invitation_code_enabled"`
@@ -57,122 +54,25 @@ type SystemSettings struct {
 	SMTPFromName           string `json:"smtp_from_name"`
 	SMTPUseTLS             bool   `json:"smtp_use_tls"`
 
-	TurnstileEnabled                       bool     `json:"turnstile_enabled"`
-	TurnstileSiteKey                       string   `json:"turnstile_site_key"`
-	TurnstileSecretKeyConfigured           bool     `json:"turnstile_secret_key_configured"`
-	TencentCaptchaEnabled                  bool     `json:"tencent_captcha_enabled"`
-	TencentCaptchaAppID                    string   `json:"tencent_captcha_app_id"`
-	TencentCaptchaAppSecretKeyConfigured   bool     `json:"tencent_captcha_app_secret_key_configured"`
-	TencentCaptchaCloudSecretIDConfigured  bool     `json:"tencent_captcha_cloud_secret_id_configured"`
-	TencentCaptchaCloudSecretKeyConfigured bool     `json:"tencent_captcha_cloud_secret_key_configured"`
-	TencentCaptchaRegion                   string   `json:"tencent_captcha_region"`
-	AliyunCaptchaEnabled                   bool     `json:"aliyun_captcha_enabled"`
-	AliyunCaptchaAccessKeyID               string   `json:"aliyun_captcha_access_key_id"`
-	AliyunCaptchaAccessKeySecretConfigured bool     `json:"aliyun_captcha_access_key_secret_configured"`
-	AliyunCaptchaSceneID                   string   `json:"aliyun_captcha_scene_id"`
-	AliyunCaptchaPrefix                    string   `json:"aliyun_captcha_prefix"`
-	AliyunCaptchaRegion                    string   `json:"aliyun_captcha_region"`
-	APIKeyACLTrustForwardedIP              bool     `json:"api_key_acl_trust_forwarded_ip"`
-	ForwardedClientIPHeaders               []string `json:"forwarded_client_ip_headers"`
+	APIKeyACLTrustForwardedIP bool     `json:"api_key_acl_trust_forwarded_ip"`
+	ForwardedClientIPHeaders  []string `json:"forwarded_client_ip_headers"`
 
-	LinuxDoConnectEnabled                bool   `json:"linuxdo_connect_enabled"`
-	LinuxDoConnectClientID               string `json:"linuxdo_connect_client_id"`
-	LinuxDoConnectClientSecretConfigured bool   `json:"linuxdo_connect_client_secret_configured"`
-	LinuxDoConnectRedirectURL            string `json:"linuxdo_connect_redirect_url"`
+	SiteName             string           `json:"site_name"`
+	SiteLogo             string           `json:"site_logo"`
+	SiteSubtitle         string           `json:"site_subtitle"`
+	APIBaseURL           string           `json:"api_base_url"`
+	ContactInfo          string           `json:"contact_info"`
+	DocURL               string           `json:"doc_url"`
+	HomeContent          string           `json:"home_content"`
+	CompactHomeEnabled   bool             `json:"compact_home_enabled"`
+	HideCcsImportButton  bool             `json:"hide_ccs_import_button"`
+	TableDefaultPageSize int              `json:"table_default_page_size"`
+	TablePageSizeOptions []int            `json:"table_page_size_options"`
+	CustomMenuItems      []CustomMenuItem `json:"custom_menu_items"`
+	CustomEndpoints      []CustomEndpoint `json:"custom_endpoints"`
 
-	DingTalkConnectEnabled                 bool   `json:"dingtalk_connect_enabled"`
-	DingTalkConnectClientID                string `json:"dingtalk_connect_client_id"`
-	DingTalkConnectClientSecretConfigured  bool   `json:"dingtalk_connect_client_secret_configured"`
-	DingTalkConnectRedirectURL             string `json:"dingtalk_connect_redirect_url"`
-	DingTalkConnectCorpRestrictionPolicy   string `json:"dingtalk_connect_corp_restriction_policy"`
-	DingTalkConnectInternalCorpID          string `json:"dingtalk_connect_internal_corp_id"`
-	DingTalkConnectBypassRegistration      bool   `json:"dingtalk_connect_bypass_registration"`
-	DingTalkConnectSyncCorpEmail           bool   `json:"dingtalk_connect_sync_corp_email"`
-	DingTalkConnectSyncDisplayName         bool   `json:"dingtalk_connect_sync_display_name"`
-	DingTalkConnectSyncDept                bool   `json:"dingtalk_connect_sync_dept"`
-	DingTalkConnectSyncCorpEmailAttrKey    string `json:"dingtalk_connect_sync_corp_email_attr_key"`
-	DingTalkConnectSyncDisplayNameAttrKey  string `json:"dingtalk_connect_sync_display_name_attr_key"`
-	DingTalkConnectSyncDeptAttrKey         string `json:"dingtalk_connect_sync_dept_attr_key"`
-	DingTalkConnectSyncCorpEmailAttrName   string `json:"dingtalk_connect_sync_corp_email_attr_name"`
-	DingTalkConnectSyncDisplayNameAttrName string `json:"dingtalk_connect_sync_display_name_attr_name"`
-	DingTalkConnectSyncDeptAttrName        string `json:"dingtalk_connect_sync_dept_attr_name"`
-
-	WeChatConnectEnabled                   bool   `json:"wechat_connect_enabled"`
-	WeChatConnectAppID                     string `json:"wechat_connect_app_id"`
-	WeChatConnectAppSecretConfigured       bool   `json:"wechat_connect_app_secret_configured"`
-	WeChatConnectOpenAppID                 string `json:"wechat_connect_open_app_id"`
-	WeChatConnectOpenAppSecretConfigured   bool   `json:"wechat_connect_open_app_secret_configured"`
-	WeChatConnectMPAppID                   string `json:"wechat_connect_mp_app_id"`
-	WeChatConnectMPAppSecretConfigured     bool   `json:"wechat_connect_mp_app_secret_configured"`
-	WeChatConnectMobileAppID               string `json:"wechat_connect_mobile_app_id"`
-	WeChatConnectMobileAppSecretConfigured bool   `json:"wechat_connect_mobile_app_secret_configured"`
-	WeChatConnectOpenEnabled               bool   `json:"wechat_connect_open_enabled"`
-	WeChatConnectMPEnabled                 bool   `json:"wechat_connect_mp_enabled"`
-	WeChatConnectMobileEnabled             bool   `json:"wechat_connect_mobile_enabled"`
-	WeChatConnectMode                      string `json:"wechat_connect_mode"`
-	WeChatConnectScopes                    string `json:"wechat_connect_scopes"`
-	WeChatConnectRedirectURL               string `json:"wechat_connect_redirect_url"`
-	WeChatConnectFrontendRedirectURL       string `json:"wechat_connect_frontend_redirect_url"`
-
-	OIDCConnectEnabled                bool   `json:"oidc_connect_enabled"`
-	OIDCConnectProviderName           string `json:"oidc_connect_provider_name"`
-	OIDCConnectClientID               string `json:"oidc_connect_client_id"`
-	OIDCConnectClientSecretConfigured bool   `json:"oidc_connect_client_secret_configured"`
-	OIDCConnectIssuerURL              string `json:"oidc_connect_issuer_url"`
-	OIDCConnectDiscoveryURL           string `json:"oidc_connect_discovery_url"`
-	OIDCConnectAuthorizeURL           string `json:"oidc_connect_authorize_url"`
-	OIDCConnectTokenURL               string `json:"oidc_connect_token_url"`
-	OIDCConnectUserInfoURL            string `json:"oidc_connect_userinfo_url"`
-	OIDCConnectJWKSURL                string `json:"oidc_connect_jwks_url"`
-	OIDCConnectScopes                 string `json:"oidc_connect_scopes"`
-	OIDCConnectRedirectURL            string `json:"oidc_connect_redirect_url"`
-	OIDCConnectFrontendRedirectURL    string `json:"oidc_connect_frontend_redirect_url"`
-	OIDCConnectTokenAuthMethod        string `json:"oidc_connect_token_auth_method"`
-	OIDCConnectUsePKCE                bool   `json:"oidc_connect_use_pkce"`
-	OIDCConnectValidateIDToken        bool   `json:"oidc_connect_validate_id_token"`
-	OIDCConnectAllowedSigningAlgs     string `json:"oidc_connect_allowed_signing_algs"`
-	OIDCConnectClockSkewSeconds       int    `json:"oidc_connect_clock_skew_seconds"`
-	OIDCConnectRequireEmailVerified   bool   `json:"oidc_connect_require_email_verified"`
-	OIDCConnectUserInfoEmailPath      string `json:"oidc_connect_userinfo_email_path"`
-	OIDCConnectUserInfoIDPath         string `json:"oidc_connect_userinfo_id_path"`
-	OIDCConnectUserInfoUsernamePath   string `json:"oidc_connect_userinfo_username_path"`
-
-	GitHubOAuthEnabled                bool   `json:"github_oauth_enabled"`
-	GitHubOAuthClientID               string `json:"github_oauth_client_id"`
-	GitHubOAuthClientSecretConfigured bool   `json:"github_oauth_client_secret_configured"`
-	GitHubOAuthRedirectURL            string `json:"github_oauth_redirect_url"`
-	GitHubOAuthFrontendRedirectURL    string `json:"github_oauth_frontend_redirect_url"`
-	GoogleOAuthEnabled                bool   `json:"google_oauth_enabled"`
-	GoogleOAuthClientID               string `json:"google_oauth_client_id"`
-	GoogleOAuthClientSecretConfigured bool   `json:"google_oauth_client_secret_configured"`
-	GoogleOAuthRedirectURL            string `json:"google_oauth_redirect_url"`
-	GoogleOAuthFrontendRedirectURL    string `json:"google_oauth_frontend_redirect_url"`
-
-	SiteName                    string           `json:"site_name"`
-	SiteLogo                    string           `json:"site_logo"`
-	SiteSubtitle                string           `json:"site_subtitle"`
-	APIBaseURL                  string           `json:"api_base_url"`
-	ContactInfo                 string           `json:"contact_info"`
-	DocURL                      string           `json:"doc_url"`
-	HomeContent                 string           `json:"home_content"`
-	CompactHomeEnabled          bool             `json:"compact_home_enabled"`
-	HideCcsImportButton         bool             `json:"hide_ccs_import_button"`
-	PurchaseSubscriptionEnabled bool             `json:"purchase_subscription_enabled"`
-	PurchaseSubscriptionURL     string           `json:"purchase_subscription_url"`
-	TableDefaultPageSize        int              `json:"table_default_page_size"`
-	TablePageSizeOptions        []int            `json:"table_page_size_options"`
-	CustomMenuItems             []CustomMenuItem `json:"custom_menu_items"`
-	CustomEndpoints             []CustomEndpoint `json:"custom_endpoints"`
-
-	DefaultConcurrency           int                          `json:"default_concurrency"`
-	DefaultBalance               float64                      `json:"default_balance"`
-	AffiliateRebateRate          float64                      `json:"affiliate_rebate_rate"`
-	AffiliateRebateFreezeHours   int                          `json:"affiliate_rebate_freeze_hours"`
-	AffiliateRebateDurationDays  int                          `json:"affiliate_rebate_duration_days"`
-	AffiliateRebatePerInviteeCap float64                      `json:"affiliate_rebate_per_invitee_cap"`
-	AdminRechargeRebateEnabled   bool                         `json:"affiliate_admin_recharge_enabled"`
-	DefaultUserRPMLimit          int                          `json:"default_user_rpm_limit"`
-	DefaultSubscriptions         []DefaultSubscriptionSetting `json:"default_subscriptions"`
+	DefaultConcurrency  int `json:"default_concurrency"`
+	DefaultUserRPMLimit int `json:"default_user_rpm_limit"`
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`
@@ -186,10 +86,7 @@ type SystemSettings struct {
 	IdentityPatchPrompt string `json:"identity_patch_prompt"`
 
 	// Ops monitoring (vNext)
-	OpsMonitoringEnabled         bool   `json:"ops_monitoring_enabled"`
-	OpsRealtimeMonitoringEnabled bool   `json:"ops_realtime_monitoring_enabled"`
-	OpsQueryModeDefault          string `json:"ops_query_mode_default"`
-	OpsMetricsIntervalSeconds    int    `json:"ops_metrics_interval_seconds"`
+	OpsMonitoringEnabled bool `json:"ops_monitoring_enabled"`
 
 	MinClaudeCodeVersion string `json:"min_claude_code_version"`
 	MaxClaudeCodeVersion string `json:"max_claude_code_version"`
@@ -225,13 +122,6 @@ type SystemSettings struct {
 	CodexCLIOnlyEngineFingerprintSignals string `json:"codex_cli_only_engine_fingerprint_signals"`
 
 	// Web Search Emulation
-	WebSearchEmulationEnabled bool `json:"web_search_emulation_enabled"`
-
-	// Payment visible method routing
-	PaymentVisibleMethodAlipaySource  string `json:"payment_visible_method_alipay_source"`
-	PaymentVisibleMethodWxpaySource   string `json:"payment_visible_method_wxpay_source"`
-	PaymentVisibleMethodAlipayEnabled bool   `json:"payment_visible_method_alipay_enabled"`
-	PaymentVisibleMethodWxpayEnabled  bool   `json:"payment_visible_method_wxpay_enabled"`
 
 	// OpenAI account scheduling
 	OpenAILowUpstreamRatePriorityEnabled                   bool    `json:"openai_low_upstream_rate_priority_enabled"`
@@ -262,63 +152,14 @@ type SystemSettings struct {
 	OpenAIAdvancedSchedulerEffectiveWeightPreviousResponse string  `json:"openai_advanced_scheduler_effective_weight_previous_response"`
 	OpenAIAdvancedSchedulerEffectiveWeightSessionSticky    string  `json:"openai_advanced_scheduler_effective_weight_session_sticky"`
 
-	// Payment configuration
-	PaymentEnabled                   bool     `json:"payment_enabled"`
-	PaymentMinAmount                 float64  `json:"payment_min_amount"`
-	PaymentMaxAmount                 float64  `json:"payment_max_amount"`
-	PaymentDailyLimit                float64  `json:"payment_daily_limit"`
-	PaymentOrderTimeoutMin           int      `json:"payment_order_timeout_minutes"`
-	PaymentMaxPendingOrders          int      `json:"payment_max_pending_orders"`
-	PaymentEnabledTypes              []string `json:"payment_enabled_types"`
-	PaymentBalanceDisabled           bool     `json:"payment_balance_disabled"`
-	PaymentBalanceRechargeMultiplier float64  `json:"payment_balance_recharge_multiplier"`
-	PaymentSubscriptionUSDToCNYRate  float64  `json:"payment_subscription_usd_to_cny_rate"`
-	PaymentRechargeFeeRate           float64  `json:"payment_recharge_fee_rate"`
-	PaymentLoadBalanceStrat          string   `json:"payment_load_balance_strategy"`
-	PaymentProductNamePrefix         string   `json:"payment_product_name_prefix"`
-	PaymentProductNameSuffix         string   `json:"payment_product_name_suffix"`
-	PaymentHelpImageURL              string   `json:"payment_help_image_url"`
-	PaymentHelpText                  string   `json:"payment_help_text"`
-
-	// Cancel rate limit
-	PaymentCancelRateLimitEnabled bool   `json:"payment_cancel_rate_limit_enabled"`
-	PaymentCancelRateLimitMax     int    `json:"payment_cancel_rate_limit_max"`
-	PaymentCancelRateLimitWindow  int    `json:"payment_cancel_rate_limit_window"`
-	PaymentCancelRateLimitUnit    string `json:"payment_cancel_rate_limit_unit"`
-	PaymentCancelRateLimitMode    string `json:"payment_cancel_rate_limit_window_mode"`
-
-	// Force Alipay mobile clients to use QR code payment instead of mobile redirect
-	PaymentAlipayForceQRCode bool `json:"payment_alipay_force_qrcode"`
-	// Use Alipay face-to-face precreate and an app deep link on mobile clients.
-	PaymentAlipayMobilePrecreateDeepLink bool `json:"payment_alipay_mobile_precreate_deep_link"`
-
-	// 余额、订阅到期与账号限额通知
-	BalanceLowNotifyEnabled         bool               `json:"balance_low_notify_enabled"`
-	BalanceLowNotifyThreshold       float64            `json:"balance_low_notify_threshold"`
-	BalanceLowNotifyRechargeURL     string             `json:"balance_low_notify_recharge_url"`
-	SubscriptionExpiryNotifyEnabled bool               `json:"subscription_expiry_notify_enabled"`
-	AccountQuotaNotifyEnabled       bool               `json:"account_quota_notify_enabled"`
-	AccountQuotaNotifyEmails        []NotifyEmailEntry `json:"account_quota_notify_emails"`
-
-	// Channel Monitor feature switch
-	ChannelMonitorEnabled                bool   `json:"channel_monitor_enabled"`
-	ChannelMonitorMode                   string `json:"channel_monitor_mode"`
-	ChannelMonitorDefaultIntervalSeconds int    `json:"channel_monitor_default_interval_seconds"`
-	ChannelMonitorHideThroughput         bool   `json:"channel_monitor_hide_throughput"`
-	ChannelMonitorShowQuota              bool   `json:"channel_monitor_show_quota"`
+	// Provider 账号限额通知
+	AccountQuotaNotifyEnabled bool               `json:"account_quota_notify_enabled"`
+	AccountQuotaNotifyEmails  []NotifyEmailEntry `json:"account_quota_notify_emails"`
 
 	// Grok model mapping policy (admin settings; empty account mapping falls back to these).
 	GrokDefaultTextModel           string `json:"grok_default_text_model"`
 	GrokCrossClientModelMapEnabled bool   `json:"grok_cross_client_model_map_enabled"`
 	GrokDefaultBaseURLMode         string `json:"grok_default_base_url_mode"`
-
-	// Available Channels feature switch (user-facing aggregate view)
-	AvailableChannelsEnabled bool `json:"available_channels_enabled"`
-
-	// Model Plaza feature (public group/model pricing showcase)
-	ModelPlazaEnabled     bool   `json:"model_plaza_enabled"`
-	ModelPlazaRequireAuth bool   `json:"model_plaza_require_auth"`
-	ModelPlazaDescription string `json:"model_plaza_description"`
 
 	// 风控中心功能开关
 	RiskControlEnabled bool `json:"risk_control_enabled"`
@@ -328,13 +169,9 @@ type SystemSettings struct {
 	CyberSessionBlockTTLSeconds int  `json:"cyber_session_block_ttl_seconds"`
 
 	// Affiliate (邀请返利) feature switch
-	AffiliateEnabled bool `json:"affiliate_enabled"`
 
 	// OpenAI fast/flex policy
 	OpenAIFastPolicySettings *OpenAIFastPolicySettings `json:"openai_fast_policy_settings,omitempty"`
-
-	// 系统全局默认平台配额（key = platform，nil/缺省 = 不限制）
-	DefaultPlatformQuotas map[string]*service.DefaultPlatformQuotaSetting `json:"default_platform_quotas,omitempty"`
 
 	// 系统全局账号自动停调阈值（key = platform，100 = disabled）
 	AccountSchedulingThresholds map[string]int `json:"account_scheduling_thresholds,omitempty"`
@@ -343,18 +180,11 @@ type SystemSettings struct {
 	AllowUserViewErrorRequests bool `json:"allow_user_view_error_requests"`
 }
 
-type DefaultSubscriptionSetting struct {
-	GroupID      int64 `json:"group_id"`
-	ValidityDays int   `json:"validity_days"`
-}
-
 type PublicSettings struct {
 	RegistrationEnabled                 bool                     `json:"registration_enabled"`
 	EmailVerifyEnabled                  bool                     `json:"email_verify_enabled"`
-	ForceEmailOnThirdPartySignup        bool                     `json:"force_email_on_third_party_signup"`
 	RegistrationEmailSuffixWhitelist    []string                 `json:"registration_email_suffix_whitelist"`
 	RegistrationEmailDomainQuotaEnabled bool                     `json:"registration_email_domain_quota_enabled"`
-	PromoCodeEnabled                    bool                     `json:"promo_code_enabled"`
 	PasswordResetEnabled                bool                     `json:"password_reset_enabled"`
 	InvitationCodeEnabled               bool                     `json:"invitation_code_enabled"`
 	TotpEnabled                         bool                     `json:"totp_enabled"` // TOTP 双因素认证
@@ -364,15 +194,6 @@ type PublicSettings struct {
 	LoginAgreementUpdatedAt             string                   `json:"login_agreement_updated_at"`
 	LoginAgreementRevision              string                   `json:"login_agreement_revision"`
 	LoginAgreementDocuments             []LoginAgreementDocument `json:"login_agreement_documents"`
-	TurnstileEnabled                    bool                     `json:"turnstile_enabled"`
-	TurnstileSiteKey                    string                   `json:"turnstile_site_key"`
-	TencentCaptchaEnabled               bool                     `json:"tencent_captcha_enabled"`
-	TencentCaptchaAppID                 string                   `json:"tencent_captcha_app_id"`
-	TencentCaptchaRegion                string                   `json:"tencent_captcha_region"`
-	AliyunCaptchaEnabled                bool                     `json:"aliyun_captcha_enabled"`
-	AliyunCaptchaSceneID                string                   `json:"aliyun_captcha_scene_id"`
-	AliyunCaptchaPrefix                 string                   `json:"aliyun_captcha_prefix"`
-	AliyunCaptchaRegion                 string                   `json:"aliyun_captcha_region"`
 	SiteName                            string                   `json:"site_name"`
 	SiteLogo                            string                   `json:"site_logo"`
 	SiteSubtitle                        string                   `json:"site_subtitle"`
@@ -382,46 +203,17 @@ type PublicSettings struct {
 	HomeContent                         string                   `json:"home_content"`
 	CompactHomeEnabled                  bool                     `json:"compact_home_enabled"`
 	HideCcsImportButton                 bool                     `json:"hide_ccs_import_button"`
-	PurchaseSubscriptionEnabled         bool                     `json:"purchase_subscription_enabled"`
-	PurchaseSubscriptionURL             string                   `json:"purchase_subscription_url"`
 	TableDefaultPageSize                int                      `json:"table_default_page_size"`
 	TablePageSizeOptions                []int                    `json:"table_page_size_options"`
 	CustomMenuItems                     []CustomMenuItem         `json:"custom_menu_items"`
 	CustomEndpoints                     []CustomEndpoint         `json:"custom_endpoints"`
-	DingTalkOAuthEnabled                bool                     `json:"dingtalk_oauth_enabled"`
-	LinuxDoOAuthEnabled                 bool                     `json:"linuxdo_oauth_enabled"`
-	WeChatOAuthEnabled                  bool                     `json:"wechat_oauth_enabled"`
-	WeChatOAuthOpenEnabled              bool                     `json:"wechat_oauth_open_enabled"`
-	WeChatOAuthMPEnabled                bool                     `json:"wechat_oauth_mp_enabled"`
-	WeChatOAuthMobileEnabled            bool                     `json:"wechat_oauth_mobile_enabled"`
-	OIDCOAuthEnabled                    bool                     `json:"oidc_oauth_enabled"`
-	OIDCOAuthProviderName               string                   `json:"oidc_oauth_provider_name"`
-	GitHubOAuthEnabled                  bool                     `json:"github_oauth_enabled"`
-	GoogleOAuthEnabled                  bool                     `json:"google_oauth_enabled"`
 	BackendModeEnabled                  bool                     `json:"backend_mode_enabled"`
-	PaymentEnabled                      bool                     `json:"payment_enabled"`
 	Version                             string                   `json:"version"`
 	// 服务器全局时区（IANA 名称与当前 UTC 偏移，如 "Asia/Shanghai" / "+08:00"）。
 	// 高峰时段等按服务器本地时间判定的窗口，前端展示时据此标注，避免用户按浏览器本地时间误读。
-	ServerTimezone              string  `json:"server_timezone"`
-	ServerUTCOffset             string  `json:"server_utc_offset"`
-	BalanceLowNotifyEnabled     bool    `json:"balance_low_notify_enabled"`
-	AccountQuotaNotifyEnabled   bool    `json:"account_quota_notify_enabled"`
-	BalanceLowNotifyThreshold   float64 `json:"balance_low_notify_threshold"`
-	BalanceLowNotifyRechargeURL string  `json:"balance_low_notify_recharge_url"`
-
-	ChannelMonitorEnabled                bool   `json:"channel_monitor_enabled"`
-	ChannelMonitorMode                   string `json:"channel_monitor_mode"`
-	ChannelMonitorDefaultIntervalSeconds int    `json:"channel_monitor_default_interval_seconds"`
-	ChannelMonitorHideThroughput         bool   `json:"channel_monitor_hide_throughput"`
-	ChannelMonitorShowQuota              bool   `json:"channel_monitor_show_quota"`
-
-	AvailableChannelsEnabled bool `json:"available_channels_enabled"`
-
-	ModelPlazaEnabled     bool `json:"model_plaza_enabled"`
-	ModelPlazaRequireAuth bool `json:"model_plaza_require_auth"`
-
-	AffiliateEnabled bool `json:"affiliate_enabled"`
+	ServerTimezone            string `json:"server_timezone"`
+	ServerUTCOffset           string `json:"server_utc_offset"`
+	AccountQuotaNotifyEnabled bool   `json:"account_quota_notify_enabled"`
 
 	RiskControlEnabled bool `json:"risk_control_enabled"`
 
