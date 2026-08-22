@@ -3,6 +3,8 @@ package repository
 import (
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -11,6 +13,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
 
 	"github.com/imroc/req/v3"
+	"golang.org/x/net/http/httpproxy"
 )
 
 // reqClientOptions 定义 req 客户端的构建参数
@@ -58,6 +61,12 @@ func getSharedReqClient(opts reqClientOptions) (*req.Client, error) {
 	}
 	if trimmed != "" {
 		client.SetProxyURL(trimmed)
+	} else {
+		// OAuth account creation happens before an account-specific proxy can
+		// exist. Resolve the standard environment on every request so Personal
+		// runtime changes to HTTP(S)_PROXY/NO_PROXY take effect without creating
+		// another provider-specific transport. ALL_PROXY is the final fallback.
+		client.GetTransport().SetProxy(providerAuthProxyFromEnvironment)
 	}
 	client = instrumentReqClient(client)
 
@@ -66,6 +75,24 @@ func getSharedReqClient(opts reqClientOptions) (*req.Client, error) {
 		return c, nil
 	}
 	return client, nil
+}
+
+func providerAuthProxyFromEnvironment(req *http.Request) (*url.URL, error) {
+	if req == nil || req.URL == nil {
+		return nil, nil
+	}
+	cfg := httpproxy.FromEnvironment()
+	if strings.TrimSpace(cfg.HTTPProxy) == "" && strings.TrimSpace(cfg.HTTPSProxy) == "" {
+		allProxy := strings.TrimSpace(os.Getenv("ALL_PROXY"))
+		if allProxy == "" {
+			allProxy = strings.TrimSpace(os.Getenv("all_proxy"))
+		}
+		if allProxy != "" {
+			cfg.HTTPProxy = allProxy
+			cfg.HTTPSProxy = allProxy
+		}
+	}
+	return cfg.ProxyFunc()(req.URL)
 }
 
 func instrumentReqClient(client *req.Client) *req.Client {

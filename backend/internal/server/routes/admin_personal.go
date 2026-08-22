@@ -41,8 +41,32 @@ func RegisterPersonalAdminRoutes(
 	// Local proxy management is retained for provider connectivity.
 	registerProxyRoutes(admin, h, stepUpAuth)
 
+	// These are active Gateway network/error-handling controls, not SaaS
+	// administration. Their handlers and SQLite Ent schemas are part of the
+	// Personal runtime and must remain reachable from the settings UI.
+	registerTLSFingerprintProfileRoutes(admin, h)
+	registerErrorPassthroughRoutes(admin, h)
+
 	// Local audit history remains available to the owner.
 	registerAuditLogRoutes(admin, h, stepUpAuth)
+}
+
+func registerTLSFingerprintProfileRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	profiles := admin.Group("/tls-fingerprint-profiles")
+	profiles.GET("", h.Admin.TLSFingerprintProfile.List)
+	profiles.GET("/:id", h.Admin.TLSFingerprintProfile.GetByID)
+	profiles.POST("", h.Admin.TLSFingerprintProfile.Create)
+	profiles.PUT("/:id", h.Admin.TLSFingerprintProfile.Update)
+	profiles.DELETE("/:id", h.Admin.TLSFingerprintProfile.Delete)
+}
+
+func registerErrorPassthroughRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	rules := admin.Group("/error-passthrough-rules")
+	rules.GET("", h.Admin.ErrorPassthrough.List)
+	rules.GET("/:id", h.Admin.ErrorPassthrough.GetByID)
+	rules.POST("", h.Admin.ErrorPassthrough.Create)
+	rules.PUT("/:id", h.Admin.ErrorPassthrough.Update)
+	rules.DELETE("/:id", h.Admin.ErrorPassthrough.Delete)
 }
 
 // registerPersonalMemberRoutes exposes only the owner-managed private-member

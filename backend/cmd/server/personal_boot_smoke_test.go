@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"testing"
 
@@ -31,6 +33,17 @@ func TestPersonalApplicationBootSmoke(t *testing.T) {
 	}
 	if app == nil || app.Server == nil {
 		t.Fatal("Personal Edition application/server must be initialized")
+	}
+	for _, path := range []string{
+		"/api/v1/admin/tls-fingerprint-profiles",
+		"/api/v1/admin/error-passthrough-rules",
+	} {
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, path, nil)
+		app.Server.Handler.ServeHTTP(recorder, request)
+		if recorder.Code == http.StatusNotFound {
+			t.Fatalf("required Personal Gateway admin route is not registered: %s", path)
+		}
 	}
 	app.Cleanup()
 }

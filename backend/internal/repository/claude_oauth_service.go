@@ -11,7 +11,6 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/oauth"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyurl"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/Wei-Shaw/sub2api/internal/util/logredact"
 
@@ -262,19 +261,14 @@ func (s *claudeOAuthService) RefreshToken(ctx context.Context, refreshToken, pro
 }
 
 func createReqClient(proxyURL string) (*req.Client, error) {
-	// 禁用 CookieJar，确保每次授权都是干净的会话
-	client := req.C().
-		SetTimeout(60 * time.Second).
-		ImpersonateChrome().
-		SetCookieJar(nil) // 禁用 CookieJar
-
-	trimmed, _, err := proxyurl.Parse(proxyURL)
+	client, err := getSharedReqClient(reqClientOptions{
+		ProxyURL:    proxyURL,
+		Timeout:     60 * time.Second,
+		Impersonate: true,
+	})
 	if err != nil {
 		return nil, err
 	}
-	if trimmed != "" {
-		client.SetProxyURL(trimmed)
-	}
-
-	return instrumentReqClient(client), nil
+	// Claude auth does not need browser cookies; tokens remain request-local.
+	return client.SetCookieJar(nil), nil
 }
