@@ -14,6 +14,9 @@ func ensurePersonalSQLiteInfrastructure(ctx context.Context, db *sql.DB) error {
 	if db == nil {
 		return fmt.Errorf("nil personal sqlite db")
 	}
+	if err := ensurePersonalSQLiteUsageLogColumns(ctx, db); err != nil {
+		return err
+	}
 
 	statements := []string{
 		// Remove unreachable external-user identity adoption tables from upgrades.
@@ -154,6 +157,58 @@ func ensurePersonalSQLiteInfrastructure(ctx context.Context, db *sql.DB) error {
 	for _, statement := range statements {
 		if _, err := db.ExecContext(ctx, statement); err != nil {
 			return fmt.Errorf("create personal sqlite infrastructure: %w", err)
+		}
+	}
+	return nil
+}
+
+// ensurePersonalSQLiteUsageLogColumns upgrades databases created before the
+// canonical gateway usage metadata was represented by the Personal schema.
+// SQLite has no portable ADD COLUMN IF NOT EXISTS, so inspect first. Existing
+// rows and OAuth/account state remain untouched and repeated startup is safe.
+func ensurePersonalSQLiteUsageLogColumns(ctx context.Context, db *sql.DB) error {
+	rows, err := db.QueryContext(ctx, `PRAGMA table_info(usage_logs)`)
+	if err != nil {
+		return fmt.Errorf("inspect personal usage schema: %w", err)
+	}
+	existing := make(map[string]struct{})
+	for rows.Next() {
+		var cid int
+		var name, columnType string
+		var notNull, pk int
+		var defaultValue any
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &pk); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("scan personal usage schema: %w", err)
+		}
+		existing[name] = struct{}{}
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("close personal usage schema rows: %w", err)
+	}
+	// Narrow repository tests may initialize only the infrastructure-owned
+	// tables. The full Personal bootstrap creates Ent tables before this hook.
+	if len(existing) == 0 {
+		return nil
+	}
+	columns := []struct{ name, definition string }{
+		{"image_output_tokens", "INTEGER NOT NULL DEFAULT 0"},
+		{"image_input_tokens", "INTEGER NOT NULL DEFAULT 0"},
+		{"request_type", "INTEGER NOT NULL DEFAULT 0"},
+		{"openai_ws_mode", "INTEGER NOT NULL DEFAULT 0"},
+		{"service_tier", "TEXT NULL"},
+		{"reasoning_effort", "TEXT NULL"},
+		{"inbound_endpoint", "TEXT NULL"},
+		{"upstream_endpoint", "TEXT NULL"},
+		{"session_id", "TEXT NULL"},
+	}
+	for _, column := range columns {
+		if _, ok := existing[column.name]; ok {
+			continue
+		}
+		statement := fmt.Sprintf("ALTER TABLE usage_logs ADD COLUMN %s %s", column.name, column.definition)
+		if _, err := db.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("upgrade personal usage schema column %s: %w", column.name, err)
 		}
 	}
 	return nil

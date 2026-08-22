@@ -201,6 +201,9 @@ func (r *usageLogRepository) createSingle(ctx context.Context, sqlq sqlExecutor,
 	if ctx != nil && ctx.Err() != nil {
 		return false, service.MarkUsageLogCreateNotPersisted(ctx.Err())
 	}
+	if r != nil && r.sqlite {
+		return createSingleUsageLogSQLite(ctx, sqlq, log, prepared)
+	}
 
 	query := `
 		INSERT INTO usage_logs (
@@ -517,6 +520,10 @@ func (r *usageLogRepository) flushBestEffortBatch(db *sql.DB, batch []usageLogBe
 	if len(batch) == 0 {
 		return
 	}
+	if r != nil && r.sqlite {
+		r.flushBestEffortBatchSQLite(db, batch)
+		return
+	}
 
 	type bestEffortGroup struct {
 		prepared usageLogInsertPrepared
@@ -605,6 +612,9 @@ func completeUsageLogCreateRequest(req usageLogCreateRequest, res usageLogCreate
 func (r *usageLogRepository) batchInsertUsageLogs(db *sql.DB, keys []string, preparedByKey map[string]usageLogInsertPrepared) (map[string]bool, map[string]usageLogBatchState, bool, error) {
 	if len(keys) == 0 {
 		return map[string]bool{}, map[string]usageLogBatchState{}, false, nil
+	}
+	if r != nil && r.sqlite {
+		return batchInsertUsageLogsSQLite(db, keys, preparedByKey)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

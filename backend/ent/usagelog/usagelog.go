@@ -50,8 +50,16 @@ const (
 	FieldCacheCreation5mTokens = "cache_creation_5m_tokens"
 	// FieldCacheCreation1hTokens holds the string denoting the cache_creation_1h_tokens field in the database.
 	FieldCacheCreation1hTokens = "cache_creation_1h_tokens"
+	// FieldImageOutputTokens holds the string denoting the image_output_tokens field in the database.
+	FieldImageOutputTokens = "image_output_tokens"
+	// FieldImageInputTokens holds the string denoting the image_input_tokens field in the database.
+	FieldImageInputTokens = "image_input_tokens"
+	// FieldRequestType holds the string denoting the request_type field in the database.
+	FieldRequestType = "request_type"
 	// FieldStream holds the string denoting the stream field in the database.
 	FieldStream = "stream"
+	// FieldOpenaiWsMode holds the string denoting the openai_ws_mode field in the database.
+	FieldOpenaiWsMode = "openai_ws_mode"
 	// FieldDurationMs holds the string denoting the duration_ms field in the database.
 	FieldDurationMs = "duration_ms"
 	// FieldFirstTokenMs holds the string denoting the first_token_ms field in the database.
@@ -60,6 +68,16 @@ const (
 	FieldUserAgent = "user_agent"
 	// FieldIPAddress holds the string denoting the ip_address field in the database.
 	FieldIPAddress = "ip_address"
+	// FieldServiceTier holds the string denoting the service_tier field in the database.
+	FieldServiceTier = "service_tier"
+	// FieldReasoningEffort holds the string denoting the reasoning_effort field in the database.
+	FieldReasoningEffort = "reasoning_effort"
+	// FieldInboundEndpoint holds the string denoting the inbound_endpoint field in the database.
+	FieldInboundEndpoint = "inbound_endpoint"
+	// FieldUpstreamEndpoint holds the string denoting the upstream_endpoint field in the database.
+	FieldUpstreamEndpoint = "upstream_endpoint"
+	// FieldSessionID holds the string denoting the session_id field in the database.
+	FieldSessionID = "session_id"
 	// FieldImageCount holds the string denoting the image_count field in the database.
 	FieldImageCount = "image_count"
 	// FieldImageSize holds the string denoting the image_size field in the database.
@@ -141,11 +159,20 @@ var Columns = []string{
 	FieldCacheReadTokens,
 	FieldCacheCreation5mTokens,
 	FieldCacheCreation1hTokens,
+	FieldImageOutputTokens,
+	FieldImageInputTokens,
+	FieldRequestType,
 	FieldStream,
+	FieldOpenaiWsMode,
 	FieldDurationMs,
 	FieldFirstTokenMs,
 	FieldUserAgent,
 	FieldIPAddress,
+	FieldServiceTier,
+	FieldReasoningEffort,
+	FieldInboundEndpoint,
+	FieldUpstreamEndpoint,
+	FieldSessionID,
 	FieldImageCount,
 	FieldImageSize,
 	FieldImageInputSize,
@@ -193,12 +220,30 @@ var (
 	DefaultCacheCreation5mTokens int
 	// DefaultCacheCreation1hTokens holds the default value on creation for the "cache_creation_1h_tokens" field.
 	DefaultCacheCreation1hTokens int
+	// DefaultImageOutputTokens holds the default value on creation for the "image_output_tokens" field.
+	DefaultImageOutputTokens int
+	// DefaultImageInputTokens holds the default value on creation for the "image_input_tokens" field.
+	DefaultImageInputTokens int
+	// DefaultRequestType holds the default value on creation for the "request_type" field.
+	DefaultRequestType int16
 	// DefaultStream holds the default value on creation for the "stream" field.
 	DefaultStream bool
+	// DefaultOpenaiWsMode holds the default value on creation for the "openai_ws_mode" field.
+	DefaultOpenaiWsMode bool
 	// UserAgentValidator is a validator for the "user_agent" field. It is called by the builders before save.
 	UserAgentValidator func(string) error
 	// IPAddressValidator is a validator for the "ip_address" field. It is called by the builders before save.
 	IPAddressValidator func(string) error
+	// ServiceTierValidator is a validator for the "service_tier" field. It is called by the builders before save.
+	ServiceTierValidator func(string) error
+	// ReasoningEffortValidator is a validator for the "reasoning_effort" field. It is called by the builders before save.
+	ReasoningEffortValidator func(string) error
+	// InboundEndpointValidator is a validator for the "inbound_endpoint" field. It is called by the builders before save.
+	InboundEndpointValidator func(string) error
+	// UpstreamEndpointValidator is a validator for the "upstream_endpoint" field. It is called by the builders before save.
+	UpstreamEndpointValidator func(string) error
+	// SessionIDValidator is a validator for the "session_id" field. It is called by the builders before save.
+	SessionIDValidator func(string) error
 	// DefaultImageCount holds the default value on creation for the "image_count" field.
 	DefaultImageCount int
 	// ImageSizeValidator is a validator for the "image_size" field. It is called by the builders before save.
@@ -315,9 +360,29 @@ func ByCacheCreation1hTokens(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCacheCreation1hTokens, opts...).ToFunc()
 }
 
+// ByImageOutputTokens orders the results by the image_output_tokens field.
+func ByImageOutputTokens(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldImageOutputTokens, opts...).ToFunc()
+}
+
+// ByImageInputTokens orders the results by the image_input_tokens field.
+func ByImageInputTokens(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldImageInputTokens, opts...).ToFunc()
+}
+
+// ByRequestType orders the results by the request_type field.
+func ByRequestType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRequestType, opts...).ToFunc()
+}
+
 // ByStream orders the results by the stream field.
 func ByStream(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStream, opts...).ToFunc()
+}
+
+// ByOpenaiWsMode orders the results by the openai_ws_mode field.
+func ByOpenaiWsMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOpenaiWsMode, opts...).ToFunc()
 }
 
 // ByDurationMs orders the results by the duration_ms field.
@@ -338,6 +403,31 @@ func ByUserAgent(opts ...sql.OrderTermOption) OrderOption {
 // ByIPAddress orders the results by the ip_address field.
 func ByIPAddress(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldIPAddress, opts...).ToFunc()
+}
+
+// ByServiceTier orders the results by the service_tier field.
+func ByServiceTier(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldServiceTier, opts...).ToFunc()
+}
+
+// ByReasoningEffort orders the results by the reasoning_effort field.
+func ByReasoningEffort(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReasoningEffort, opts...).ToFunc()
+}
+
+// ByInboundEndpoint orders the results by the inbound_endpoint field.
+func ByInboundEndpoint(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldInboundEndpoint, opts...).ToFunc()
+}
+
+// ByUpstreamEndpoint orders the results by the upstream_endpoint field.
+func ByUpstreamEndpoint(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUpstreamEndpoint, opts...).ToFunc()
+}
+
+// BySessionID orders the results by the session_id field.
+func BySessionID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSessionID, opts...).ToFunc()
 }
 
 // ByImageCount orders the results by the image_count field.

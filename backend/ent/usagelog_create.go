@@ -238,6 +238,48 @@ func (_c *UsageLogCreate) SetNillableCacheCreation1hTokens(v *int) *UsageLogCrea
 	return _c
 }
 
+// SetImageOutputTokens sets the "image_output_tokens" field.
+func (_c *UsageLogCreate) SetImageOutputTokens(v int) *UsageLogCreate {
+	_c.mutation.SetImageOutputTokens(v)
+	return _c
+}
+
+// SetNillableImageOutputTokens sets the "image_output_tokens" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableImageOutputTokens(v *int) *UsageLogCreate {
+	if v != nil {
+		_c.SetImageOutputTokens(*v)
+	}
+	return _c
+}
+
+// SetImageInputTokens sets the "image_input_tokens" field.
+func (_c *UsageLogCreate) SetImageInputTokens(v int) *UsageLogCreate {
+	_c.mutation.SetImageInputTokens(v)
+	return _c
+}
+
+// SetNillableImageInputTokens sets the "image_input_tokens" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableImageInputTokens(v *int) *UsageLogCreate {
+	if v != nil {
+		_c.SetImageInputTokens(*v)
+	}
+	return _c
+}
+
+// SetRequestType sets the "request_type" field.
+func (_c *UsageLogCreate) SetRequestType(v int16) *UsageLogCreate {
+	_c.mutation.SetRequestType(v)
+	return _c
+}
+
+// SetNillableRequestType sets the "request_type" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableRequestType(v *int16) *UsageLogCreate {
+	if v != nil {
+		_c.SetRequestType(*v)
+	}
+	return _c
+}
+
 // SetStream sets the "stream" field.
 func (_c *UsageLogCreate) SetStream(v bool) *UsageLogCreate {
 	_c.mutation.SetStream(v)
@@ -248,6 +290,20 @@ func (_c *UsageLogCreate) SetStream(v bool) *UsageLogCreate {
 func (_c *UsageLogCreate) SetNillableStream(v *bool) *UsageLogCreate {
 	if v != nil {
 		_c.SetStream(*v)
+	}
+	return _c
+}
+
+// SetOpenaiWsMode sets the "openai_ws_mode" field.
+func (_c *UsageLogCreate) SetOpenaiWsMode(v bool) *UsageLogCreate {
+	_c.mutation.SetOpenaiWsMode(v)
+	return _c
+}
+
+// SetNillableOpenaiWsMode sets the "openai_ws_mode" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableOpenaiWsMode(v *bool) *UsageLogCreate {
+	if v != nil {
+		_c.SetOpenaiWsMode(*v)
 	}
 	return _c
 }
@@ -304,6 +360,76 @@ func (_c *UsageLogCreate) SetIPAddress(v string) *UsageLogCreate {
 func (_c *UsageLogCreate) SetNillableIPAddress(v *string) *UsageLogCreate {
 	if v != nil {
 		_c.SetIPAddress(*v)
+	}
+	return _c
+}
+
+// SetServiceTier sets the "service_tier" field.
+func (_c *UsageLogCreate) SetServiceTier(v string) *UsageLogCreate {
+	_c.mutation.SetServiceTier(v)
+	return _c
+}
+
+// SetNillableServiceTier sets the "service_tier" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableServiceTier(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetServiceTier(*v)
+	}
+	return _c
+}
+
+// SetReasoningEffort sets the "reasoning_effort" field.
+func (_c *UsageLogCreate) SetReasoningEffort(v string) *UsageLogCreate {
+	_c.mutation.SetReasoningEffort(v)
+	return _c
+}
+
+// SetNillableReasoningEffort sets the "reasoning_effort" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableReasoningEffort(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetReasoningEffort(*v)
+	}
+	return _c
+}
+
+// SetInboundEndpoint sets the "inbound_endpoint" field.
+func (_c *UsageLogCreate) SetInboundEndpoint(v string) *UsageLogCreate {
+	_c.mutation.SetInboundEndpoint(v)
+	return _c
+}
+
+// SetNillableInboundEndpoint sets the "inbound_endpoint" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableInboundEndpoint(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetInboundEndpoint(*v)
+	}
+	return _c
+}
+
+// SetUpstreamEndpoint sets the "upstream_endpoint" field.
+func (_c *UsageLogCreate) SetUpstreamEndpoint(v string) *UsageLogCreate {
+	_c.mutation.SetUpstreamEndpoint(v)
+	return _c
+}
+
+// SetNillableUpstreamEndpoint sets the "upstream_endpoint" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableUpstreamEndpoint(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetUpstreamEndpoint(*v)
+	}
+	return _c
+}
+
+// SetSessionID sets the "session_id" field.
+func (_c *UsageLogCreate) SetSessionID(v string) *UsageLogCreate {
+	_c.mutation.SetSessionID(v)
+	return _c
+}
+
+// SetNillableSessionID sets the "session_id" field if the given value is not nil.
+func (_c *UsageLogCreate) SetNillableSessionID(v *string) *UsageLogCreate {
+	if v != nil {
+		_c.SetSessionID(*v)
 	}
 	return _c
 }
@@ -519,9 +645,25 @@ func (_c *UsageLogCreate) defaults() {
 		v := usagelog.DefaultCacheCreation1hTokens
 		_c.mutation.SetCacheCreation1hTokens(v)
 	}
+	if _, ok := _c.mutation.ImageOutputTokens(); !ok {
+		v := usagelog.DefaultImageOutputTokens
+		_c.mutation.SetImageOutputTokens(v)
+	}
+	if _, ok := _c.mutation.ImageInputTokens(); !ok {
+		v := usagelog.DefaultImageInputTokens
+		_c.mutation.SetImageInputTokens(v)
+	}
+	if _, ok := _c.mutation.RequestType(); !ok {
+		v := usagelog.DefaultRequestType
+		_c.mutation.SetRequestType(v)
+	}
 	if _, ok := _c.mutation.Stream(); !ok {
 		v := usagelog.DefaultStream
 		_c.mutation.SetStream(v)
+	}
+	if _, ok := _c.mutation.OpenaiWsMode(); !ok {
+		v := usagelog.DefaultOpenaiWsMode
+		_c.mutation.SetOpenaiWsMode(v)
 	}
 	if _, ok := _c.mutation.ImageCount(); !ok {
 		v := usagelog.DefaultImageCount
@@ -602,8 +744,20 @@ func (_c *UsageLogCreate) check() error {
 	if _, ok := _c.mutation.CacheCreation1hTokens(); !ok {
 		return &ValidationError{Name: "cache_creation_1h_tokens", err: errors.New(`ent: missing required field "UsageLog.cache_creation_1h_tokens"`)}
 	}
+	if _, ok := _c.mutation.ImageOutputTokens(); !ok {
+		return &ValidationError{Name: "image_output_tokens", err: errors.New(`ent: missing required field "UsageLog.image_output_tokens"`)}
+	}
+	if _, ok := _c.mutation.ImageInputTokens(); !ok {
+		return &ValidationError{Name: "image_input_tokens", err: errors.New(`ent: missing required field "UsageLog.image_input_tokens"`)}
+	}
+	if _, ok := _c.mutation.RequestType(); !ok {
+		return &ValidationError{Name: "request_type", err: errors.New(`ent: missing required field "UsageLog.request_type"`)}
+	}
 	if _, ok := _c.mutation.Stream(); !ok {
 		return &ValidationError{Name: "stream", err: errors.New(`ent: missing required field "UsageLog.stream"`)}
+	}
+	if _, ok := _c.mutation.OpenaiWsMode(); !ok {
+		return &ValidationError{Name: "openai_ws_mode", err: errors.New(`ent: missing required field "UsageLog.openai_ws_mode"`)}
 	}
 	if v, ok := _c.mutation.UserAgent(); ok {
 		if err := usagelog.UserAgentValidator(v); err != nil {
@@ -613,6 +767,31 @@ func (_c *UsageLogCreate) check() error {
 	if v, ok := _c.mutation.IPAddress(); ok {
 		if err := usagelog.IPAddressValidator(v); err != nil {
 			return &ValidationError{Name: "ip_address", err: fmt.Errorf(`ent: validator failed for field "UsageLog.ip_address": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ServiceTier(); ok {
+		if err := usagelog.ServiceTierValidator(v); err != nil {
+			return &ValidationError{Name: "service_tier", err: fmt.Errorf(`ent: validator failed for field "UsageLog.service_tier": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ReasoningEffort(); ok {
+		if err := usagelog.ReasoningEffortValidator(v); err != nil {
+			return &ValidationError{Name: "reasoning_effort", err: fmt.Errorf(`ent: validator failed for field "UsageLog.reasoning_effort": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.InboundEndpoint(); ok {
+		if err := usagelog.InboundEndpointValidator(v); err != nil {
+			return &ValidationError{Name: "inbound_endpoint", err: fmt.Errorf(`ent: validator failed for field "UsageLog.inbound_endpoint": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.UpstreamEndpoint(); ok {
+		if err := usagelog.UpstreamEndpointValidator(v); err != nil {
+			return &ValidationError{Name: "upstream_endpoint", err: fmt.Errorf(`ent: validator failed for field "UsageLog.upstream_endpoint": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SessionID(); ok {
+		if err := usagelog.SessionIDValidator(v); err != nil {
+			return &ValidationError{Name: "session_id", err: fmt.Errorf(`ent: validator failed for field "UsageLog.session_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.ImageCount(); !ok {
@@ -741,9 +920,25 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 		_spec.SetField(usagelog.FieldCacheCreation1hTokens, field.TypeInt, value)
 		_node.CacheCreation1hTokens = value
 	}
+	if value, ok := _c.mutation.ImageOutputTokens(); ok {
+		_spec.SetField(usagelog.FieldImageOutputTokens, field.TypeInt, value)
+		_node.ImageOutputTokens = value
+	}
+	if value, ok := _c.mutation.ImageInputTokens(); ok {
+		_spec.SetField(usagelog.FieldImageInputTokens, field.TypeInt, value)
+		_node.ImageInputTokens = value
+	}
+	if value, ok := _c.mutation.RequestType(); ok {
+		_spec.SetField(usagelog.FieldRequestType, field.TypeInt16, value)
+		_node.RequestType = value
+	}
 	if value, ok := _c.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
 		_node.Stream = value
+	}
+	if value, ok := _c.mutation.OpenaiWsMode(); ok {
+		_spec.SetField(usagelog.FieldOpenaiWsMode, field.TypeBool, value)
+		_node.OpenaiWsMode = value
 	}
 	if value, ok := _c.mutation.DurationMs(); ok {
 		_spec.SetField(usagelog.FieldDurationMs, field.TypeInt, value)
@@ -760,6 +955,26 @@ func (_c *UsageLogCreate) createSpec() (*UsageLog, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.IPAddress(); ok {
 		_spec.SetField(usagelog.FieldIPAddress, field.TypeString, value)
 		_node.IPAddress = &value
+	}
+	if value, ok := _c.mutation.ServiceTier(); ok {
+		_spec.SetField(usagelog.FieldServiceTier, field.TypeString, value)
+		_node.ServiceTier = &value
+	}
+	if value, ok := _c.mutation.ReasoningEffort(); ok {
+		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
+		_node.ReasoningEffort = &value
+	}
+	if value, ok := _c.mutation.InboundEndpoint(); ok {
+		_spec.SetField(usagelog.FieldInboundEndpoint, field.TypeString, value)
+		_node.InboundEndpoint = &value
+	}
+	if value, ok := _c.mutation.UpstreamEndpoint(); ok {
+		_spec.SetField(usagelog.FieldUpstreamEndpoint, field.TypeString, value)
+		_node.UpstreamEndpoint = &value
+	}
+	if value, ok := _c.mutation.SessionID(); ok {
+		_spec.SetField(usagelog.FieldSessionID, field.TypeString, value)
+		_node.SessionID = &value
 	}
 	if value, ok := _c.mutation.ImageCount(); ok {
 		_spec.SetField(usagelog.FieldImageCount, field.TypeInt, value)
@@ -1221,6 +1436,60 @@ func (u *UsageLogUpsert) AddCacheCreation1hTokens(v int) *UsageLogUpsert {
 	return u
 }
 
+// SetImageOutputTokens sets the "image_output_tokens" field.
+func (u *UsageLogUpsert) SetImageOutputTokens(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldImageOutputTokens, v)
+	return u
+}
+
+// UpdateImageOutputTokens sets the "image_output_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateImageOutputTokens() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldImageOutputTokens)
+	return u
+}
+
+// AddImageOutputTokens adds v to the "image_output_tokens" field.
+func (u *UsageLogUpsert) AddImageOutputTokens(v int) *UsageLogUpsert {
+	u.Add(usagelog.FieldImageOutputTokens, v)
+	return u
+}
+
+// SetImageInputTokens sets the "image_input_tokens" field.
+func (u *UsageLogUpsert) SetImageInputTokens(v int) *UsageLogUpsert {
+	u.Set(usagelog.FieldImageInputTokens, v)
+	return u
+}
+
+// UpdateImageInputTokens sets the "image_input_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateImageInputTokens() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldImageInputTokens)
+	return u
+}
+
+// AddImageInputTokens adds v to the "image_input_tokens" field.
+func (u *UsageLogUpsert) AddImageInputTokens(v int) *UsageLogUpsert {
+	u.Add(usagelog.FieldImageInputTokens, v)
+	return u
+}
+
+// SetRequestType sets the "request_type" field.
+func (u *UsageLogUpsert) SetRequestType(v int16) *UsageLogUpsert {
+	u.Set(usagelog.FieldRequestType, v)
+	return u
+}
+
+// UpdateRequestType sets the "request_type" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateRequestType() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldRequestType)
+	return u
+}
+
+// AddRequestType adds v to the "request_type" field.
+func (u *UsageLogUpsert) AddRequestType(v int16) *UsageLogUpsert {
+	u.Add(usagelog.FieldRequestType, v)
+	return u
+}
+
 // SetStream sets the "stream" field.
 func (u *UsageLogUpsert) SetStream(v bool) *UsageLogUpsert {
 	u.Set(usagelog.FieldStream, v)
@@ -1230,6 +1499,18 @@ func (u *UsageLogUpsert) SetStream(v bool) *UsageLogUpsert {
 // UpdateStream sets the "stream" field to the value that was provided on create.
 func (u *UsageLogUpsert) UpdateStream() *UsageLogUpsert {
 	u.SetExcluded(usagelog.FieldStream)
+	return u
+}
+
+// SetOpenaiWsMode sets the "openai_ws_mode" field.
+func (u *UsageLogUpsert) SetOpenaiWsMode(v bool) *UsageLogUpsert {
+	u.Set(usagelog.FieldOpenaiWsMode, v)
+	return u
+}
+
+// UpdateOpenaiWsMode sets the "openai_ws_mode" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateOpenaiWsMode() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldOpenaiWsMode)
 	return u
 }
 
@@ -1314,6 +1595,96 @@ func (u *UsageLogUpsert) UpdateIPAddress() *UsageLogUpsert {
 // ClearIPAddress clears the value of the "ip_address" field.
 func (u *UsageLogUpsert) ClearIPAddress() *UsageLogUpsert {
 	u.SetNull(usagelog.FieldIPAddress)
+	return u
+}
+
+// SetServiceTier sets the "service_tier" field.
+func (u *UsageLogUpsert) SetServiceTier(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldServiceTier, v)
+	return u
+}
+
+// UpdateServiceTier sets the "service_tier" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateServiceTier() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldServiceTier)
+	return u
+}
+
+// ClearServiceTier clears the value of the "service_tier" field.
+func (u *UsageLogUpsert) ClearServiceTier() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldServiceTier)
+	return u
+}
+
+// SetReasoningEffort sets the "reasoning_effort" field.
+func (u *UsageLogUpsert) SetReasoningEffort(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldReasoningEffort, v)
+	return u
+}
+
+// UpdateReasoningEffort sets the "reasoning_effort" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateReasoningEffort() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldReasoningEffort)
+	return u
+}
+
+// ClearReasoningEffort clears the value of the "reasoning_effort" field.
+func (u *UsageLogUpsert) ClearReasoningEffort() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldReasoningEffort)
+	return u
+}
+
+// SetInboundEndpoint sets the "inbound_endpoint" field.
+func (u *UsageLogUpsert) SetInboundEndpoint(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldInboundEndpoint, v)
+	return u
+}
+
+// UpdateInboundEndpoint sets the "inbound_endpoint" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateInboundEndpoint() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldInboundEndpoint)
+	return u
+}
+
+// ClearInboundEndpoint clears the value of the "inbound_endpoint" field.
+func (u *UsageLogUpsert) ClearInboundEndpoint() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldInboundEndpoint)
+	return u
+}
+
+// SetUpstreamEndpoint sets the "upstream_endpoint" field.
+func (u *UsageLogUpsert) SetUpstreamEndpoint(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldUpstreamEndpoint, v)
+	return u
+}
+
+// UpdateUpstreamEndpoint sets the "upstream_endpoint" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateUpstreamEndpoint() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldUpstreamEndpoint)
+	return u
+}
+
+// ClearUpstreamEndpoint clears the value of the "upstream_endpoint" field.
+func (u *UsageLogUpsert) ClearUpstreamEndpoint() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldUpstreamEndpoint)
+	return u
+}
+
+// SetSessionID sets the "session_id" field.
+func (u *UsageLogUpsert) SetSessionID(v string) *UsageLogUpsert {
+	u.Set(usagelog.FieldSessionID, v)
+	return u
+}
+
+// UpdateSessionID sets the "session_id" field to the value that was provided on create.
+func (u *UsageLogUpsert) UpdateSessionID() *UsageLogUpsert {
+	u.SetExcluded(usagelog.FieldSessionID)
+	return u
+}
+
+// ClearSessionID clears the value of the "session_id" field.
+func (u *UsageLogUpsert) ClearSessionID() *UsageLogUpsert {
+	u.SetNull(usagelog.FieldSessionID)
 	return u
 }
 
@@ -1880,6 +2251,69 @@ func (u *UsageLogUpsertOne) UpdateCacheCreation1hTokens() *UsageLogUpsertOne {
 	})
 }
 
+// SetImageOutputTokens sets the "image_output_tokens" field.
+func (u *UsageLogUpsertOne) SetImageOutputTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetImageOutputTokens(v)
+	})
+}
+
+// AddImageOutputTokens adds v to the "image_output_tokens" field.
+func (u *UsageLogUpsertOne) AddImageOutputTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddImageOutputTokens(v)
+	})
+}
+
+// UpdateImageOutputTokens sets the "image_output_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateImageOutputTokens() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateImageOutputTokens()
+	})
+}
+
+// SetImageInputTokens sets the "image_input_tokens" field.
+func (u *UsageLogUpsertOne) SetImageInputTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetImageInputTokens(v)
+	})
+}
+
+// AddImageInputTokens adds v to the "image_input_tokens" field.
+func (u *UsageLogUpsertOne) AddImageInputTokens(v int) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddImageInputTokens(v)
+	})
+}
+
+// UpdateImageInputTokens sets the "image_input_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateImageInputTokens() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateImageInputTokens()
+	})
+}
+
+// SetRequestType sets the "request_type" field.
+func (u *UsageLogUpsertOne) SetRequestType(v int16) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetRequestType(v)
+	})
+}
+
+// AddRequestType adds v to the "request_type" field.
+func (u *UsageLogUpsertOne) AddRequestType(v int16) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddRequestType(v)
+	})
+}
+
+// UpdateRequestType sets the "request_type" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateRequestType() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateRequestType()
+	})
+}
+
 // SetStream sets the "stream" field.
 func (u *UsageLogUpsertOne) SetStream(v bool) *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
@@ -1891,6 +2325,20 @@ func (u *UsageLogUpsertOne) SetStream(v bool) *UsageLogUpsertOne {
 func (u *UsageLogUpsertOne) UpdateStream() *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateStream()
+	})
+}
+
+// SetOpenaiWsMode sets the "openai_ws_mode" field.
+func (u *UsageLogUpsertOne) SetOpenaiWsMode(v bool) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetOpenaiWsMode(v)
+	})
+}
+
+// UpdateOpenaiWsMode sets the "openai_ws_mode" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateOpenaiWsMode() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateOpenaiWsMode()
 	})
 }
 
@@ -1989,6 +2437,111 @@ func (u *UsageLogUpsertOne) UpdateIPAddress() *UsageLogUpsertOne {
 func (u *UsageLogUpsertOne) ClearIPAddress() *UsageLogUpsertOne {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.ClearIPAddress()
+	})
+}
+
+// SetServiceTier sets the "service_tier" field.
+func (u *UsageLogUpsertOne) SetServiceTier(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetServiceTier(v)
+	})
+}
+
+// UpdateServiceTier sets the "service_tier" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateServiceTier() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateServiceTier()
+	})
+}
+
+// ClearServiceTier clears the value of the "service_tier" field.
+func (u *UsageLogUpsertOne) ClearServiceTier() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearServiceTier()
+	})
+}
+
+// SetReasoningEffort sets the "reasoning_effort" field.
+func (u *UsageLogUpsertOne) SetReasoningEffort(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetReasoningEffort(v)
+	})
+}
+
+// UpdateReasoningEffort sets the "reasoning_effort" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateReasoningEffort() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateReasoningEffort()
+	})
+}
+
+// ClearReasoningEffort clears the value of the "reasoning_effort" field.
+func (u *UsageLogUpsertOne) ClearReasoningEffort() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearReasoningEffort()
+	})
+}
+
+// SetInboundEndpoint sets the "inbound_endpoint" field.
+func (u *UsageLogUpsertOne) SetInboundEndpoint(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetInboundEndpoint(v)
+	})
+}
+
+// UpdateInboundEndpoint sets the "inbound_endpoint" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateInboundEndpoint() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateInboundEndpoint()
+	})
+}
+
+// ClearInboundEndpoint clears the value of the "inbound_endpoint" field.
+func (u *UsageLogUpsertOne) ClearInboundEndpoint() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearInboundEndpoint()
+	})
+}
+
+// SetUpstreamEndpoint sets the "upstream_endpoint" field.
+func (u *UsageLogUpsertOne) SetUpstreamEndpoint(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetUpstreamEndpoint(v)
+	})
+}
+
+// UpdateUpstreamEndpoint sets the "upstream_endpoint" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateUpstreamEndpoint() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateUpstreamEndpoint()
+	})
+}
+
+// ClearUpstreamEndpoint clears the value of the "upstream_endpoint" field.
+func (u *UsageLogUpsertOne) ClearUpstreamEndpoint() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearUpstreamEndpoint()
+	})
+}
+
+// SetSessionID sets the "session_id" field.
+func (u *UsageLogUpsertOne) SetSessionID(v string) *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetSessionID(v)
+	})
+}
+
+// UpdateSessionID sets the "session_id" field to the value that was provided on create.
+func (u *UsageLogUpsertOne) UpdateSessionID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateSessionID()
+	})
+}
+
+// ClearSessionID clears the value of the "session_id" field.
+func (u *UsageLogUpsertOne) ClearSessionID() *UsageLogUpsertOne {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearSessionID()
 	})
 }
 
@@ -2749,6 +3302,69 @@ func (u *UsageLogUpsertBulk) UpdateCacheCreation1hTokens() *UsageLogUpsertBulk {
 	})
 }
 
+// SetImageOutputTokens sets the "image_output_tokens" field.
+func (u *UsageLogUpsertBulk) SetImageOutputTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetImageOutputTokens(v)
+	})
+}
+
+// AddImageOutputTokens adds v to the "image_output_tokens" field.
+func (u *UsageLogUpsertBulk) AddImageOutputTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddImageOutputTokens(v)
+	})
+}
+
+// UpdateImageOutputTokens sets the "image_output_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateImageOutputTokens() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateImageOutputTokens()
+	})
+}
+
+// SetImageInputTokens sets the "image_input_tokens" field.
+func (u *UsageLogUpsertBulk) SetImageInputTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetImageInputTokens(v)
+	})
+}
+
+// AddImageInputTokens adds v to the "image_input_tokens" field.
+func (u *UsageLogUpsertBulk) AddImageInputTokens(v int) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddImageInputTokens(v)
+	})
+}
+
+// UpdateImageInputTokens sets the "image_input_tokens" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateImageInputTokens() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateImageInputTokens()
+	})
+}
+
+// SetRequestType sets the "request_type" field.
+func (u *UsageLogUpsertBulk) SetRequestType(v int16) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetRequestType(v)
+	})
+}
+
+// AddRequestType adds v to the "request_type" field.
+func (u *UsageLogUpsertBulk) AddRequestType(v int16) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.AddRequestType(v)
+	})
+}
+
+// UpdateRequestType sets the "request_type" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateRequestType() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateRequestType()
+	})
+}
+
 // SetStream sets the "stream" field.
 func (u *UsageLogUpsertBulk) SetStream(v bool) *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
@@ -2760,6 +3376,20 @@ func (u *UsageLogUpsertBulk) SetStream(v bool) *UsageLogUpsertBulk {
 func (u *UsageLogUpsertBulk) UpdateStream() *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.UpdateStream()
+	})
+}
+
+// SetOpenaiWsMode sets the "openai_ws_mode" field.
+func (u *UsageLogUpsertBulk) SetOpenaiWsMode(v bool) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetOpenaiWsMode(v)
+	})
+}
+
+// UpdateOpenaiWsMode sets the "openai_ws_mode" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateOpenaiWsMode() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateOpenaiWsMode()
 	})
 }
 
@@ -2858,6 +3488,111 @@ func (u *UsageLogUpsertBulk) UpdateIPAddress() *UsageLogUpsertBulk {
 func (u *UsageLogUpsertBulk) ClearIPAddress() *UsageLogUpsertBulk {
 	return u.Update(func(s *UsageLogUpsert) {
 		s.ClearIPAddress()
+	})
+}
+
+// SetServiceTier sets the "service_tier" field.
+func (u *UsageLogUpsertBulk) SetServiceTier(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetServiceTier(v)
+	})
+}
+
+// UpdateServiceTier sets the "service_tier" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateServiceTier() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateServiceTier()
+	})
+}
+
+// ClearServiceTier clears the value of the "service_tier" field.
+func (u *UsageLogUpsertBulk) ClearServiceTier() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearServiceTier()
+	})
+}
+
+// SetReasoningEffort sets the "reasoning_effort" field.
+func (u *UsageLogUpsertBulk) SetReasoningEffort(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetReasoningEffort(v)
+	})
+}
+
+// UpdateReasoningEffort sets the "reasoning_effort" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateReasoningEffort() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateReasoningEffort()
+	})
+}
+
+// ClearReasoningEffort clears the value of the "reasoning_effort" field.
+func (u *UsageLogUpsertBulk) ClearReasoningEffort() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearReasoningEffort()
+	})
+}
+
+// SetInboundEndpoint sets the "inbound_endpoint" field.
+func (u *UsageLogUpsertBulk) SetInboundEndpoint(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetInboundEndpoint(v)
+	})
+}
+
+// UpdateInboundEndpoint sets the "inbound_endpoint" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateInboundEndpoint() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateInboundEndpoint()
+	})
+}
+
+// ClearInboundEndpoint clears the value of the "inbound_endpoint" field.
+func (u *UsageLogUpsertBulk) ClearInboundEndpoint() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearInboundEndpoint()
+	})
+}
+
+// SetUpstreamEndpoint sets the "upstream_endpoint" field.
+func (u *UsageLogUpsertBulk) SetUpstreamEndpoint(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetUpstreamEndpoint(v)
+	})
+}
+
+// UpdateUpstreamEndpoint sets the "upstream_endpoint" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateUpstreamEndpoint() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateUpstreamEndpoint()
+	})
+}
+
+// ClearUpstreamEndpoint clears the value of the "upstream_endpoint" field.
+func (u *UsageLogUpsertBulk) ClearUpstreamEndpoint() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearUpstreamEndpoint()
+	})
+}
+
+// SetSessionID sets the "session_id" field.
+func (u *UsageLogUpsertBulk) SetSessionID(v string) *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.SetSessionID(v)
+	})
+}
+
+// UpdateSessionID sets the "session_id" field to the value that was provided on create.
+func (u *UsageLogUpsertBulk) UpdateSessionID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.UpdateSessionID()
+	})
+}
+
+// ClearSessionID clears the value of the "session_id" field.
+func (u *UsageLogUpsertBulk) ClearSessionID() *UsageLogUpsertBulk {
+	return u.Update(func(s *UsageLogUpsert) {
+		s.ClearSessionID()
 	})
 }
 

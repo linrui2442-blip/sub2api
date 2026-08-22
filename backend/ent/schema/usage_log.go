@@ -83,9 +83,17 @@ func (UsageLog) Fields() []ent.Field {
 			Default(0),
 		field.Int("cache_creation_1h_tokens").
 			Default(0),
+		field.Int("image_output_tokens").
+			Default(0),
+		field.Int("image_input_tokens").
+			Default(0),
 
 		// 其他字段
+		field.Int16("request_type").
+			Default(0),
 		field.Bool("stream").
+			Default(false),
+		field.Bool("openai_ws_mode").
 			Default(false),
 		field.Int("duration_ms").
 			Optional().
@@ -99,6 +107,26 @@ func (UsageLog) Fields() []ent.Field {
 			Nillable(),
 		field.String("ip_address").
 			MaxLen(45). // 支持 IPv6
+			Optional().
+			Nillable(),
+		field.String("service_tier").
+			MaxLen(32).
+			Optional().
+			Nillable(),
+		field.String("reasoning_effort").
+			MaxLen(32).
+			Optional().
+			Nillable(),
+		field.String("inbound_endpoint").
+			MaxLen(128).
+			Optional().
+			Nillable(),
+		field.String("upstream_endpoint").
+			MaxLen(128).
+			Optional().
+			Nillable(),
+		field.String("session_id").
+			MaxLen(128).
 			Optional().
 			Nillable(),
 

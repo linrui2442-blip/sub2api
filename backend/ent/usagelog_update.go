@@ -374,6 +374,69 @@ func (_u *UsageLogUpdate) AddCacheCreation1hTokens(v int) *UsageLogUpdate {
 	return _u
 }
 
+// SetImageOutputTokens sets the "image_output_tokens" field.
+func (_u *UsageLogUpdate) SetImageOutputTokens(v int) *UsageLogUpdate {
+	_u.mutation.ResetImageOutputTokens()
+	_u.mutation.SetImageOutputTokens(v)
+	return _u
+}
+
+// SetNillableImageOutputTokens sets the "image_output_tokens" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableImageOutputTokens(v *int) *UsageLogUpdate {
+	if v != nil {
+		_u.SetImageOutputTokens(*v)
+	}
+	return _u
+}
+
+// AddImageOutputTokens adds value to the "image_output_tokens" field.
+func (_u *UsageLogUpdate) AddImageOutputTokens(v int) *UsageLogUpdate {
+	_u.mutation.AddImageOutputTokens(v)
+	return _u
+}
+
+// SetImageInputTokens sets the "image_input_tokens" field.
+func (_u *UsageLogUpdate) SetImageInputTokens(v int) *UsageLogUpdate {
+	_u.mutation.ResetImageInputTokens()
+	_u.mutation.SetImageInputTokens(v)
+	return _u
+}
+
+// SetNillableImageInputTokens sets the "image_input_tokens" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableImageInputTokens(v *int) *UsageLogUpdate {
+	if v != nil {
+		_u.SetImageInputTokens(*v)
+	}
+	return _u
+}
+
+// AddImageInputTokens adds value to the "image_input_tokens" field.
+func (_u *UsageLogUpdate) AddImageInputTokens(v int) *UsageLogUpdate {
+	_u.mutation.AddImageInputTokens(v)
+	return _u
+}
+
+// SetRequestType sets the "request_type" field.
+func (_u *UsageLogUpdate) SetRequestType(v int16) *UsageLogUpdate {
+	_u.mutation.ResetRequestType()
+	_u.mutation.SetRequestType(v)
+	return _u
+}
+
+// SetNillableRequestType sets the "request_type" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableRequestType(v *int16) *UsageLogUpdate {
+	if v != nil {
+		_u.SetRequestType(*v)
+	}
+	return _u
+}
+
+// AddRequestType adds value to the "request_type" field.
+func (_u *UsageLogUpdate) AddRequestType(v int16) *UsageLogUpdate {
+	_u.mutation.AddRequestType(v)
+	return _u
+}
+
 // SetStream sets the "stream" field.
 func (_u *UsageLogUpdate) SetStream(v bool) *UsageLogUpdate {
 	_u.mutation.SetStream(v)
@@ -384,6 +447,20 @@ func (_u *UsageLogUpdate) SetStream(v bool) *UsageLogUpdate {
 func (_u *UsageLogUpdate) SetNillableStream(v *bool) *UsageLogUpdate {
 	if v != nil {
 		_u.SetStream(*v)
+	}
+	return _u
+}
+
+// SetOpenaiWsMode sets the "openai_ws_mode" field.
+func (_u *UsageLogUpdate) SetOpenaiWsMode(v bool) *UsageLogUpdate {
+	_u.mutation.SetOpenaiWsMode(v)
+	return _u
+}
+
+// SetNillableOpenaiWsMode sets the "openai_ws_mode" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableOpenaiWsMode(v *bool) *UsageLogUpdate {
+	if v != nil {
+		_u.SetOpenaiWsMode(*v)
 	}
 	return _u
 }
@@ -479,6 +556,106 @@ func (_u *UsageLogUpdate) SetNillableIPAddress(v *string) *UsageLogUpdate {
 // ClearIPAddress clears the value of the "ip_address" field.
 func (_u *UsageLogUpdate) ClearIPAddress() *UsageLogUpdate {
 	_u.mutation.ClearIPAddress()
+	return _u
+}
+
+// SetServiceTier sets the "service_tier" field.
+func (_u *UsageLogUpdate) SetServiceTier(v string) *UsageLogUpdate {
+	_u.mutation.SetServiceTier(v)
+	return _u
+}
+
+// SetNillableServiceTier sets the "service_tier" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableServiceTier(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetServiceTier(*v)
+	}
+	return _u
+}
+
+// ClearServiceTier clears the value of the "service_tier" field.
+func (_u *UsageLogUpdate) ClearServiceTier() *UsageLogUpdate {
+	_u.mutation.ClearServiceTier()
+	return _u
+}
+
+// SetReasoningEffort sets the "reasoning_effort" field.
+func (_u *UsageLogUpdate) SetReasoningEffort(v string) *UsageLogUpdate {
+	_u.mutation.SetReasoningEffort(v)
+	return _u
+}
+
+// SetNillableReasoningEffort sets the "reasoning_effort" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableReasoningEffort(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetReasoningEffort(*v)
+	}
+	return _u
+}
+
+// ClearReasoningEffort clears the value of the "reasoning_effort" field.
+func (_u *UsageLogUpdate) ClearReasoningEffort() *UsageLogUpdate {
+	_u.mutation.ClearReasoningEffort()
+	return _u
+}
+
+// SetInboundEndpoint sets the "inbound_endpoint" field.
+func (_u *UsageLogUpdate) SetInboundEndpoint(v string) *UsageLogUpdate {
+	_u.mutation.SetInboundEndpoint(v)
+	return _u
+}
+
+// SetNillableInboundEndpoint sets the "inbound_endpoint" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableInboundEndpoint(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetInboundEndpoint(*v)
+	}
+	return _u
+}
+
+// ClearInboundEndpoint clears the value of the "inbound_endpoint" field.
+func (_u *UsageLogUpdate) ClearInboundEndpoint() *UsageLogUpdate {
+	_u.mutation.ClearInboundEndpoint()
+	return _u
+}
+
+// SetUpstreamEndpoint sets the "upstream_endpoint" field.
+func (_u *UsageLogUpdate) SetUpstreamEndpoint(v string) *UsageLogUpdate {
+	_u.mutation.SetUpstreamEndpoint(v)
+	return _u
+}
+
+// SetNillableUpstreamEndpoint sets the "upstream_endpoint" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableUpstreamEndpoint(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetUpstreamEndpoint(*v)
+	}
+	return _u
+}
+
+// ClearUpstreamEndpoint clears the value of the "upstream_endpoint" field.
+func (_u *UsageLogUpdate) ClearUpstreamEndpoint() *UsageLogUpdate {
+	_u.mutation.ClearUpstreamEndpoint()
+	return _u
+}
+
+// SetSessionID sets the "session_id" field.
+func (_u *UsageLogUpdate) SetSessionID(v string) *UsageLogUpdate {
+	_u.mutation.SetSessionID(v)
+	return _u
+}
+
+// SetNillableSessionID sets the "session_id" field if the given value is not nil.
+func (_u *UsageLogUpdate) SetNillableSessionID(v *string) *UsageLogUpdate {
+	if v != nil {
+		_u.SetSessionID(*v)
+	}
+	return _u
+}
+
+// ClearSessionID clears the value of the "session_id" field.
+func (_u *UsageLogUpdate) ClearSessionID() *UsageLogUpdate {
+	_u.mutation.ClearSessionID()
 	return _u
 }
 
@@ -781,6 +958,31 @@ func (_u *UsageLogUpdate) check() error {
 			return &ValidationError{Name: "ip_address", err: fmt.Errorf(`ent: validator failed for field "UsageLog.ip_address": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ServiceTier(); ok {
+		if err := usagelog.ServiceTierValidator(v); err != nil {
+			return &ValidationError{Name: "service_tier", err: fmt.Errorf(`ent: validator failed for field "UsageLog.service_tier": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ReasoningEffort(); ok {
+		if err := usagelog.ReasoningEffortValidator(v); err != nil {
+			return &ValidationError{Name: "reasoning_effort", err: fmt.Errorf(`ent: validator failed for field "UsageLog.reasoning_effort": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.InboundEndpoint(); ok {
+		if err := usagelog.InboundEndpointValidator(v); err != nil {
+			return &ValidationError{Name: "inbound_endpoint", err: fmt.Errorf(`ent: validator failed for field "UsageLog.inbound_endpoint": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.UpstreamEndpoint(); ok {
+		if err := usagelog.UpstreamEndpointValidator(v); err != nil {
+			return &ValidationError{Name: "upstream_endpoint", err: fmt.Errorf(`ent: validator failed for field "UsageLog.upstream_endpoint": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SessionID(); ok {
+		if err := usagelog.SessionIDValidator(v); err != nil {
+			return &ValidationError{Name: "session_id", err: fmt.Errorf(`ent: validator failed for field "UsageLog.session_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ImageSize(); ok {
 		if err := usagelog.ImageSizeValidator(v); err != nil {
 			return &ValidationError{Name: "image_size", err: fmt.Errorf(`ent: validator failed for field "UsageLog.image_size": %w`, err)}
@@ -911,8 +1113,29 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.AddedCacheCreation1hTokens(); ok {
 		_spec.AddField(usagelog.FieldCacheCreation1hTokens, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.ImageOutputTokens(); ok {
+		_spec.SetField(usagelog.FieldImageOutputTokens, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedImageOutputTokens(); ok {
+		_spec.AddField(usagelog.FieldImageOutputTokens, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.ImageInputTokens(); ok {
+		_spec.SetField(usagelog.FieldImageInputTokens, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedImageInputTokens(); ok {
+		_spec.AddField(usagelog.FieldImageInputTokens, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.RequestType(); ok {
+		_spec.SetField(usagelog.FieldRequestType, field.TypeInt16, value)
+	}
+	if value, ok := _u.mutation.AddedRequestType(); ok {
+		_spec.AddField(usagelog.FieldRequestType, field.TypeInt16, value)
+	}
 	if value, ok := _u.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.OpenaiWsMode(); ok {
+		_spec.SetField(usagelog.FieldOpenaiWsMode, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.DurationMs(); ok {
 		_spec.SetField(usagelog.FieldDurationMs, field.TypeInt, value)
@@ -943,6 +1166,36 @@ func (_u *UsageLogUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.IPAddressCleared() {
 		_spec.ClearField(usagelog.FieldIPAddress, field.TypeString)
+	}
+	if value, ok := _u.mutation.ServiceTier(); ok {
+		_spec.SetField(usagelog.FieldServiceTier, field.TypeString, value)
+	}
+	if _u.mutation.ServiceTierCleared() {
+		_spec.ClearField(usagelog.FieldServiceTier, field.TypeString)
+	}
+	if value, ok := _u.mutation.ReasoningEffort(); ok {
+		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
+	}
+	if _u.mutation.ReasoningEffortCleared() {
+		_spec.ClearField(usagelog.FieldReasoningEffort, field.TypeString)
+	}
+	if value, ok := _u.mutation.InboundEndpoint(); ok {
+		_spec.SetField(usagelog.FieldInboundEndpoint, field.TypeString, value)
+	}
+	if _u.mutation.InboundEndpointCleared() {
+		_spec.ClearField(usagelog.FieldInboundEndpoint, field.TypeString)
+	}
+	if value, ok := _u.mutation.UpstreamEndpoint(); ok {
+		_spec.SetField(usagelog.FieldUpstreamEndpoint, field.TypeString, value)
+	}
+	if _u.mutation.UpstreamEndpointCleared() {
+		_spec.ClearField(usagelog.FieldUpstreamEndpoint, field.TypeString)
+	}
+	if value, ok := _u.mutation.SessionID(); ok {
+		_spec.SetField(usagelog.FieldSessionID, field.TypeString, value)
+	}
+	if _u.mutation.SessionIDCleared() {
+		_spec.ClearField(usagelog.FieldSessionID, field.TypeString)
 	}
 	if value, ok := _u.mutation.ImageCount(); ok {
 		_spec.SetField(usagelog.FieldImageCount, field.TypeInt, value)
@@ -1480,6 +1733,69 @@ func (_u *UsageLogUpdateOne) AddCacheCreation1hTokens(v int) *UsageLogUpdateOne 
 	return _u
 }
 
+// SetImageOutputTokens sets the "image_output_tokens" field.
+func (_u *UsageLogUpdateOne) SetImageOutputTokens(v int) *UsageLogUpdateOne {
+	_u.mutation.ResetImageOutputTokens()
+	_u.mutation.SetImageOutputTokens(v)
+	return _u
+}
+
+// SetNillableImageOutputTokens sets the "image_output_tokens" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableImageOutputTokens(v *int) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetImageOutputTokens(*v)
+	}
+	return _u
+}
+
+// AddImageOutputTokens adds value to the "image_output_tokens" field.
+func (_u *UsageLogUpdateOne) AddImageOutputTokens(v int) *UsageLogUpdateOne {
+	_u.mutation.AddImageOutputTokens(v)
+	return _u
+}
+
+// SetImageInputTokens sets the "image_input_tokens" field.
+func (_u *UsageLogUpdateOne) SetImageInputTokens(v int) *UsageLogUpdateOne {
+	_u.mutation.ResetImageInputTokens()
+	_u.mutation.SetImageInputTokens(v)
+	return _u
+}
+
+// SetNillableImageInputTokens sets the "image_input_tokens" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableImageInputTokens(v *int) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetImageInputTokens(*v)
+	}
+	return _u
+}
+
+// AddImageInputTokens adds value to the "image_input_tokens" field.
+func (_u *UsageLogUpdateOne) AddImageInputTokens(v int) *UsageLogUpdateOne {
+	_u.mutation.AddImageInputTokens(v)
+	return _u
+}
+
+// SetRequestType sets the "request_type" field.
+func (_u *UsageLogUpdateOne) SetRequestType(v int16) *UsageLogUpdateOne {
+	_u.mutation.ResetRequestType()
+	_u.mutation.SetRequestType(v)
+	return _u
+}
+
+// SetNillableRequestType sets the "request_type" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableRequestType(v *int16) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetRequestType(*v)
+	}
+	return _u
+}
+
+// AddRequestType adds value to the "request_type" field.
+func (_u *UsageLogUpdateOne) AddRequestType(v int16) *UsageLogUpdateOne {
+	_u.mutation.AddRequestType(v)
+	return _u
+}
+
 // SetStream sets the "stream" field.
 func (_u *UsageLogUpdateOne) SetStream(v bool) *UsageLogUpdateOne {
 	_u.mutation.SetStream(v)
@@ -1490,6 +1806,20 @@ func (_u *UsageLogUpdateOne) SetStream(v bool) *UsageLogUpdateOne {
 func (_u *UsageLogUpdateOne) SetNillableStream(v *bool) *UsageLogUpdateOne {
 	if v != nil {
 		_u.SetStream(*v)
+	}
+	return _u
+}
+
+// SetOpenaiWsMode sets the "openai_ws_mode" field.
+func (_u *UsageLogUpdateOne) SetOpenaiWsMode(v bool) *UsageLogUpdateOne {
+	_u.mutation.SetOpenaiWsMode(v)
+	return _u
+}
+
+// SetNillableOpenaiWsMode sets the "openai_ws_mode" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableOpenaiWsMode(v *bool) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetOpenaiWsMode(*v)
 	}
 	return _u
 }
@@ -1585,6 +1915,106 @@ func (_u *UsageLogUpdateOne) SetNillableIPAddress(v *string) *UsageLogUpdateOne 
 // ClearIPAddress clears the value of the "ip_address" field.
 func (_u *UsageLogUpdateOne) ClearIPAddress() *UsageLogUpdateOne {
 	_u.mutation.ClearIPAddress()
+	return _u
+}
+
+// SetServiceTier sets the "service_tier" field.
+func (_u *UsageLogUpdateOne) SetServiceTier(v string) *UsageLogUpdateOne {
+	_u.mutation.SetServiceTier(v)
+	return _u
+}
+
+// SetNillableServiceTier sets the "service_tier" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableServiceTier(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetServiceTier(*v)
+	}
+	return _u
+}
+
+// ClearServiceTier clears the value of the "service_tier" field.
+func (_u *UsageLogUpdateOne) ClearServiceTier() *UsageLogUpdateOne {
+	_u.mutation.ClearServiceTier()
+	return _u
+}
+
+// SetReasoningEffort sets the "reasoning_effort" field.
+func (_u *UsageLogUpdateOne) SetReasoningEffort(v string) *UsageLogUpdateOne {
+	_u.mutation.SetReasoningEffort(v)
+	return _u
+}
+
+// SetNillableReasoningEffort sets the "reasoning_effort" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableReasoningEffort(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetReasoningEffort(*v)
+	}
+	return _u
+}
+
+// ClearReasoningEffort clears the value of the "reasoning_effort" field.
+func (_u *UsageLogUpdateOne) ClearReasoningEffort() *UsageLogUpdateOne {
+	_u.mutation.ClearReasoningEffort()
+	return _u
+}
+
+// SetInboundEndpoint sets the "inbound_endpoint" field.
+func (_u *UsageLogUpdateOne) SetInboundEndpoint(v string) *UsageLogUpdateOne {
+	_u.mutation.SetInboundEndpoint(v)
+	return _u
+}
+
+// SetNillableInboundEndpoint sets the "inbound_endpoint" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableInboundEndpoint(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetInboundEndpoint(*v)
+	}
+	return _u
+}
+
+// ClearInboundEndpoint clears the value of the "inbound_endpoint" field.
+func (_u *UsageLogUpdateOne) ClearInboundEndpoint() *UsageLogUpdateOne {
+	_u.mutation.ClearInboundEndpoint()
+	return _u
+}
+
+// SetUpstreamEndpoint sets the "upstream_endpoint" field.
+func (_u *UsageLogUpdateOne) SetUpstreamEndpoint(v string) *UsageLogUpdateOne {
+	_u.mutation.SetUpstreamEndpoint(v)
+	return _u
+}
+
+// SetNillableUpstreamEndpoint sets the "upstream_endpoint" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableUpstreamEndpoint(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetUpstreamEndpoint(*v)
+	}
+	return _u
+}
+
+// ClearUpstreamEndpoint clears the value of the "upstream_endpoint" field.
+func (_u *UsageLogUpdateOne) ClearUpstreamEndpoint() *UsageLogUpdateOne {
+	_u.mutation.ClearUpstreamEndpoint()
+	return _u
+}
+
+// SetSessionID sets the "session_id" field.
+func (_u *UsageLogUpdateOne) SetSessionID(v string) *UsageLogUpdateOne {
+	_u.mutation.SetSessionID(v)
+	return _u
+}
+
+// SetNillableSessionID sets the "session_id" field if the given value is not nil.
+func (_u *UsageLogUpdateOne) SetNillableSessionID(v *string) *UsageLogUpdateOne {
+	if v != nil {
+		_u.SetSessionID(*v)
+	}
+	return _u
+}
+
+// ClearSessionID clears the value of the "session_id" field.
+func (_u *UsageLogUpdateOne) ClearSessionID() *UsageLogUpdateOne {
+	_u.mutation.ClearSessionID()
 	return _u
 }
 
@@ -1900,6 +2330,31 @@ func (_u *UsageLogUpdateOne) check() error {
 			return &ValidationError{Name: "ip_address", err: fmt.Errorf(`ent: validator failed for field "UsageLog.ip_address": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ServiceTier(); ok {
+		if err := usagelog.ServiceTierValidator(v); err != nil {
+			return &ValidationError{Name: "service_tier", err: fmt.Errorf(`ent: validator failed for field "UsageLog.service_tier": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ReasoningEffort(); ok {
+		if err := usagelog.ReasoningEffortValidator(v); err != nil {
+			return &ValidationError{Name: "reasoning_effort", err: fmt.Errorf(`ent: validator failed for field "UsageLog.reasoning_effort": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.InboundEndpoint(); ok {
+		if err := usagelog.InboundEndpointValidator(v); err != nil {
+			return &ValidationError{Name: "inbound_endpoint", err: fmt.Errorf(`ent: validator failed for field "UsageLog.inbound_endpoint": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.UpstreamEndpoint(); ok {
+		if err := usagelog.UpstreamEndpointValidator(v); err != nil {
+			return &ValidationError{Name: "upstream_endpoint", err: fmt.Errorf(`ent: validator failed for field "UsageLog.upstream_endpoint": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SessionID(); ok {
+		if err := usagelog.SessionIDValidator(v); err != nil {
+			return &ValidationError{Name: "session_id", err: fmt.Errorf(`ent: validator failed for field "UsageLog.session_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ImageSize(); ok {
 		if err := usagelog.ImageSizeValidator(v); err != nil {
 			return &ValidationError{Name: "image_size", err: fmt.Errorf(`ent: validator failed for field "UsageLog.image_size": %w`, err)}
@@ -2047,8 +2502,29 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	if value, ok := _u.mutation.AddedCacheCreation1hTokens(); ok {
 		_spec.AddField(usagelog.FieldCacheCreation1hTokens, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.ImageOutputTokens(); ok {
+		_spec.SetField(usagelog.FieldImageOutputTokens, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedImageOutputTokens(); ok {
+		_spec.AddField(usagelog.FieldImageOutputTokens, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.ImageInputTokens(); ok {
+		_spec.SetField(usagelog.FieldImageInputTokens, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedImageInputTokens(); ok {
+		_spec.AddField(usagelog.FieldImageInputTokens, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.RequestType(); ok {
+		_spec.SetField(usagelog.FieldRequestType, field.TypeInt16, value)
+	}
+	if value, ok := _u.mutation.AddedRequestType(); ok {
+		_spec.AddField(usagelog.FieldRequestType, field.TypeInt16, value)
+	}
 	if value, ok := _u.mutation.Stream(); ok {
 		_spec.SetField(usagelog.FieldStream, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.OpenaiWsMode(); ok {
+		_spec.SetField(usagelog.FieldOpenaiWsMode, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.DurationMs(); ok {
 		_spec.SetField(usagelog.FieldDurationMs, field.TypeInt, value)
@@ -2079,6 +2555,36 @@ func (_u *UsageLogUpdateOne) sqlSave(ctx context.Context) (_node *UsageLog, err 
 	}
 	if _u.mutation.IPAddressCleared() {
 		_spec.ClearField(usagelog.FieldIPAddress, field.TypeString)
+	}
+	if value, ok := _u.mutation.ServiceTier(); ok {
+		_spec.SetField(usagelog.FieldServiceTier, field.TypeString, value)
+	}
+	if _u.mutation.ServiceTierCleared() {
+		_spec.ClearField(usagelog.FieldServiceTier, field.TypeString)
+	}
+	if value, ok := _u.mutation.ReasoningEffort(); ok {
+		_spec.SetField(usagelog.FieldReasoningEffort, field.TypeString, value)
+	}
+	if _u.mutation.ReasoningEffortCleared() {
+		_spec.ClearField(usagelog.FieldReasoningEffort, field.TypeString)
+	}
+	if value, ok := _u.mutation.InboundEndpoint(); ok {
+		_spec.SetField(usagelog.FieldInboundEndpoint, field.TypeString, value)
+	}
+	if _u.mutation.InboundEndpointCleared() {
+		_spec.ClearField(usagelog.FieldInboundEndpoint, field.TypeString)
+	}
+	if value, ok := _u.mutation.UpstreamEndpoint(); ok {
+		_spec.SetField(usagelog.FieldUpstreamEndpoint, field.TypeString, value)
+	}
+	if _u.mutation.UpstreamEndpointCleared() {
+		_spec.ClearField(usagelog.FieldUpstreamEndpoint, field.TypeString)
+	}
+	if value, ok := _u.mutation.SessionID(); ok {
+		_spec.SetField(usagelog.FieldSessionID, field.TypeString, value)
+	}
+	if _u.mutation.SessionIDCleared() {
+		_spec.ClearField(usagelog.FieldSessionID, field.TypeString)
 	}
 	if value, ok := _u.mutation.ImageCount(); ok {
 		_spec.SetField(usagelog.FieldImageCount, field.TypeInt, value)
