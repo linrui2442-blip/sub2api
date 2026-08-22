@@ -1114,7 +1114,7 @@ export default {
 	          projectIdLabel: 'Project ID (optional)',
 	          projectIdPlaceholder: 'e.g. my-gcp-project or cloud-ai-companion-xxxxx',
 	          projectIdHint:
-	            'Leave empty to auto-detect after code exchange. If auto-detection fails, fill it in and re-generate the auth URL to try again.',
+	            'Free-tier eligible accounts usually receive a managed project. Standard-tier or free-tier-ineligible accounts must provide their own GCP Project ID.',
 	          howToGetProjectId: 'How to get',
 	          step2OpenUrl: 'Open the URL in your browser and complete authorization',
 	          openUrlDesc:
@@ -1137,7 +1137,7 @@ export default {
 	          failedToGenerateUrl: 'Failed to generate Gemini auth URL',
 	          missingExchangeParams: 'Missing auth code, session ID, or state',
 	          failedToExchangeCode: 'Failed to exchange Gemini auth code',
-	          missingProjectId: 'GCP Project ID retrieval failed: Your Google account is not linked to an active GCP project. Please activate GCP and bind a credit card in Google Cloud Console, or manually enter the Project ID during authorization.',
+	          missingProjectId: 'This Google account requires a user-owned GCP Project ID. Enter it in the authorization form, generate a new authorization URL, and authorize again.',
 	          modelPassthrough: 'Gemini Model Passthrough',
 	          modelPassthroughDesc:
 	            'All model requests are forwarded directly to the Gemini API without model restrictions or mappings.',

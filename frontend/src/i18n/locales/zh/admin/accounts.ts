@@ -1171,7 +1171,7 @@ export default {
           projectIdLabel: 'Project ID（可选）',
           projectIdPlaceholder: '例如：my-gcp-project 或 cloud-ai-companion-xxxxx',
           projectIdHint:
-            '留空则在兑换授权码后自动探测；若自动探测失败，可填写后重新生成授权链接再授权。',
+            '符合免费层资格的账号通常会自动获得托管项目；standard-tier 或不符合免费层资格的账号必须填写自己的 GCP Project ID。',
           howToGetProjectId: '如何获取',
           step2OpenUrl: '在浏览器中打开链接并完成授权',
           openUrlDesc: '请在新标签页中打开授权链接，登录您的 Google 账户并授权。',
@@ -1191,7 +1191,7 @@ export default {
           missingExchangeParams: '缺少 code / session_id / state',
           failedToExchangeCode: 'Gemini 授权码兑换失败',
           missingProjectId:
-            'GCP Project ID 获取失败：您的 Google 账号未关联有效的 GCP 项目。请前往 Google Cloud Console 激活 GCP 并绑定信用卡，或在授权时手动填写 Project ID。',
+            '此 Google 账号需要用户自有的 GCP Project ID。请在授权表单中填写 Project ID，重新生成授权链接后再授权。',
           modelPassthrough: 'Gemini 直接转发模型',
           modelPassthroughDesc: '所有模型请求将直接转发至 Gemini API，不进行模型限制或映射。',
           stateWarningTitle: '提示',
