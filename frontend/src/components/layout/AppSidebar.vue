@@ -18,7 +18,7 @@
         <router-link :to="homePath" class="sidebar-brand-title text-lg font-bold text-gray-900 dark:text-white" @click="closeMobile">
           {{ siteName }}
         </router-link>
-        <VersionBadge :version="siteVersion" />
+        <span v-if="siteVersion" class="text-xs text-gray-400 dark:text-gray-500">v{{ siteVersion }}</span>
       </div>
     </div>
 
@@ -87,7 +87,6 @@
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAppStore, useAuthStore } from '@/stores'
-import VersionBadge from '@/components/common/VersionBadge.vue'
 import { sanitizeUrl } from '@/utils/url'
 
 interface NavItem {

@@ -169,6 +169,74 @@ func TestProviderAuthProxyFromEnvironment(t *testing.T) {
 	})
 }
 
+func TestResolveWindowsProxyConfig(t *testing.T) {
+	target, err := url.Parse("https://oauth2.googleapis.com/token")
+	require.NoError(t, err)
+
+	t.Run("disabled", func(t *testing.T) {
+		proxy, ok := resolveWindowsProxyConfig(target, windowsProxyConfig{Server: "127.0.0.1:7890"})
+		require.False(t, ok)
+		require.Nil(t, proxy)
+	})
+	t.Run("single server", func(t *testing.T) {
+		proxy, ok := resolveWindowsProxyConfig(target, windowsProxyConfig{Enabled: true, Server: "127.0.0.1:7890"})
+		require.True(t, ok)
+		require.Equal(t, "http://127.0.0.1:7890", proxy.String())
+	})
+	t.Run("per protocol", func(t *testing.T) {
+		proxy, ok := resolveWindowsProxyConfig(target, windowsProxyConfig{Enabled: true, Server: "http=proxy.test:80;https=secure.test:443"})
+		require.True(t, ok)
+		require.Equal(t, "http://secure.test:443", proxy.String())
+	})
+	for _, host := range []string{"localhost", "127.0.0.1"} {
+		t.Run("bypass "+host, func(t *testing.T) {
+			local, parseErr := url.Parse("http://" + host + "/health")
+			require.NoError(t, parseErr)
+			proxy, ok := resolveWindowsProxyConfig(local, windowsProxyConfig{
+				Enabled: true, Server: "proxy.test:8080", Override: "localhost;127.0.0.1;<local>",
+			})
+			require.False(t, ok)
+			require.Nil(t, proxy)
+		})
+	}
+	t.Run("malformed safely falls back", func(t *testing.T) {
+		proxy, ok := resolveWindowsProxyConfig(target, windowsProxyConfig{Enabled: true, Server: "://bad"})
+		require.False(t, ok)
+		require.Nil(t, proxy)
+	})
+}
+
+func TestResolveProviderAuthProxyPriority(t *testing.T) {
+	clearProviderProxyEnvironment(t)
+	t.Setenv("HTTPS_PROXY", "http://environment.test:8080")
+	original := systemProxyResolver
+	t.Cleanup(func() { systemProxyResolver = original })
+
+	req, err := http.NewRequest(http.MethodPost, "https://provider.test/token", nil)
+	require.NoError(t, err)
+	systemProxyResolver = func(*url.URL) (*url.URL, bool) {
+		proxy, parseErr := url.Parse("http://windows.test:9090")
+		require.NoError(t, parseErr)
+		return proxy, true
+	}
+	decision, err := resolveProviderAuthProxy(req)
+	require.NoError(t, err)
+	require.Equal(t, "windows_system", decision.Source)
+	require.Equal(t, "http://windows.test:9090", decision.URL.String())
+
+	systemProxyResolver = func(*url.URL) (*url.URL, bool) { return nil, false }
+	decision, err = resolveProviderAuthProxy(req)
+	require.NoError(t, err)
+	require.Equal(t, "environment", decision.Source)
+	require.Equal(t, "http://environment.test:8080", decision.URL.String())
+
+	t.Setenv("HTTPS_PROXY", "")
+	decision, err = resolveProviderAuthProxy(req)
+	require.NoError(t, err)
+	require.Equal(t, "direct", decision.Source)
+	require.Nil(t, decision.URL)
+}
+
 func TestProviderAuthClientsUseExplicitProxyAheadOfEnvironment(t *testing.T) {
 	clearProviderProxyEnvironment(t)
 	t.Setenv("HTTPS_PROXY", "http://environment-proxy.test:8080")
@@ -186,6 +254,34 @@ func TestProviderAuthClientsUseExplicitProxyAheadOfEnvironment(t *testing.T) {
 			proxy, err := client.GetTransport().Proxy(req)
 			require.NoError(t, err)
 			require.Equal(t, "http://account-proxy.test:9090", proxy.String())
+		})
+	}
+}
+
+func TestProviderAuthClientsShareWindowsSystemProxy(t *testing.T) {
+	clearProviderProxyEnvironment(t)
+	original := systemProxyResolver
+	t.Cleanup(func() { systemProxyResolver = original })
+	systemProxyResolver = func(*url.URL) (*url.URL, bool) {
+		proxy, err := url.Parse("http://windows-system.test:9090")
+		require.NoError(t, err)
+		return proxy, true
+	}
+	sharedReqClients = sync.Map{}
+
+	for name, factory := range map[string]func(string) (*req.Client, error){
+		"openai": createOpenAIReqClient,
+		"gemini": createGeminiReqClient,
+		"claude": createReqClient,
+	} {
+		t.Run(name, func(t *testing.T) {
+			client, err := factory("")
+			require.NoError(t, err)
+			request, err := http.NewRequest(http.MethodPost, "https://provider.test/token", nil)
+			require.NoError(t, err)
+			proxy, err := client.GetTransport().Proxy(request)
+			require.NoError(t, err)
+			require.Equal(t, "http://windows-system.test:9090", proxy.String())
 		})
 	}
 }

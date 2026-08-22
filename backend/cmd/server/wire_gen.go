@@ -163,15 +163,17 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	openAIOAuthHandler := admin.NewOpenAIOAuthHandler(openAIOAuthService, adminService, openAIQuotaService, rateLimitService)
 	geminiOAuthHandler := admin.NewGeminiOAuthHandler(geminiOAuthService)
 	proxyHandler := admin.NewProxyHandler(adminService)
-	auditLogRepository := repository.NewAuditLogRepository(db)
-	auditLogService := service.ProvideAuditLogService(auditLogRepository, settingService)
-	auditLogHandler := admin.NewAuditLogHandler(auditLogService, totpService)
-	adminHandlers := handler.ProvidePersonalAdminHandlers(adminUserHandler, groupHandler, accountHandler, oAuthHandler, openAIOAuthHandler, geminiOAuthHandler, proxyHandler, auditLogHandler)
-	requestEligibilityChecker := service.ProvidePersonalRequestEligibilityChecker()
-	usageRecordWorkerPool := service.NewUsageRecordWorkerPool(configConfig)
 	errorPassthroughRepository := repository.NewErrorPassthroughRepository(client)
 	errorPassthroughCache := repository.NewErrorPassthroughCache(redisClient)
 	errorPassthroughService := service.NewErrorPassthroughService(errorPassthroughRepository, errorPassthroughCache)
+	errorPassthroughHandler := admin.NewErrorPassthroughHandler(errorPassthroughService)
+	tlsFingerprintProfileHandler := admin.NewTLSFingerprintProfileHandler(tlsFingerprintProfileService)
+	auditLogRepository := repository.NewAuditLogRepository(db)
+	auditLogService := service.ProvideAuditLogService(auditLogRepository, settingService)
+	auditLogHandler := admin.NewAuditLogHandler(auditLogService, totpService)
+	adminHandlers := handler.ProvidePersonalAdminHandlers(adminUserHandler, groupHandler, accountHandler, oAuthHandler, openAIOAuthHandler, geminiOAuthHandler, proxyHandler, errorPassthroughHandler, tlsFingerprintProfileHandler, auditLogHandler)
+	requestEligibilityChecker := service.ProvidePersonalRequestEligibilityChecker()
+	usageRecordWorkerPool := service.NewUsageRecordWorkerPool(configConfig)
 	userMsgQueueCache := repository.NewUserMsgQueueCache(redisClient)
 	userMessageQueueService := service.ProvideUserMessageQueueService(userMsgQueueCache, rpmCache, configConfig)
 	configManager := securityaudit.NewConfigManager(db, settingRepository, redisClient, secretEncryptor, configConfig)
@@ -204,6 +206,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	v := providePersonalCleanup(client, redisClient, apiKeyService, opsService, schedulerSnapshotService, tokenRefreshService, usageRecordWorkerPool, oAuthService, openAIOAuthService, geminiOAuthService, openAIGatewayService, auditLogService, promptService)
 	application := &Application{
 		Server:      httpServer,
+		Handlers:    handlers,
 		PromptAudit: promptService,
 		Cleanup:     v,
 	}
@@ -215,6 +218,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 // Application is the Personal Edition runtime assembled by Wire.
 type Application struct {
 	Server      *http.Server
+	Handlers    *handler.Handlers
 	PromptAudit *securityaudit.PromptService
 	Cleanup     func()
 }

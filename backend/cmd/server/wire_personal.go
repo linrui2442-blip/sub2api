@@ -26,6 +26,7 @@ import (
 // Application is the Personal Edition runtime assembled by Wire.
 type Application struct {
 	Server      *http.Server
+	Handlers    *handler.Handlers
 	PromptAudit *securityaudit.PromptService
 	Cleanup     func()
 }
@@ -58,7 +59,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 		server.PersonalProviderSet,
 		providePrivacyClientFactory,
 		providePersonalCleanup,
-		wire.Struct(new(Application), "Server", "PromptAudit", "Cleanup"),
+		wire.Struct(new(Application), "Server", "Handlers", "PromptAudit", "Cleanup"),
 	)
 	return nil, nil
 }

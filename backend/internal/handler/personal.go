@@ -71,17 +71,21 @@ func ProvidePersonalAdminHandlers(
 	openaiOAuthHandler *admin.OpenAIOAuthHandler,
 	geminiOAuthHandler *admin.GeminiOAuthHandler,
 	proxyHandler *admin.ProxyHandler,
+	errorPassthroughHandler *admin.ErrorPassthroughHandler,
+	tlsFingerprintProfileHandler *admin.TLSFingerprintProfileHandler,
 	auditLogHandler *admin.AuditLogHandler,
 ) *AdminHandlers {
 	return &AdminHandlers{
-		User:        userHandler,
-		Group:       groupHandler,
-		Account:     accountHandler,
-		OAuth:       oauthHandler,
-		OpenAIOAuth: openaiOAuthHandler,
-		GeminiOAuth: geminiOAuthHandler,
-		Proxy:       proxyHandler,
-		AuditLog:    auditLogHandler,
+		User:                  userHandler,
+		Group:                 groupHandler,
+		Account:               accountHandler,
+		OAuth:                 oauthHandler,
+		OpenAIOAuth:           openaiOAuthHandler,
+		GeminiOAuth:           geminiOAuthHandler,
+		Proxy:                 proxyHandler,
+		ErrorPassthrough:      errorPassthroughHandler,
+		TLSFingerprintProfile: tlsFingerprintProfileHandler,
+		AuditLog:              auditLogHandler,
 	}
 }
 
@@ -136,6 +140,8 @@ var PersonalProviderSet = wire.NewSet(
 	admin.NewOpenAIOAuthHandler,
 	admin.NewGeminiOAuthHandler,
 	admin.NewProxyHandler,
+	admin.NewErrorPassthroughHandler,
+	admin.NewTLSFingerprintProfileHandler,
 	admin.NewAuditLogHandler,
 
 	ProvidePersonalAdminHandlers,
