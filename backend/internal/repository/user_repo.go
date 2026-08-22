@@ -19,7 +19,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
-	"github.com/lib/pq"
 
 	entsql "entgo.io/ent/dialect/sql"
 )
@@ -645,11 +644,11 @@ func (r *userRepository) GetLatestUsedAtByUserIDs(ctx context.Context, userIDs [
 	const query = `
 		SELECT user_id, MAX(created_at) AS last_used_at
 		FROM usage_logs
-		WHERE user_id = ANY($1)
+		WHERE user_id IN (SELECT value FROM json_each($1))
 		GROUP BY user_id
 	`
 
-	rows, err := r.sql.QueryContext(ctx, query, pq.Array(userIDs))
+	rows, err := r.sql.QueryContext(ctx, query, sqliteJSONList(userIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -719,8 +718,8 @@ func (r *userRepository) BatchSetConcurrency(ctx context.Context, userIDs []int6
 		value = 0
 	}
 	res, err := r.sql.ExecContext(ctx,
-		"UPDATE users SET concurrency = $1, updated_at = NOW() WHERE id = ANY($2) AND deleted_at IS NULL",
-		value, pq.Array(userIDs))
+		"UPDATE users SET concurrency = $1, updated_at = CURRENT_TIMESTAMP WHERE id IN (SELECT value FROM json_each($2)) AND deleted_at IS NULL",
+		value, sqliteJSONList(userIDs))
 	if err != nil {
 		return 0, fmt.Errorf("batch set concurrency: %w", err)
 	}
@@ -733,8 +732,8 @@ func (r *userRepository) BatchAddConcurrency(ctx context.Context, userIDs []int6
 		return 0, nil
 	}
 	res, err := r.sql.ExecContext(ctx,
-		"UPDATE users SET concurrency = GREATEST(concurrency + $1, 0), updated_at = NOW() WHERE id = ANY($2) AND deleted_at IS NULL",
-		delta, pq.Array(userIDs))
+		"UPDATE users SET concurrency = MAX(concurrency + $1, 0), updated_at = CURRENT_TIMESTAMP WHERE id IN (SELECT value FROM json_each($2)) AND deleted_at IS NULL",
+		delta, sqliteJSONList(userIDs))
 	if err != nil {
 		return 0, fmt.Errorf("batch add concurrency: %w", err)
 	}
@@ -759,11 +758,11 @@ func (r *userRepository) BatchUpdateLimits(ctx context.Context, userIDs []int64,
 		args = append(args, value)
 		setClauses = append(setClauses, fmt.Sprintf("rpm_limit = $%d", len(args)))
 	}
-	setClauses = append(setClauses, "updated_at = NOW()")
-	args = append(args, pq.Array(userIDs))
+	setClauses = append(setClauses, "updated_at = CURRENT_TIMESTAMP")
+	args = append(args, sqliteJSONList(userIDs))
 
 	query := fmt.Sprintf(
-		"UPDATE users SET %s WHERE id = ANY($%d) AND deleted_at IS NULL",
+		"UPDATE users SET %s WHERE id IN (SELECT value FROM json_each($%d)) AND deleted_at IS NULL",
 		strings.Join(setClauses, ", "),
 		len(args),
 	)

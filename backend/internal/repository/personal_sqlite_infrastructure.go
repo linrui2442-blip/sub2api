@@ -7,7 +7,7 @@ import (
 )
 
 // ensurePersonalSQLiteInfrastructure creates the small set of runtime objects
-// that upstream owns through hand-written PostgreSQL migrations rather than Ent
+// that upstream owns through hand-written migrations rather than Ent
 // schemas. Keep this list intentionally narrow: Personal Edition should only
 // carry infrastructure required by its private GPT/Gemini gateway paths.
 func ensurePersonalSQLiteInfrastructure(ctx context.Context, db *sql.DB) error {
@@ -72,6 +72,54 @@ func ensurePersonalSQLiteInfrastructure(ctx context.Context, db *sql.DB) error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_user_group_rpm_overrides_group
 			ON user_group_rpm_overrides (group_id, user_id)`,
+
+		// Audit and operational logs are core Personal observability. They are
+		// intentionally local and are not part of Ent's generated schema.
+		`CREATE TABLE IF NOT EXISTS audit_logs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			actor_user_id INTEGER NULL, actor_email TEXT NOT NULL DEFAULT '',
+			actor_role TEXT NOT NULL DEFAULT '', auth_method TEXT NOT NULL DEFAULT '',
+			credential_masked TEXT NOT NULL DEFAULT '', action TEXT NOT NULL DEFAULT '',
+			method TEXT NOT NULL DEFAULT '', path TEXT NOT NULL DEFAULT '', request_id TEXT NOT NULL DEFAULT '',
+			client_ip TEXT NOT NULL DEFAULT '', user_agent TEXT NOT NULL DEFAULT '', request_body TEXT NOT NULL DEFAULT '',
+			status_code INTEGER NOT NULL DEFAULT 0, latency_ms INTEGER NOT NULL DEFAULT 0,
+			extra TEXT NOT NULL DEFAULT '{}'
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_user_id ON audit_logs(actor_user_id)`,
+		`CREATE TABLE IF NOT EXISTS ops_system_logs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			host TEXT NULL, level TEXT NOT NULL, component TEXT NOT NULL, message TEXT NOT NULL,
+			request_id TEXT NULL, client_request_id TEXT NULL, user_id INTEGER NULL,
+			api_key_id INTEGER NULL, account_id INTEGER NULL, platform TEXT NULL, model TEXT NULL,
+			extra TEXT NOT NULL DEFAULT '{}'
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_ops_system_logs_created_at ON ops_system_logs(created_at)`,
+		`CREATE TABLE IF NOT EXISTS ops_error_logs (
+			id INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NULL, client_request_id TEXT NULL,
+			user_id INTEGER NULL, api_key_id INTEGER NULL, account_id INTEGER NULL, group_id INTEGER NULL,
+			client_ip TEXT NULL, platform TEXT NULL, model TEXT NULL, request_path TEXT NULL,
+			stream INTEGER NOT NULL DEFAULT 0, inbound_endpoint TEXT NULL, upstream_endpoint TEXT NULL,
+			requested_model TEXT NULL, upstream_model TEXT NULL, request_type INTEGER NULL, user_agent TEXT NULL,
+			error_phase TEXT NOT NULL, error_type TEXT NOT NULL, severity TEXT NULL, status_code INTEGER NULL,
+			is_business_limited INTEGER NOT NULL DEFAULT 0, is_count_tokens INTEGER NOT NULL DEFAULT 0,
+			error_message TEXT NULL, error_body TEXT NULL, error_source TEXT NULL, error_owner TEXT NULL,
+			upstream_status_code INTEGER NULL, upstream_error_message TEXT NULL, upstream_error_detail TEXT NULL,
+			upstream_errors TEXT NULL, auth_latency_ms INTEGER NULL, routing_latency_ms INTEGER NULL,
+			upstream_latency_ms INTEGER NULL, response_latency_ms INTEGER NULL, time_to_first_token_ms INTEGER NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, api_key_prefix TEXT NULL,
+			resolved INTEGER NOT NULL DEFAULT 0, resolved_at DATETIME NULL, resolved_by_user_id INTEGER NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_ops_error_logs_created_at ON ops_error_logs(created_at)`,
+		`CREATE TABLE IF NOT EXISTS ops_ingress_reject_aggregates (
+			id INTEGER PRIMARY KEY AUTOINCREMENT, bucket_start DATETIME NOT NULL,
+			reject_reason TEXT NOT NULL, route_family TEXT NOT NULL, protocol TEXT NOT NULL,
+			client_ip TEXT NOT NULL DEFAULT '', user_id INTEGER NOT NULL DEFAULT 0, api_key_id INTEGER NOT NULL DEFAULT 0,
+			request_count INTEGER NOT NULL, first_seen DATETIME NOT NULL, last_seen DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(bucket_start, reject_reason, route_family, protocol, client_ip, user_id, api_key_id)
+		)`,
 
 		// Local profile avatar metadata is stored beside the SQLite user record.
 		`CREATE TABLE IF NOT EXISTS user_avatars (

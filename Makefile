@@ -7,8 +7,8 @@
 FRONTEND_CRITICAL_VITEST := \
 	src/api/__tests__/client.spec.ts \
 	src/api/__tests__/tokenRefresh.spec.ts \
-	src/components/user/profile/__tests__/ProfileInfoCard.spec.ts \
-	src/views/admin/__tests__/SettingsView.spec.ts
+	src/components/user/profile/__tests__/ProfilePasswordForm.spec.ts \
+	src/views/admin/__tests__/UsersView.spec.ts
 
 # 一键编译前后端
 build: build-backend build-frontend

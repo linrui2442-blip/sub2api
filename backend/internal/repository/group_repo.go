@@ -13,7 +13,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
-	"github.com/lib/pq"
 
 	entsql "entgo.io/ent/dialect/sql"
 )
@@ -589,8 +588,8 @@ func (r *groupRepository) ExistsByIDs(ctx context.Context, ids []int64) (map[int
 	rows, err := r.sql.QueryContext(ctx, `
 		SELECT id
 		FROM groups
-		WHERE id = ANY($1) AND deleted_at IS NULL
-	`, pq.Array(uniqueIDs))
+		WHERE id IN (SELECT value FROM json_each($1)) AND deleted_at IS NULL
+	`, sqliteJSONList(uniqueIDs))
 	if err != nil {
 		return nil, err
 	}
@@ -753,9 +752,9 @@ func (r *groupRepository) loadAccountCounts(ctx context.Context, groupIDs []int6
 			COUNT(*) FILTER (WHERE %s) AS rate_limited
 		FROM account_groups ag
 		JOIN accounts a ON a.id = ag.account_id
-		WHERE ag.group_id = ANY($1)
+		WHERE ag.group_id IN (SELECT value FROM json_each($1))
 		GROUP BY ag.group_id`, groupAccountAvailableSQL, groupAccountTemporarilyLimitedSQL),
-		pq.Array(groupIDs),
+		sqliteJSONList(groupIDs),
 	)
 	if err != nil {
 		return nil, err
@@ -790,8 +789,8 @@ func (r *groupRepository) GetAccountIDsByGroupIDs(ctx context.Context, groupIDs 
 
 	rows, err := r.sql.QueryContext(
 		ctx,
-		"SELECT DISTINCT account_id FROM account_groups WHERE group_id = ANY($1) ORDER BY account_id",
-		pq.Array(groupIDs),
+		"SELECT DISTINCT account_id FROM account_groups WHERE group_id IN (SELECT value FROM json_each($1)) ORDER BY account_id",
+		sqliteJSONList(groupIDs),
 	)
 	if err != nil {
 		return nil, err
@@ -823,9 +822,9 @@ func (r *groupRepository) BindAccountsToGroup(ctx context.Context, groupID int64
 	_, err := r.sql.ExecContext(
 		ctx,
 		`INSERT INTO account_groups (account_id, group_id, priority, created_at)
-		 SELECT unnest($1::bigint[]), $2, 50, NOW()
+		 SELECT value, $2, 50, CURRENT_TIMESTAMP FROM json_each($1)
 		 ON CONFLICT (account_id, group_id) DO NOTHING`,
-		pq.Array(accountIDs),
+		sqliteJSONList(accountIDs),
 		groupID,
 	)
 	if err != nil {
@@ -867,8 +866,8 @@ func (r *groupRepository) UpdateSortOrders(ctx context.Context, updates []servic
 	if err := scanSingleRow(
 		ctx,
 		r.sql,
-		`SELECT COUNT(*) FROM groups WHERE deleted_at IS NULL AND id = ANY($1)`,
-		[]any{pq.Array(groupIDs)},
+		`SELECT COUNT(*) FROM groups WHERE deleted_at IS NULL AND id IN (SELECT value FROM json_each($1))`,
+		[]any{sqliteJSONList(groupIDs)},
 		&existingCount,
 	); err != nil {
 		return err
@@ -885,7 +884,7 @@ func (r *groupRepository) UpdateSortOrders(ctx context.Context, updates []servic
 		args = append(args, id, sortOrderByID[id])
 		placeholder += 2
 	}
-	args = append(args, pq.Array(groupIDs))
+	args = append(args, sqliteJSONList(groupIDs))
 
 	query := fmt.Sprintf(`
 		UPDATE groups
@@ -893,7 +892,7 @@ func (r *groupRepository) UpdateSortOrders(ctx context.Context, updates []servic
 			%s
 			ELSE sort_order
 		END
-		WHERE deleted_at IS NULL AND id = ANY($%d)
+		WHERE deleted_at IS NULL AND id IN (SELECT value FROM json_each($%d))
 	`, strings.Join(caseClauses, "\n\t\t\t"), placeholder)
 
 	result, err := r.sql.ExecContext(ctx, query, args...)
