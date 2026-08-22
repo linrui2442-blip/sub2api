@@ -31,12 +31,13 @@ func RegisterPersonalAdminRoutes(
 	// Routing groups remain core to account selection and per-key model access.
 	registerGroupRoutes(admin, h)
 
-	// Provider account pool and OAuth lifecycle. OpenAI and Gemini are enabled
-	// in V1; the underlying account/provider core remains platform-generic so
-	// Anthropic/Claude and future adapters can be registered without a rewrite.
+	// Provider account pool and OAuth lifecycle. OpenAI, Gemini API and the
+	// experimental Antigravity subscription bridge are enabled in Personal V1;
+	// the underlying account/provider core remains platform-generic.
 	registerAccountRoutes(admin, h, stepUpAuth)
 	registerOpenAIOAuthRoutes(admin, h)
 	registerGeminiOAuthRoutes(admin, h)
+	registerAntigravityOAuthRoutes(admin, h)
 
 	// Local proxy management is retained for provider connectivity.
 	registerProxyRoutes(admin, h, stepUpAuth)
@@ -185,6 +186,13 @@ func registerGeminiOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	gemini.POST("/oauth/auth-url", h.Admin.GeminiOAuth.GenerateAuthURL)
 	gemini.POST("/oauth/exchange-code", h.Admin.GeminiOAuth.ExchangeCode)
 	gemini.GET("/oauth/capabilities", h.Admin.GeminiOAuth.GetCapabilities)
+}
+
+func registerAntigravityOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	antigravity := admin.Group("/antigravity")
+	antigravity.POST("/oauth/auth-url", h.Admin.AntigravityOAuth.GenerateAuthURL)
+	antigravity.POST("/oauth/exchange-code", h.Admin.AntigravityOAuth.ExchangeCode)
+	antigravity.POST("/oauth/refresh-token", h.Admin.AntigravityOAuth.RefreshToken)
 }
 
 func registerProxyRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {

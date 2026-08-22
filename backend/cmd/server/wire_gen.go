@@ -162,6 +162,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	oAuthHandler := admin.NewOAuthHandler(oAuthService)
 	openAIOAuthHandler := admin.NewOpenAIOAuthHandler(openAIOAuthService, adminService, openAIQuotaService, rateLimitService)
 	geminiOAuthHandler := admin.NewGeminiOAuthHandler(geminiOAuthService)
+	antigravityOAuthHandler := admin.NewAntigravityOAuthHandler(antigravityOAuthService)
 	proxyHandler := admin.NewProxyHandler(adminService)
 	errorPassthroughRepository := repository.NewErrorPassthroughRepository(client)
 	errorPassthroughCache := repository.NewErrorPassthroughCache(redisClient)
@@ -171,7 +172,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	auditLogRepository := repository.NewAuditLogRepository(db)
 	auditLogService := service.ProvideAuditLogService(auditLogRepository, settingService)
 	auditLogHandler := admin.NewAuditLogHandler(auditLogService, totpService)
-	adminHandlers := handler.ProvidePersonalAdminHandlers(adminUserHandler, groupHandler, accountHandler, oAuthHandler, openAIOAuthHandler, geminiOAuthHandler, proxyHandler, errorPassthroughHandler, tlsFingerprintProfileHandler, auditLogHandler)
+	adminHandlers := handler.ProvidePersonalAdminHandlers(adminUserHandler, groupHandler, accountHandler, oAuthHandler, openAIOAuthHandler, geminiOAuthHandler, antigravityOAuthHandler, proxyHandler, errorPassthroughHandler, tlsFingerprintProfileHandler, auditLogHandler)
 	requestEligibilityChecker := service.ProvidePersonalRequestEligibilityChecker()
 	usageRecordWorkerPool := service.NewUsageRecordWorkerPool(configConfig)
 	userMsgQueueCache := repository.NewUserMsgQueueCache(redisClient)
@@ -203,7 +204,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	engine := server.ProvidePersonalRouter(configConfig, handlers, jwtAuthMiddleware, adminAuthMiddleware, apiKeyAuthMiddleware, auditLogMiddleware, stepUpAuthMiddleware, apiKeyService, opsService, settingService, compositeRouteResolver)
 	httpServer := server.ProvideHTTPServer(configConfig, engine)
 	tokenRefreshService := service.ProvideTokenRefreshService(accountRepository, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, grokOAuthService, compositeTokenCacheInvalidator, schedulerCache, configConfig, tempUnschedCache, privacyClientFactory, proxyRepository, oAuthRefreshAPI, openAIGatewayService)
-	v := providePersonalCleanup(client, redisClient, apiKeyService, opsService, schedulerSnapshotService, tokenRefreshService, usageRecordWorkerPool, oAuthService, openAIOAuthService, geminiOAuthService, openAIGatewayService, auditLogService, promptService)
+	v := providePersonalCleanup(client, redisClient, apiKeyService, opsService, schedulerSnapshotService, tokenRefreshService, usageRecordWorkerPool, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, openAIGatewayService, auditLogService, promptService)
 	application := &Application{
 		Server:      httpServer,
 		Handlers:    handlers,
@@ -242,6 +243,7 @@ func providePersonalCleanup(
 	oauth *service.OAuthService,
 	openaiOAuth *service.OpenAIOAuthService,
 	geminiOAuth *service.GeminiOAuthService,
+	antigravityOAuth *service.AntigravityOAuthService,
 	openAIGateway *service.OpenAIGatewayService,
 	auditLog *service.AuditLogService,
 	promptAudit *securityaudit.PromptService,
@@ -301,6 +303,12 @@ func providePersonalCleanup(
 			{"GeminiOAuthService", func() error {
 				if geminiOAuth != nil {
 					geminiOAuth.Stop()
+				}
+				return nil
+			}},
+			{"AntigravityOAuthService", func() error {
+				if antigravityOAuth != nil {
+					antigravityOAuth.Stop()
 				}
 				return nil
 			}},

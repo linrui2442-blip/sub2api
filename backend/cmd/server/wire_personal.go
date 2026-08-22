@@ -79,6 +79,7 @@ func providePersonalCleanup(
 	oauth *service.OAuthService,
 	openaiOAuth *service.OpenAIOAuthService,
 	geminiOAuth *service.GeminiOAuthService,
+	antigravityOAuth *service.AntigravityOAuthService,
 	openAIGateway *service.OpenAIGatewayService,
 	auditLog *service.AuditLogService,
 	promptAudit *securityaudit.PromptService,
@@ -138,6 +139,12 @@ func providePersonalCleanup(
 			{"GeminiOAuthService", func() error {
 				if geminiOAuth != nil {
 					geminiOAuth.Stop()
+				}
+				return nil
+			}},
+			{"AntigravityOAuthService", func() error {
+				if antigravityOAuth != nil {
+					antigravityOAuth.Stop()
 				}
 				return nil
 			}},

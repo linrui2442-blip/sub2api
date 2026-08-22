@@ -7,7 +7,7 @@ const inactiveButtonClass =
 
 /** Providers exposed by the Personal Edition account setup UI. */
 export const PERSONAL_ACCOUNT_PROVIDERS: ReadonlyArray<{
-  id: Extract<AccountPlatform, 'openai' | 'gemini' | 'anthropic'>
+  id: Extract<AccountPlatform, 'openai' | 'gemini' | 'anthropic' | 'antigravity'>
   label: string
   activeClass: string
   inactiveClass: string
@@ -28,6 +28,12 @@ export const PERSONAL_ACCOUNT_PROVIDERS: ReadonlyArray<{
     id: 'anthropic',
     label: 'Anthropic / Claude',
     activeClass: `${baseButtonClass} bg-white text-orange-600 shadow-sm dark:bg-dark-600 dark:text-orange-400`,
+    inactiveClass: inactiveButtonClass
+  },
+  {
+    id: 'antigravity',
+    label: 'Gemini Pro / Antigravity · Experimental',
+    activeClass: `${baseButtonClass} bg-white text-purple-600 shadow-sm dark:bg-dark-600 dark:text-purple-400`,
     inactiveClass: inactiveButtonClass
   }
 ]
