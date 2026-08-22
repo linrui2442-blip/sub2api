@@ -15,6 +15,7 @@ type authInvalidationRepoStub struct {
 	mu         sync.Mutex
 	events     []AuthCacheInvalidationEvent
 	claimLimit int
+	claimCalls int
 	scheduled  []int64
 	deleted    []int64
 	retried    []int64
@@ -27,6 +28,7 @@ func (r *authInvalidationRepoStub) Claim(_ context.Context, _ string, limit int,
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.claimLimit = limit
+	r.claimCalls++
 	return append([]AuthCacheInvalidationEvent(nil), r.events...), nil
 }
 func (r *authInvalidationRepoStub) DeleteClaimed(_ context.Context, id int64, _ string) error {
@@ -204,6 +206,19 @@ func TestAuthCacheInvalidationWorker_LifecycleIsManagedAndIdempotent(t *testing.
 	require.Eventually(t, func() bool { return worker.Health(context.Background()).Running }, time.Second, 10*time.Millisecond)
 	require.NotPanics(t, func() { worker.Stop(); worker.Stop() })
 	require.False(t, worker.Health(context.Background()).Running)
+}
+
+func TestAuthCacheInvalidationWorker_EmptyQueueContinuesWithoutFailures(t *testing.T) {
+	repo := &authInvalidationRepoStub{}
+	worker := NewAuthCacheInvalidationWorker(repo, &authInvalidationCacheStub{})
+	worker.Start()
+	require.Eventually(t, func() bool {
+		repo.mu.Lock()
+		defer repo.mu.Unlock()
+		return repo.claimCalls >= 3
+	}, 2*time.Second, 25*time.Millisecond)
+	worker.Stop()
+	require.Zero(t, worker.Health(context.Background()).Failures)
 }
 
 func TestAuthInvalidationRetryDelayIsBoundedAndJittered(t *testing.T) {

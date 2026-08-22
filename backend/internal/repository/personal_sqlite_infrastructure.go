@@ -44,6 +44,22 @@ func ensurePersonalSQLiteInfrastructure(ctx context.Context, db *sql.DB) error {
 			ON scheduler_outbox (dedup_key)
 			WHERE dedup_key IS NOT NULL`,
 
+		// Durable API-key auth cache invalidations allow the local worker to
+		// retry Redis delivery without losing account or permission changes.
+		`CREATE TABLE IF NOT EXISTS auth_cache_invalidation_outbox (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			cache_key TEXT NOT NULL,
+			attempts INTEGER NOT NULL DEFAULT 0,
+			delivery_stage INTEGER NOT NULL DEFAULT 0,
+			available_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			claimed_at DATETIME NULL,
+			claimed_by TEXT NULL,
+			last_error TEXT NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_auth_cache_invalidation_outbox_claim
+			ON auth_cache_invalidation_outbox (available_at, claimed_at, id)`,
+
 		// Browser refresh sessions must survive a local restart. The token itself
 		// is never stored: token_hash is the SHA-256 digest used by the existing
 		// rotation/replay-defense flow.
