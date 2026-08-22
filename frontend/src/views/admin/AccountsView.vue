@@ -2217,7 +2217,18 @@ const confirmCreateSparkShadow = async () => {
   }
 }
 const handleDelete = (a: Account) => { deletingAcc.value = a; showDeleteDialog.value = true }
-const confirmDelete = async () => { if(!deletingAcc.value) return; try { await adminAPI.accounts.delete(deletingAcc.value.id); showDeleteDialog.value = false; deletingAcc.value = null; reload() } catch (error) { console.error('Failed to delete account:', error) } }
+const confirmDelete = async () => {
+  if (!deletingAcc.value) return
+  try {
+    await adminAPI.accounts.delete(deletingAcc.value.id)
+    showDeleteDialog.value = false
+    deletingAcc.value = null
+    reload()
+  } catch (error: any) {
+    console.error('Failed to delete account:', error)
+    appStore.showError(error?.response?.data?.message || t('admin.accounts.failedToDelete'))
+  }
+}
 const handleToggleSchedulable = async (a: Account) => {
   const nextSchedulable = !a.schedulable
   togglingSchedulable.value = a.id
