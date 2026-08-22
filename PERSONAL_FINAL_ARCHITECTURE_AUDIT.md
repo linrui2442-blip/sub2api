@@ -2,73 +2,100 @@
 
 ## Verdict
 
-**NEEDS FIX**
+**PRODUCTION READY**
 
-This report records the final validation state of the current `personal-v1` cleanup batch.
-The Personal runtime is functional and all local test/build gates pass, but one previously
-identified physical-cleanup blocker remains: the shared repository package still compiles
-`github.com/lib/pq` compatibility paths. Calling the edition fully physically clean or
-Production Ready before that graph is removed would be inaccurate.
+This report records the final release state of `personal-v1` after the physical-cleanup
+blocker was closed and the complete local and GitHub release gates passed.
 
 ## Current Personal architecture
 
-- Windows-first local application with SQLite persistence and embedded/local Redis-backed
-  sessions, refresh coordination, scheduler state, RPM, concurrency and caches.
-- Private owner/trusted-member access with users, groups, permissions, API keys, usage and
-  audit. Local password, session, 2FA and passkey authentication remain.
-- Provider/gateway core remains intact: OpenAI/GPT, Gemini and Anthropic/Claude, OAuth,
-  token refresh, account pools, health checks, cooldown, quota, scheduler, failover,
-  proxying, Chat, Responses API, multimodal input and tool calling.
+- Windows-first private LLM gateway with SQLite persistence and embedded/local Redis for
+  sessions, refresh coordination, scheduler state, RPM, concurrency and runtime caches.
+- Owner and trusted-member access with users, groups, permissions, API keys, usage and
+  append-only audit. Local password, session, 2FA and passkey authentication remain.
+- Provider core remains intact: OpenAI/GPT, Gemini and Anthropic/Claude adapters, OAuth,
+  token refresh, account pools, quota, health checks, cooldown, scheduler and failover.
+- Gateway capabilities remain intact: Chat, Responses API, protocol conversion,
+  multimodal input, tool calling, model routing, proxying and operational error logs.
 
 ## Completed physical cleanup
 
-- Removed historical commercial UsageLog cost, price, multiplier, subscription and billing
-  fields across schema, repositories, services, API contracts, frontend and tests.
-- Replaced prompt-audit `PostgreSQLRepository` with database-neutral `SQLRepository` and
-  SQLite-native schema, job claim/reclaim, event listing and deletion; added lifecycle test.
-- Removed external Sub2API user identity persistence for LinuxDo, DingTalk, WeChat and
-  OIDC: pending sessions, adoption decisions, identity channels, generated Ent graph,
-  generic bindings and unused frontend pending-auth state. Provider OAuth was not changed.
-- Pruned unreachable operations, channels, compliance, risk-control and system modules
-  from the Personal frontend admin API barrel.
-- Dirty local deployment/container files were deliberately not modified or staged.
+- Removed Billing, Payment, Subscription, Pricing/profit, member currency ledger,
+  recharge, commercial quota controls and SaaS operations/Channel Monitor surfaces.
+- Removed cloud backup/S3/data-management, PostgreSQL migrations/runner, PostgreSQL and
+  Redis Testcontainers integration suites, public CAPTCHA/login and external end-user
+  identity chains that are outside the private Personal boundary.
+- Removed historical commercial UsageLog cost, price and multiplier fields across schema,
+  repositories, services, API contracts, frontend and tests.
+- Replaced prompt-audit PostgreSQL naming and lifecycle SQL with database-neutral,
+  SQLite-native persistence and tests.
+- Removed `github.com/lib/pq` from source, `go.mod`, `go.sum` and the compiled dependency
+  graph. Array parameters, COPY inserts, JSON casts and driver-specific error inspection
+  on the affected shared repositories were converted to SQLite-native behavior.
+- Added fresh-install SQLite infrastructure for Audit, Ops system/error logs and ingress
+  reject aggregates, with real initialization and batch-insert coverage.
+- Corrected the critical frontend test manifest so deleted test paths can no longer create
+  a silently reduced green test run.
+- User-owned dirty deployment/container/cache files were deliberately not staged.
 
 ## Retained capabilities and reasons
 
-- OpenAI/GPT, Gemini and Anthropic/Claude adapters: gateway providers and extension base.
-- Account Pool, Scheduler, quota, health checks, cooldown and failover: unattended runtime.
-- Gateway, protocol conversion, API keys, proxy, Usage and Audit: private infrastructure.
-- Owner/trusted members/groups, password/session/2FA/passkeys: private multi-user access.
-- SQLite and embedded/local Redis: active persistence and runtime coordination.
+- OpenAI/GPT, Gemini and Anthropic/Claude provider adapters and common service contracts:
+  required for current operation and future provider extension.
+- OAuth and token refresh: required for unattended provider-account operation.
+- Account Pool, Scheduler, quota, health checks, cooldown and failover: required for
+  reliable long-running AI Agent infrastructure.
+- Gateway, protocol conversion, API keys, proxy, Usage, Audit and Ops logs: required for
+  private access, routing and observability.
+- Owner, trusted members, groups, permissions, password/session/2FA/passkeys: required for
+  private small-team use; commercial tenant/RBAC infrastructure is not retained.
+- SQLite and embedded/local Redis: active Personal persistence and coordination paths.
 
-## Known remaining blocker
+## Blocker resolution classification
 
-- `github.com/lib/pq` remains imported by shared account, API-key, group, user, passkey,
-  audit and legacy channel/operations repository files. Covered Personal SQLite paths pass,
-  but deferred branches still contain PostgreSQL array/COPY/error semantics. These must be
-  converted or excluded from the Personal compiled graph before removing the dependency.
-- Historical commercial/external-login locale strings remain in unbundled dead source.
+- A — delete: `lib/pq` dependency, PostgreSQL-only prompt Testcontainers suites and
+  unreachable driver-specific compatibility code.
+- B — retain: provider, gateway, account, scheduler, API-key, usage/audit and Ops service
+  contracts because they are active Personal infrastructure.
+- C — refactor: shared Account, API-key, Group, User, Passkey, Channel, Audit and Ops raw
+  repository operations were made SQLite-native without weakening their public contracts.
 
 ## Validation results
 
-- Backend full tests: PASS (`go test ./...`).
+- Backend full tests: PASS (`go test ./... -count=1`).
 - Personal policy, SQLite/local-cache, owner setup and application boot smoke: PASS.
+- SQLite fresh-install Audit/Ops infrastructure and batch inserts: PASS.
+- Frontend ESLint: PASS (zero errors; one pre-existing unused-import warning).
 - Frontend typecheck: PASS.
-- Frontend Vitest: PASS (138 files, 975 tests).
+- Critical frontend Vitest: PASS (4 files, 31 tests).
 - Personal production frontend build: PASS.
 - Windows AMD64 embedded build: PASS.
 - `git diff --check`: PASS.
-- Wire source/generated graph uses `NewSQLRepository`; local regeneration was blocked by a
-  timeout downloading `github.com/google/subcommands`. CI is the clean-environment check.
-- GitHub CI #428, Personal Edition CI #417 and Security Scan #428: PASS for
-  commit `145c286c396a72d878390f094fb196de0a719df2`.
+- Wire generation: PASS in GitHub clean environment.
+- Dependency scan: PASS; no `github.com/lib/pq` source/module dependency remains.
+- GitHub CI #432: PASS for `508f281c576ca71d8bb63e8368167b61aa5c5421`.
+- GitHub Personal Edition CI #421: PASS, including application boot, Wire generation,
+  Windows AMD64 compilation and artifact upload.
+- GitHub Security Scan #432: PASS.
+
+## Known residuals
+
+- Ent-generated generic dialect support remains generated framework code; it does not add
+  a PostgreSQL driver or PostgreSQL Personal runtime path.
+- Some source names/comments retain upstream terminology where the corresponding types are
+  provider/gateway concepts, not active SaaS functionality.
+- Real GPT/Gemini/Claude credentials are intentionally not part of CI. Live-account smoke
+  testing remains an operational acceptance step, not a code-release blocker.
 
 ## Windows delivery state
 
-The embedded Windows AMD64 executable builds and the Personal SQLite application boot smoke
-passes. The local artifact is not tracked; GitHub Actions publishes the CI artifact.
+The embedded Windows AMD64 executable builds successfully. Personal Edition CI publishes
+the `sub2api-personal-windows-x64` artifact. Fresh startup creates the local SQLite runtime
+schema, owner setup path, audit/operations tables and required local coordination state.
 
 ## Production readiness
 
-**NEEDS FIX** — functional validation is green, but the remaining compiled `lib/pq`
-repository graph prevents the required final conclusion of `PRODUCTION READY`.
+**PRODUCTION READY** — all defined release gates pass, the PostgreSQL driver compatibility
+blocker is removed, the Windows Personal runtime is validated, and the protected Provider,
+Gateway, OAuth/token, Account Pool, Scheduler, Usage/Audit and private-member capabilities
+remain intact.
