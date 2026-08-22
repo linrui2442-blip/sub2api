@@ -1046,7 +1046,7 @@ func projectIDRequiredError(loadResp *geminicli.LoadCodeAssistResponse) error {
 			}
 		}
 		if len(reasons) > 0 {
-			return fmt.Errorf("Gemini Code Assist account is ineligible: %s", strings.Join(reasons, "; "))
+			return fmt.Errorf("gemini Code Assist account is ineligible: %s", strings.Join(reasons, "; "))
 		}
 	}
 	return errors.New("missing project_id: this Google account requires a user-owned GCP Project ID; enter it in the authorization form and generate a new authorization URL")
