@@ -91,6 +91,7 @@ type AntigravityTokenInfo struct {
 	ProjectID        string `json:"project_id,omitempty"`
 	ProjectIDMissing bool   `json:"-"`
 	PlanType         string `json:"-"`
+	PaidTierID       string `json:"-"`
 	PrivacyMode      string `json:"-"`
 }
 
@@ -157,6 +158,7 @@ func (s *AntigravityOAuthService) ExchangeCode(ctx context.Context, input *Antig
 		result.ProjectID = loadResult.ProjectID
 		if loadResult.Subscription != nil {
 			result.PlanType = loadResult.Subscription.PlanType
+			result.PaidTierID = loadResult.Subscription.PaidTierID
 		}
 	}
 
@@ -249,6 +251,7 @@ func (s *AntigravityOAuthService) ValidateRefreshToken(ctx context.Context, refr
 		tokenInfo.ProjectID = loadResult.ProjectID
 		if loadResult.Subscription != nil {
 			tokenInfo.PlanType = loadResult.Subscription.PlanType
+			tokenInfo.PaidTierID = loadResult.Subscription.PaidTierID
 		}
 	}
 
@@ -320,6 +323,7 @@ func (s *AntigravityOAuthService) RefreshAccountToken(ctx context.Context, accou
 		}
 		if loadResult.Subscription != nil {
 			tokenInfo.PlanType = loadResult.Subscription.PlanType
+			tokenInfo.PaidTierID = loadResult.Subscription.PaidTierID
 		}
 	}
 
@@ -476,6 +480,9 @@ func (s *AntigravityOAuthService) BuildAccountCredentials(tokenInfo *Antigravity
 	if tokenInfo.PlanType != "" {
 		creds["plan_type"] = tokenInfo.PlanType
 	}
+	// Always write the key so refresh can clear a formerly paid account instead
+	// of preserving a stale paid tier during credential merging.
+	creds["paid_tier"] = tokenInfo.PaidTierID
 	return creds
 }
 

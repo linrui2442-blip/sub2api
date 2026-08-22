@@ -1009,20 +1009,31 @@ func TestIsAntigravityAccountSwitchError(t *testing.T) {
 	}
 }
 
-func TestResolveAntigravityForwardBaseURL_DefaultDaily(t *testing.T) {
-	t.Setenv(antigravityForwardBaseURLEnv, "")
+func TestResolveAntigravityForwardBaseURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		override string
+		paidTier string
+		want     string
+	}{
+		{name: "pro tier", paidTier: "g1-pro-tier", want: "https://daily-cloudcode-pa.googleapis.com"},
+		{name: "ultra tier", paidTier: "g1-ultra-tier", want: "https://daily-cloudcode-pa.googleapis.com"},
+		{name: "free tier", paidTier: "free-tier", want: "https://cloudcode-pa.googleapis.com"},
+		{name: "missing paid tier", want: "https://cloudcode-pa.googleapis.com"},
+		{name: "daily override", override: "daily", want: "https://daily-cloudcode-pa.googleapis.com"},
+		{name: "empty override remains tier aware", override: "", paidTier: "g1-pro-tier", want: "https://daily-cloudcode-pa.googleapis.com"},
+	}
 
-	oldBaseURLs := append([]string(nil), antigravity.BaseURLs...)
-	defer func() {
-		antigravity.BaseURLs = oldBaseURLs
-	}()
-
-	prodURL := "https://prod.test"
-	dailyURL := "https://daily.test"
-	antigravity.BaseURLs = []string{dailyURL, prodURL}
-
-	resolved := resolveAntigravityForwardBaseURL()
-	require.Equal(t, dailyURL, resolved)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(antigravityForwardBaseURLEnv, tt.override)
+			account := &Account{Credentials: map[string]any{}}
+			if tt.paidTier != "" {
+				account.Credentials["paid_tier"] = tt.paidTier
+			}
+			require.Equal(t, tt.want, resolveAntigravityForwardBaseURL(account))
+		})
+	}
 }
 
 func TestAntigravityAccountSwitchError_Error(t *testing.T) {

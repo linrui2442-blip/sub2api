@@ -48,26 +48,25 @@ type antigravityRetryLoopResult struct {
 
 // resolveAntigravityForwardBaseURL 解析转发用 base URL。
 //
-// 默认使用生产端点 cloudcode-pa.googleapis.com（antigravity.BaseURLs 的首个地址，
-// 与账号 OAuth 登录/测试连接所用的 antigravity.BaseURL 一致）。
-//
-// 历史上这里改用 ForwardBaseURLs()（把 daily/sandbox 排到首位）并默认取首个地址，
-// 导致网关把带生产 OAuth token 的请求发到 daily-cloudcode-pa.sandbox.googleapis.com，
-// 上游拒绝 → 账号被 401「Invalid bearer token」/502 打入临时不可调度且无法恢复
-// （见 #3611 / #2962）。后台「测试连接」用的是生产端点，所以「测试成功但网关 401」。
-//
-// daily/sandbox 端点仅供内部联调，需显式设置
-// GATEWAY_ANTIGRAVITY_FORWARD_BASE_URL=daily（或 sandbox）才启用。
-func resolveAntigravityForwardBaseURL() string {
-	baseURLs := antigravity.BaseURLs
-	if len(baseURLs) == 0 {
-		return ""
-	}
+// 显式环境变量用于诊断并具有最高优先级；未覆盖时，Google AI Pro/Ultra
+// 账号使用 daily，其余账号（含没有 paid_tier 的旧账号）使用 prod。
+func resolveAntigravityForwardBaseURL(account *Account) string {
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv(antigravityForwardBaseURLEnv)))
-	if (mode == "daily" || mode == "sandbox") && len(baseURLs) > 1 {
-		return baseURLs[1]
+	if mode == "daily" || mode == "sandbox" {
+		return "https://daily-cloudcode-pa.googleapis.com"
 	}
-	return baseURLs[0]
+	if mode == "prod" || mode == "production" {
+		return "https://cloudcode-pa.googleapis.com"
+	}
+
+	paidTier := ""
+	if account != nil {
+		paidTier = strings.ToLower(strings.TrimSpace(account.GetCredential("paid_tier")))
+	}
+	if paidTier == "g1-pro-tier" || paidTier == "g1-ultra-tier" {
+		return "https://daily-cloudcode-pa.googleapis.com"
+	}
+	return "https://cloudcode-pa.googleapis.com"
 }
 
 // smartRetryAction 智能重试的处理结果
@@ -488,7 +487,7 @@ func (s *AntigravityGatewayService) antigravityRetryLoop(p antigravityRetryLoopP
 		}
 	}
 
-	baseURL := resolveAntigravityForwardBaseURL()
+	baseURL := resolveAntigravityForwardBaseURL(p.account)
 	if baseURL == "" {
 		return nil, errors.New("no antigravity forward base url configured")
 	}

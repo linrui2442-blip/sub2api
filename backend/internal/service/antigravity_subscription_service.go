@@ -11,6 +11,7 @@ const antigravitySubscriptionAbnormal = "abnormal"
 // AntigravitySubscriptionResult 表示订阅检测后的规范化结果。
 type AntigravitySubscriptionResult struct {
 	PlanType           string
+	PaidTierID         string
 	SubscriptionStatus string
 	SubscriptionError  string
 }
@@ -23,12 +24,17 @@ func NormalizeAntigravitySubscription(resp *antigravity.LoadCodeAssistResponse) 
 	}
 	tierID := resp.GetTier()
 	planType := antigravity.TierIDToPlanType(tierID)
+	paidTierID := ""
+	if resp.PaidTier != nil {
+		paidTierID = strings.TrimSpace(resp.PaidTier.ID)
+	}
 	if len(resp.IneligibleTiers) > 0 {
 		if planType == "" || planType == "Free" {
 			planType = "Abnormal"
 		}
 		result := AntigravitySubscriptionResult{
 			PlanType:           planType,
+			PaidTierID:         paidTierID,
 			SubscriptionStatus: antigravitySubscriptionAbnormal,
 		}
 		if resp.IneligibleTiers[0] != nil {
@@ -37,6 +43,7 @@ func NormalizeAntigravitySubscription(resp *antigravity.LoadCodeAssistResponse) 
 		return result
 	}
 	return AntigravitySubscriptionResult{
-		PlanType: planType,
+		PlanType:   planType,
+		PaidTierID: paidTierID,
 	}
 }
