@@ -174,12 +174,13 @@ func (r *groupRepository) GetByID(ctx context.Context, id int64) (*service.Group
 		return nil, err
 	}
 	counts, err := r.loadAccountCounts(ctx, []int64{out.ID})
-	if err == nil {
-		c := counts[out.ID]
-		out.AccountCount = c.Total
-		out.ActiveAccountCount = c.Active
-		out.RateLimitedAccountCount = c.RateLimited
+	if err != nil {
+		return nil, fmt.Errorf("load group account counts: %w", err)
 	}
+	c := counts[out.ID]
+	out.AccountCount = c.Total
+	out.ActiveAccountCount = c.Active
+	out.RateLimitedAccountCount = c.RateLimited
 	return out, nil
 }
 
@@ -306,13 +307,14 @@ func (r *groupRepository) ListWithFilters(ctx context.Context, params pagination
 	}
 
 	counts, err := r.loadAccountCounts(ctx, groupIDs)
-	if err == nil {
-		for i := range outGroups {
-			c := counts[outGroups[i].ID]
-			outGroups[i].AccountCount = c.Total
-			outGroups[i].ActiveAccountCount = c.Active
-			outGroups[i].RateLimitedAccountCount = c.RateLimited
-		}
+	if err != nil {
+		return nil, nil, fmt.Errorf("load group account counts: %w", err)
+	}
+	for i := range outGroups {
+		c := counts[outGroups[i].ID]
+		outGroups[i].AccountCount = c.Total
+		outGroups[i].ActiveAccountCount = c.Active
+		outGroups[i].RateLimitedAccountCount = c.RateLimited
 	}
 
 	return outGroups, paginationResultFromTotal(int64(total), params), nil
@@ -471,13 +473,14 @@ func (r *groupRepository) ListActive(ctx context.Context) ([]service.Group, erro
 	}
 
 	counts, err := r.loadAccountCounts(ctx, groupIDs)
-	if err == nil {
-		for i := range outGroups {
-			c := counts[outGroups[i].ID]
-			outGroups[i].AccountCount = c.Total
-			outGroups[i].ActiveAccountCount = c.Active
-			outGroups[i].RateLimitedAccountCount = c.RateLimited
-		}
+	if err != nil {
+		return nil, fmt.Errorf("load group account counts: %w", err)
+	}
+	for i := range outGroups {
+		c := counts[outGroups[i].ID]
+		outGroups[i].AccountCount = c.Total
+		outGroups[i].ActiveAccountCount = c.Active
+		outGroups[i].RateLimitedAccountCount = c.RateLimited
 	}
 
 	return outGroups, nil
@@ -544,13 +547,14 @@ func (r *groupRepository) ListActiveByPlatform(ctx context.Context, platform str
 	}
 
 	counts, err := r.loadAccountCounts(ctx, groupIDs)
-	if err == nil {
-		for i := range outGroups {
-			c := counts[outGroups[i].ID]
-			outGroups[i].AccountCount = c.Total
-			outGroups[i].ActiveAccountCount = c.Active
-			outGroups[i].RateLimitedAccountCount = c.RateLimited
-		}
+	if err != nil {
+		return nil, fmt.Errorf("load group account counts: %w", err)
+	}
+	for i := range outGroups {
+		c := counts[outGroups[i].ID]
+		outGroups[i].AccountCount = c.Total
+		outGroups[i].ActiveAccountCount = c.Active
+		outGroups[i].RateLimitedAccountCount = c.RateLimited
 	}
 
 	return outGroups, nil
@@ -721,20 +725,20 @@ const (
 	groupAccountAvailableSQL = `a.deleted_at IS NULL
 				AND a.status = 'active'
 				AND a.schedulable = true
-				AND (a.expires_at IS NULL OR a.expires_at > NOW() OR a.auto_pause_on_expired = FALSE)
-				AND (a.rate_limit_reset_at IS NULL OR a.rate_limit_reset_at <= NOW())
-				AND (a.overload_until IS NULL OR a.overload_until <= NOW())
-				AND (a.temp_unschedulable_until IS NULL OR a.temp_unschedulable_until <= NOW())`
+				AND (a.expires_at IS NULL OR a.expires_at > CURRENT_TIMESTAMP OR a.auto_pause_on_expired = FALSE)
+				AND (a.rate_limit_reset_at IS NULL OR a.rate_limit_reset_at <= CURRENT_TIMESTAMP)
+				AND (a.overload_until IS NULL OR a.overload_until <= CURRENT_TIMESTAMP)
+				AND (a.temp_unschedulable_until IS NULL OR a.temp_unschedulable_until <= CURRENT_TIMESTAMP)`
 
 	// 这里沿用历史字段名 RateLimitedAccountCount，但统计的是会让账号暂时退出调度的时间窗口。
 	groupAccountTemporarilyLimitedSQL = `a.deleted_at IS NULL
 				AND a.status = 'active'
 				AND a.schedulable = true
-				AND (a.expires_at IS NULL OR a.expires_at > NOW() OR a.auto_pause_on_expired = FALSE)
+				AND (a.expires_at IS NULL OR a.expires_at > CURRENT_TIMESTAMP OR a.auto_pause_on_expired = FALSE)
 				AND (
-					a.rate_limit_reset_at > NOW() OR
-					a.overload_until > NOW() OR
-					a.temp_unschedulable_until > NOW()
+					a.rate_limit_reset_at > CURRENT_TIMESTAMP OR
+					a.overload_until > CURRENT_TIMESTAMP OR
+					a.temp_unschedulable_until > CURRENT_TIMESTAMP
 				)`
 )
 
