@@ -22,7 +22,11 @@ export function useAntigravityOAuth() {
     error.value = ''
   }
 
-  const generateAuthUrl = async (proxyId: number | null | undefined): Promise<boolean> => {
+  const generateAuthUrl = async (
+    proxyId: number | null | undefined,
+    reason: 'first_add' | 'confirmed_reauth' | 'manual_force',
+    accountId?: number
+  ): Promise<boolean> => {
     loading.value = true
     authUrl.value = ''
     sessionId.value = ''
@@ -30,8 +34,9 @@ export function useAntigravityOAuth() {
     error.value = ''
 
     try {
-      const payload: Record<string, unknown> = {}
+      const payload: Record<string, unknown> = { reason }
       if (proxyId) payload.proxy_id = proxyId
+      if (accountId) payload.account_id = accountId
 
       const response = await adminAPI.antigravity.generateAuthUrl(payload as any)
       authUrl.value = response.auth_url

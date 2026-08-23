@@ -1190,6 +1190,8 @@ export default {
             '方式1：复制完整的链接\n(http://localhost:xxx/auth/callback?code=...)\n方式2：仅复制 code 参数的值',
           authCodeHint: '您可以直接复制整个链接或仅复制 code 参数值，系统会自动识别',
           failedToGenerateUrl: '生成 Antigravity 授权链接失败',
+          forceReauthWarning:
+            '当前长期授权仍有效，通常无需重新授权。强制重新授权可能签发新的 refresh token。仅在确认需要时继续。',
           missingExchangeParams: '缺少 code / session_id / state',
           failedToExchangeCode: 'Antigravity 授权码兑换失败',
           // Refresh Token auth

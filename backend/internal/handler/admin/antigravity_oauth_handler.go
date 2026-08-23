@@ -15,7 +15,9 @@ func NewAntigravityOAuthHandler(antigravityOAuthService *service.AntigravityOAut
 }
 
 type AntigravityGenerateAuthURLRequest struct {
-	ProxyID *int64 `json:"proxy_id"`
+	ProxyID   *int64 `json:"proxy_id"`
+	AccountID *int64 `json:"account_id"`
+	Reason    string `json:"reason" binding:"required"`
 }
 
 // GenerateAuthURL generates Google OAuth authorization URL
@@ -27,9 +29,14 @@ func (h *AntigravityOAuthHandler) GenerateAuthURL(c *gin.Context) {
 		return
 	}
 
-	result, err := h.antigravityOAuthService.GenerateAuthURL(c.Request.Context(), req.ProxyID)
+	result, err := h.antigravityOAuthService.GenerateAuthURL(
+		c.Request.Context(),
+		req.ProxyID,
+		req.AccountID,
+		service.AntigravityInteractiveOAuthReason(req.Reason),
+	)
 	if err != nil {
-		response.InternalError(c, "生成授权链接失败: "+err.Error())
+		response.BadRequest(c, "生成授权链接失败: "+err.Error())
 		return
 	}
 

@@ -1135,6 +1135,8 @@ export default {
             'Option 1: Copy the complete URL\n(http://localhost:xxx/auth/callback?code=...)\nOption 2: Copy only the code parameter value',
                     authCodeHint: 'You can copy the entire URL or just the code parameter value, the system will auto-detect',
                     failedToGenerateUrl: 'Failed to generate Antigravity auth URL',
+                    forceReauthWarning:
+                      'Your durable authorization is usually still valid. Forcing reauthorization may issue a new refresh token. Continue only when you have confirmed it is necessary.',
                     missingExchangeParams: 'Missing code, session ID, or state',
                     failedToExchangeCode: 'Failed to exchange Antigravity auth code',
                     // Refresh Token auth

@@ -13,6 +13,8 @@ export interface AntigravityAuthUrlResponse {
 
 export interface AntigravityAuthUrlRequest {
   proxy_id?: number
+  account_id?: number
+  reason: 'first_add' | 'confirmed_reauth' | 'manual_force'
 }
 
 export interface AntigravityExchangeCodeRequest {
