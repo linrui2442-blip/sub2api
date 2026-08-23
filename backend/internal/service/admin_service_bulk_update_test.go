@@ -299,40 +299,19 @@ func TestAdminServiceBulkUpdateAccounts_NormalizesOpenAISettings(t *testing.T) {
 			openAIEndpointCapabilitiesCredentialKey: []any{"chat_completions", "embeddings"},
 		},
 		Extra: map[string]any{
-			openAILongContextBillingEnabledKey: true,
-			"openai_responses_mode":            "auto",
+			retiredOpenAILongContextBillingExtraKey: true,
+			"openai_responses_mode":                 "auto",
 		},
 	})
 
 	require.NoError(t, err)
 	require.Equal(t, 2, result.Success)
-	require.Zero(t, result.LongContextInheritedCount)
 	require.Equal(t, 1, repo.bulkUpdateCalls)
 	require.Contains(t, repo.lastBulkUpdate.Credentials, openAIEndpointCapabilitiesCredentialKey)
 	require.Nil(t, repo.lastBulkUpdate.Credentials[openAIEndpointCapabilitiesCredentialKey])
-	require.Equal(t, true, repo.lastBulkUpdate.Extra[openAILongContextBillingEnabledKey])
+	require.NotContains(t, repo.lastBulkUpdate.Extra, retiredOpenAILongContextBillingExtraKey)
 	require.Contains(t, repo.lastBulkUpdate.Extra, "openai_responses_mode")
 	require.Nil(t, repo.lastBulkUpdate.Extra["openai_responses_mode"])
-}
-
-func TestAdminServiceBulkUpdateAccounts_AcceptsLongContextAccountTypes(t *testing.T) {
-	for _, accountType := range []string{AccountTypeOAuth, AccountTypeSetupToken, AccountTypeAPIKey} {
-		t.Run(accountType, func(t *testing.T) {
-			repo := &accountRepoStubForBulkUpdate{getByIDsAccounts: []*Account{{
-				ID: 1, Platform: PlatformOpenAI, Type: accountType,
-			}}}
-			svc := &adminServiceImpl{accountRepo: repo}
-
-			result, err := svc.BulkUpdateAccounts(context.Background(), &BulkUpdateAccountsInput{
-				AccountIDs: []int64{1},
-				Extra:      map[string]any{openAILongContextBillingEnabledKey: false},
-			})
-
-			require.NoError(t, err)
-			require.Equal(t, 1, result.Success)
-			require.Equal(t, 1, repo.bulkUpdateCalls)
-		})
-	}
 }
 
 func TestAdminServiceBulkUpdateAccounts_EmbeddingsOnlyResetsResponsesMode(t *testing.T) {
@@ -361,7 +340,6 @@ func TestAdminServiceBulkUpdateAccounts_RejectsInvalidOpenAISettingValuesBeforeW
 		extra       map[string]any
 		reason      string
 	}{
-		{name: "long context type", extra: map[string]any{openAILongContextBillingEnabledKey: "true"}, reason: "OPENAI_LONG_CONTEXT_BILLING_INVALID"},
 		{name: "empty capabilities", credentials: map[string]any{openAIEndpointCapabilitiesCredentialKey: []any{}}, reason: "OPENAI_ENDPOINT_CAPABILITIES_INVALID"},
 		{name: "unknown capability", credentials: map[string]any{openAIEndpointCapabilitiesCredentialKey: []any{"responses"}}, reason: "OPENAI_ENDPOINT_CAPABILITIES_INVALID"},
 		{name: "capabilities type", credentials: map[string]any{openAIEndpointCapabilitiesCredentialKey: "chat_completions"}, reason: "OPENAI_ENDPOINT_CAPABILITIES_INVALID"},
@@ -398,35 +376,11 @@ func TestAdminServiceBulkUpdateAccounts_RejectsInvalidOpenAITargetsBeforeWrite(t
 		input    *BulkUpdateAccountsInput
 	}{
 		{
-			name:     "missing account",
-			accounts: []*Account{{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeOAuth}},
-			input: &BulkUpdateAccountsInput{
-				AccountIDs: []int64{1, 2},
-				Extra:      map[string]any{openAILongContextBillingEnabledKey: true},
-			},
-		},
-		{
-			name:     "mixed platform long context",
-			accounts: []*Account{{ID: 1, Platform: PlatformAnthropic, Type: AccountTypeOAuth}},
-			input: &BulkUpdateAccountsInput{
-				AccountIDs: []int64{1},
-				Extra:      map[string]any{openAILongContextBillingEnabledKey: true},
-			},
-		},
-		{
 			name:     "oauth endpoint capabilities",
 			accounts: []*Account{{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeOAuth}},
 			input: &BulkUpdateAccountsInput{
 				AccountIDs:  []int64{1},
 				Credentials: map[string]any{openAIEndpointCapabilitiesCredentialKey: nil},
-			},
-		},
-		{
-			name:     "unsupported OpenAI long context account type",
-			accounts: []*Account{{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeServiceAccount}},
-			input: &BulkUpdateAccountsInput{
-				AccountIDs: []int64{1},
-				Extra:      map[string]any{openAILongContextBillingEnabledKey: true},
 			},
 		},
 	}
@@ -485,80 +439,4 @@ func TestAdminServiceBulkUpdateAccounts_ForcedResponsesAcceptsChatCapabilityUpda
 
 	require.NoError(t, err)
 	require.Equal(t, 1, repo.bulkUpdateCalls)
-}
-
-func TestAdminServiceBulkUpdateAccounts_ReportsLongContextShadowInheritance(t *testing.T) {
-	parentID := int64(1)
-	repo := &accountRepoStubForBulkUpdate{getByIDsAccounts: []*Account{
-		{ID: parentID, Platform: PlatformOpenAI, Type: AccountTypeOAuth},
-		{ID: 2, Platform: PlatformOpenAI, Type: AccountTypeOAuth, ParentAccountID: &parentID},
-	}}
-	svc := &adminServiceImpl{accountRepo: repo}
-
-	result, err := svc.BulkUpdateAccounts(context.Background(), &BulkUpdateAccountsInput{
-		AccountIDs: []int64{parentID, 2},
-		Extra:      map[string]any{openAILongContextBillingEnabledKey: true},
-	})
-
-	require.NoError(t, err)
-	require.Equal(t, 1, result.LongContextInheritedCount)
-	require.Equal(t, 1, repo.bulkUpdateCalls)
-}
-
-func TestAdminServiceBulkUpdateAccounts_RequiresParentForShadowOnlyLongContextUpdate(t *testing.T) {
-	parentID := int64(10)
-	repo := &accountRepoStubForBulkUpdate{getByIDsAccounts: []*Account{
-		{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeOAuth, ParentAccountID: &parentID},
-		{ID: 2, Platform: PlatformOpenAI, Type: AccountTypeOAuth, ParentAccountID: &parentID},
-	}}
-	svc := &adminServiceImpl{accountRepo: repo}
-
-	result, err := svc.BulkUpdateAccounts(context.Background(), &BulkUpdateAccountsInput{
-		AccountIDs: []int64{1, 2},
-		Extra:      map[string]any{openAILongContextBillingEnabledKey: true},
-	})
-
-	require.Nil(t, result)
-	requireApplicationErrorReason(t, err, "OPENAI_LONG_CONTEXT_PARENT_REQUIRED")
-	require.Zero(t, repo.bulkUpdateCalls)
-}
-
-func TestAdminServiceBulkUpdateAccounts_ShadowLongContextAllowsOtherUpdates(t *testing.T) {
-	parentID := int64(10)
-	repo := &accountRepoStubForBulkUpdate{getByIDsAccounts: []*Account{{
-		ID: 1, Platform: PlatformOpenAI, Type: AccountTypeOAuth, ParentAccountID: &parentID,
-	}}}
-	svc := &adminServiceImpl{accountRepo: repo}
-	status := StatusDisabled
-
-	result, err := svc.BulkUpdateAccounts(context.Background(), &BulkUpdateAccountsInput{
-		AccountIDs: []int64{1},
-		Status:     status,
-		Extra:      map[string]any{openAILongContextBillingEnabledKey: false},
-	})
-
-	require.NoError(t, err)
-	require.Equal(t, 1, result.LongContextInheritedCount)
-	require.Equal(t, 1, repo.bulkUpdateCalls)
-	require.NotNil(t, repo.lastBulkUpdate.Status)
-	require.Equal(t, status, *repo.lastBulkUpdate.Status)
-}
-
-func TestAdminServiceBulkUpdateAccounts_ValidatesFilterResolvedOpenAITargets(t *testing.T) {
-	repo := &accountRepoStubForBulkUpdate{
-		listData:         []Account{{ID: 7}},
-		listResult:       &pagination.PaginationResult{Total: 1},
-		getByIDsAccounts: []*Account{{ID: 7, Platform: PlatformAnthropic, Type: AccountTypeOAuth}},
-	}
-	svc := &adminServiceImpl{accountRepo: repo}
-
-	result, err := svc.BulkUpdateAccounts(context.Background(), &BulkUpdateAccountsInput{
-		Filters: &BulkUpdateAccountFilters{Platform: PlatformOpenAI},
-		Extra:   map[string]any{openAILongContextBillingEnabledKey: true},
-	})
-
-	require.Nil(t, result)
-	requireApplicationErrorReason(t, err, "OPENAI_BULK_TARGET_INVALID")
-	require.Equal(t, []int64{7}, repo.getByIDsIDs)
-	require.Zero(t, repo.bulkUpdateCalls)
 }

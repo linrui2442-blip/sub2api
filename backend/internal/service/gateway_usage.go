@@ -265,35 +265,7 @@ type RecordUsageInput struct {
 	ChannelUsageFields
 }
 
-type RecordUsageLongContextInput struct {
-	Result                *ForwardResult
-	APIKey                *APIKey
-	User                  *User
-	Account               *Account
-	Subscription          any
-	PricingAt             time.Time
-	InboundEndpoint       string
-	UpstreamEndpoint      string
-	UserAgent             string
-	IPAddress             string
-	SessionID             string
-	RequestPayloadHash    string
-	LongContextThreshold  int
-	LongContextMultiplier float64
-	ForceCacheBilling     bool
-	APIKeyService         APIKeyQuotaUpdater
-	QuotaPlatform         string
-	ChannelUsageFields
-}
-
 func (s *GatewayService) RecordUsage(ctx context.Context, input *RecordUsageInput) error {
-	if input == nil {
-		return errors.New("usage input is nil")
-	}
-	return s.recordOperationalUsage(ctx, input.Result, input.APIKey, input.User, input.Account, input.InboundEndpoint, input.UpstreamEndpoint, input.UserAgent, input.IPAddress, input.SessionID, input.ChannelUsageFields)
-}
-
-func (s *GatewayService) RecordUsageWithLongContext(ctx context.Context, input *RecordUsageLongContextInput) error {
 	if input == nil {
 		return errors.New("usage input is nil")
 	}
