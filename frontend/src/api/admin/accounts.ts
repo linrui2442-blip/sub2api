@@ -788,16 +788,6 @@ export async function batchRefresh(accountIds: number[]): Promise<BatchOperation
 }
 
 /**
- * Set privacy for an Antigravity OAuth account
- * @param id - Account ID
- * @returns Updated account
- */
-export async function setPrivacy(id: number): Promise<Account> {
-  const { data } = await apiClient.post<Account>(`/admin/accounts/${id}/set-privacy`)
-  return data
-}
-
-/**
  * OpenAI / Codex rate-limit reset feature: query and reset upstream usage.
  */
 export interface OpenAIRateLimitWindow {
@@ -1003,7 +993,6 @@ export const accountsAPI = {
   batchDelete,
   batchClearError,
   batchRefresh,
-  setPrivacy,
   revertProxyFallback,
   refreshOpenAIQuota,
   resetOpenAIQuota,

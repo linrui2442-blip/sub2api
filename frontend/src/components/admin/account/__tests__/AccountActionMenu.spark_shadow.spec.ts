@@ -128,7 +128,7 @@ describe('AccountActionMenu — spark shadow 按钮可见性', () => {
     wrapper.unmount()
   })
 
-  it('影子账号隐藏凭据/隐私类操作(重授权/刷新token/隐私)— 外审 G4', () => {
+  it('影子账号隐藏凭据操作(重授权/刷新token)— 外审 G4', () => {
     const account = makeAccount({ platform: 'openai', type: 'oauth', parent_account_id: 42 })
     const wrapper = mount(AccountActionMenu, {
       props: { show: true, account, position },
@@ -137,11 +137,10 @@ describe('AccountActionMenu — spark shadow 按钮可见性', () => {
     const body = getBodyText()
     expect(body).not.toContain('admin.accounts.reAuthorize')
     expect(body).not.toContain('admin.accounts.refreshToken')
-    expect(body).not.toContain('admin.accounts.setPrivacy')
     wrapper.unmount()
   })
 
-  it('普通 OpenAI OAuth 母账号仍显示凭据/隐私类操作', () => {
+  it('普通 OpenAI OAuth 母账号仍显示凭据操作', () => {
     const account = makeAccount({ platform: 'openai', type: 'oauth', parent_account_id: null })
     const wrapper = mount(AccountActionMenu, {
       props: { show: true, account, position },
@@ -149,7 +148,6 @@ describe('AccountActionMenu — spark shadow 按钮可见性', () => {
     })
     const body = getBodyText()
     expect(body).toContain('admin.accounts.reAuthorize')
-    expect(body).toContain('admin.accounts.setPrivacy')
     wrapper.unmount()
   })
 

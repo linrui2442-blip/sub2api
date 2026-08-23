@@ -424,7 +424,7 @@
     <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
     <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
     <ScheduledTestsPanel :show="showSchedulePanel" :account-id="scheduleAcc?.id ?? null" :model-options="scheduleModelOptions" @close="closeSchedulePanel" />
-    <AccountActionMenu :show="menu.show" :account="menu.acc" :position="menu.pos" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @set-privacy="handleSetPrivacy" @create-spark-shadow="handleCreateSparkShadow" />
+    <AccountActionMenu :show="menu.show" :account="menu.acc" :position="menu.pos" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @schedule="handleSchedule" @duplicate="handleDuplicateAccount" @reauth="handleReAuth" @refresh-token="handleRefresh" @recover-state="handleRecoverState" @reset-quota="handleResetQuota" @create-spark-shadow="handleCreateSparkShadow" />
     <SyncFromCrsModal :show="showSync" @close="showSync = false" @synced="reload" />
     <ImportDataModal :show="showImportData" @close="showImportData = false" @imported="handleDataImported" />
     <BulkEditAccountModal
@@ -2151,43 +2151,6 @@ const handleResetQuota = async (a: Account) => {
   }
 }
 
-const privacyResultMessageKey = (account: Account): { type: 'success' | 'error'; key: string } => {
-  const mode = typeof account.extra?.privacy_mode === 'string' ? account.extra.privacy_mode : ''
-  if (account.platform === 'openai') {
-    switch (mode) {
-      case 'training_off':
-        return { type: 'success', key: 'admin.accounts.privacyTrainingOff' }
-      case 'training_set_cf_blocked':
-        return { type: 'error', key: 'admin.accounts.privacyCfBlocked' }
-      default:
-        return { type: 'error', key: 'admin.accounts.privacyFailed' }
-    }
-  }
-  if (account.platform === 'antigravity') {
-    if (mode === 'privacy_set') {
-      return { type: 'success', key: 'admin.accounts.privacyAntigravitySet' }
-    }
-    return { type: 'error', key: 'admin.accounts.privacyAntigravityFailed' }
-  }
-  return { type: 'error', key: 'admin.accounts.privacyFailed' }
-}
-
-const handleSetPrivacy = async (a: Account) => {
-  try {
-    const updated = await adminAPI.accounts.setPrivacy(a.id)
-    patchAccountInList(updated)
-    enterAutoRefreshSilentWindow()
-    const result = privacyResultMessageKey(updated)
-    if (result.type === 'success') {
-      appStore.showSuccess(t(result.key))
-    } else {
-      appStore.showError(t(result.key))
-    }
-  } catch (error: any) {
-    console.error('Failed to set privacy:', error)
-    appStore.showError(error?.response?.data?.message || t('admin.accounts.privacyFailed'))
-  }
-}
 const onRevertFallback = async (a: Account) => {
   try {
     await adminAPI.accounts.revertProxyFallback(a.id)
