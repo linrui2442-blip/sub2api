@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -553,6 +555,80 @@ func TestAntigravityTokenRefresher_NeedsRefresh_NormalExpiryRulesUnchanged(t *te
 
 		require.True(t, refresher.NeedsRefresh(account, 0))
 	})
+}
+
+func TestAntigravityBackgroundRefreshWindow_DeterministicAndSpread(t *testing.T) {
+	seen := make(map[time.Duration]struct{})
+	for id := int64(1); id <= 100; id++ {
+		first := antigravityBackgroundRefreshWindow(id)
+		second := antigravityBackgroundRefreshWindow(id)
+		require.Equal(t, first, second)
+		require.GreaterOrEqual(t, first, 4*time.Minute)
+		require.LessOrEqual(t, first, 6*time.Minute)
+		seen[first] = struct{}{}
+	}
+	require.Greater(t, len(seen), 20, "100 co-expiring accounts must not share one refresh boundary")
+}
+
+func TestAntigravityTokenRefresher_BackgroundWindowIsNarrow(t *testing.T) {
+	refresher := NewAntigravityTokenRefresher(nil)
+	account := &Account{
+		ID:       42,
+		Platform: PlatformAntigravity,
+		Type:     AccountTypeOAuth,
+		Credentials: map[string]any{
+			"expires_at": time.Now().Add(10 * time.Minute).UTC().Format(time.RFC3339Nano),
+		},
+	}
+	require.False(t, refresher.NeedsRefresh(account, 15*time.Minute), "legacy 15 minute lead must be ignored")
+	account.Credentials["expires_at"] = time.Now().Add(3 * time.Minute).UTC().Format(time.RFC3339Nano)
+	require.True(t, refresher.NeedsRefresh(account, time.Hour))
+}
+
+func TestTokenRefreshService_AntigravityTransientBackoffProgressionAndReset(t *testing.T) {
+	svc := &TokenRefreshService{}
+	now := time.Date(2026, 8, 24, 0, 0, 0, 0, time.UTC)
+	var previous time.Duration
+	for failure := 1; failure <= 6; failure++ {
+		delay := svc.recordAntigravityBackgroundTransientFailure(77, now)
+		require.GreaterOrEqual(t, delay, 24*time.Second)
+		require.LessOrEqual(t, delay, antigravityBackgroundBackoffMax)
+		if failure > 1 && previous < antigravityBackgroundBackoffMax*80/100 {
+			require.Greater(t, delay, previous)
+		}
+		previous = delay
+		require.False(t, svc.antigravityBackgroundRetryReady(77, now))
+		require.True(t, svc.antigravityBackgroundRetryReady(77, now.Add(delay)))
+	}
+	svc.resetAntigravityBackgroundBackoff(77)
+	require.True(t, svc.antigravityBackgroundRetryReady(77, now))
+}
+
+func TestTokenRefreshService_DefaultBackgroundConcurrencyCapsHundredAccounts(t *testing.T) {
+	svc := &TokenRefreshService{}
+	gate := newTokenRefreshConcurrencyGate(svc.providerConcurrency())
+	var active, maximum int64
+	var wg sync.WaitGroup
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			release, err := gate.acquire(context.Background())
+			require.NoError(t, err)
+			current := atomic.AddInt64(&active, 1)
+			for {
+				old := atomic.LoadInt64(&maximum)
+				if current <= old || atomic.CompareAndSwapInt64(&maximum, old, current) {
+					break
+				}
+			}
+			time.Sleep(time.Millisecond)
+			atomic.AddInt64(&active, -1)
+			release()
+		}()
+	}
+	wg.Wait()
+	require.LessOrEqual(t, maximum, int64(defaultTokenRefreshProviderConcurrency))
 }
 
 func TestTokenRefreshService_RefreshWithRetry_AntigravityClearsForceRefreshOnSuccess(t *testing.T) {
