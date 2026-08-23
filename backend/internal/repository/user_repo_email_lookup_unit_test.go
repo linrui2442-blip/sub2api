@@ -72,6 +72,35 @@ func TestUserRepositoryExistsByEmailNormalizesLegacySpacingAndCase(t *testing.T)
 	require.True(t, exists)
 }
 
+func TestUserRepositoryProfileUpdateReusesOuterSQLiteTransaction(t *testing.T) {
+	repo, _ := newUserEntRepo(t)
+	ctx := context.Background()
+
+	user := &service.User{
+		Email:        "profile@example.com",
+		Username:     "before",
+		PasswordHash: "hash",
+		Role:         service.RoleUser,
+		Status:       service.StatusActive,
+	}
+	require.NoError(t, repo.Create(ctx, user))
+
+	updateCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	require.NoError(t, repo.WithUserProfileIdentityTx(updateCtx, func(txCtx context.Context) error {
+		current, err := repo.GetByID(txCtx, user.ID)
+		if err != nil {
+			return err
+		}
+		current.Username = "after"
+		return repo.Update(txCtx, current, service.UserUpdateFields{Username: true})
+	}))
+
+	updated, err := repo.GetByID(ctx, user.ID)
+	require.NoError(t, err)
+	require.Equal(t, "after", updated.Username)
+}
+
 func TestUserRepositoryCreateRejectsNormalizedEmailDuplicate(t *testing.T) {
 	repo, _ := newUserEntRepo(t)
 	ctx := context.Background()
