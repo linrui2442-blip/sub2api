@@ -1363,8 +1363,9 @@ func (s *adminServiceImpl) EnsureAntigravityPrivacy(ctx context.Context, account
 		}
 	}
 
-	token, _ := account.Credentials["access_token"].(string)
-	if token == "" {
+	token, err := s.antigravityAccessToken(ctx, account)
+	if err != nil {
+		logger.LegacyPrintf("service.admin", "get_antigravity_privacy_token_failed: account_id=%d err=%v", account.ID, err)
 		return ""
 	}
 
@@ -1377,7 +1378,7 @@ func (s *adminServiceImpl) EnsureAntigravityPrivacy(ctx context.Context, account
 		}
 	}
 
-	mode := setAntigravityPrivacy(ctx, token, projectID, proxyURL)
+	mode := s.setAntigravityPrivacy(ctx, token, projectID, proxyURL)
 	if mode == "" {
 		return ""
 	}
@@ -1396,8 +1397,9 @@ func (s *adminServiceImpl) ForceAntigravityPrivacy(ctx context.Context, account 
 		return ""
 	}
 
-	token, _ := account.Credentials["access_token"].(string)
-	if token == "" {
+	token, err := s.antigravityAccessToken(ctx, account)
+	if err != nil {
+		logger.LegacyPrintf("service.admin", "force_get_antigravity_privacy_token_failed: account_id=%d err=%v", account.ID, err)
 		return ""
 	}
 
@@ -1410,7 +1412,7 @@ func (s *adminServiceImpl) ForceAntigravityPrivacy(ctx context.Context, account 
 		}
 	}
 
-	mode := setAntigravityPrivacy(ctx, token, projectID, proxyURL)
+	mode := s.setAntigravityPrivacy(ctx, token, projectID, proxyURL)
 	if mode == "" {
 		return ""
 	}
@@ -1421,4 +1423,22 @@ func (s *adminServiceImpl) ForceAntigravityPrivacy(ctx context.Context, account 
 	}
 	applyAntigravityPrivacyMode(account, mode)
 	return mode
+}
+
+type antigravityAccessTokenProvider interface {
+	GetAccessToken(context.Context, *Account) (string, error)
+}
+
+func (s *adminServiceImpl) antigravityAccessToken(ctx context.Context, account *Account) (string, error) {
+	if s == nil || s.antigravityTokenProvider == nil {
+		return "", errors.New("antigravity token provider is not configured")
+	}
+	return s.antigravityTokenProvider.GetAccessToken(ctx, account)
+}
+
+func (s *adminServiceImpl) setAntigravityPrivacy(ctx context.Context, token, projectID, proxyURL string) string {
+	if s != nil && s.antigravityPrivacySetter != nil {
+		return s.antigravityPrivacySetter(ctx, token, projectID, proxyURL)
+	}
+	return setAntigravityPrivacy(ctx, token, projectID, proxyURL)
 }

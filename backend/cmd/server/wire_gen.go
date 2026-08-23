@@ -141,7 +141,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	userRPMCache := repository.NewUserRPMCache(redisClient)
 	proxyExitInfoProber := repository.NewProxyExitInfoProber(configConfig)
 	proxyLatencyCache := repository.NewProxyLatencyCache(redisClient)
-	adminService := service.NewPersonalAdminService(userRepository, adminGroupRepository, adminAccountRepository, proxyRepository, apiKeyRepository, userRPMCache, proxyExitInfoProber, proxyLatencyCache, apiKeyAuthCacheInvalidator, client, settingService, privacyClientFactory, openAIGatewayService, compositeModelRouteRepository, compositeRouteResolver, channelService)
+	adminService := service.NewPersonalAdminService(userRepository, adminGroupRepository, adminAccountRepository, proxyRepository, apiKeyRepository, userRPMCache, proxyExitInfoProber, proxyLatencyCache, apiKeyAuthCacheInvalidator, client, settingService, privacyClientFactory, antigravityTokenProvider, openAIGatewayService, compositeModelRouteRepository, compositeRouteResolver, channelService)
 	adminUserHandler := admin.ProvidePersonalUserHandler(adminService, concurrencyService, totpService, userService, settingService)
 	dashboardAggregationRepository := repository.NewDashboardAggregationRepository(db)
 	dashboardStatsCache := repository.NewDashboardCache(redisClient, configConfig)
