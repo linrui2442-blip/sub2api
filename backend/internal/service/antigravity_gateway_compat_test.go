@@ -86,6 +86,7 @@ func newAntigravityCompatAccount(accountType string) *Account {
 		Concurrency: 1,
 		Credentials: map[string]any{
 			"access_token": "stale-account-token",
+			"expires_at":   time.Now().Add(time.Hour).Unix(),
 			"project_id":   "project-3757",
 			"model_mapping": map[string]any{
 				"gemini-3.1-pro-high": "gemini-3.1-pro-high",

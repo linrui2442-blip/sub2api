@@ -129,6 +129,15 @@ type OAuthRefreshAPI struct {
 	tokenCache  GeminiTokenCache // 可选，nil = 无分布式锁
 	lockTTL     time.Duration
 	localLocks  sync.Map // key: cacheKey string -> value: *contextMutex
+	postRefresh func(*Account)
+}
+
+// SetPostRefreshHook registers a startup-time callback used to invalidate
+// provider-specific derived caches after durable credential persistence.
+func (api *OAuthRefreshAPI) SetPostRefreshHook(hook func(*Account)) {
+	if api != nil {
+		api.postRefresh = hook
+	}
 }
 
 // NewOAuthRefreshAPI 创建统一刷新 API
@@ -170,6 +179,27 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 	account *Account,
 	executor OAuthRefreshExecutor,
 	refreshWindow time.Duration,
+) (*OAuthRefreshResult, error) {
+	return api.refresh(ctx, account, executor, refreshWindow, false)
+}
+
+// ForceRefresh executes the existing locked OAuth refresh flow even when the
+// durable access token has not reached its normal refresh window. It is used
+// for a single recovery attempt after an upstream 401.
+func (api *OAuthRefreshAPI) ForceRefresh(
+	ctx context.Context,
+	account *Account,
+	executor OAuthRefreshExecutor,
+) (*OAuthRefreshResult, error) {
+	return api.refresh(ctx, account, executor, 0, true)
+}
+
+func (api *OAuthRefreshAPI) refresh(
+	ctx context.Context,
+	account *Account,
+	executor OAuthRefreshExecutor,
+	refreshWindow time.Duration,
+	force bool,
 ) (*OAuthRefreshResult, error) {
 	if api == nil || api.accountRepo == nil {
 		return nil, errors.New("oauth refresh account repository is not configured")
@@ -247,7 +277,7 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 	}
 
 	// 3. 二次检查是否仍需刷新（另一条路径可能已刷新）
-	if !executor.NeedsRefresh(freshAccount, refreshWindow) {
+	if !force && !executor.NeedsRefresh(freshAccount, refreshWindow) {
 		return &OAuthRefreshResult{
 			Account: freshAccount,
 		}, nil
@@ -363,6 +393,9 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 		if eligibilityErr := grokOAuthRequestAccountEligibilityError(freshAccount); eligibilityErr != nil {
 			return nil, withGrokCredentialFailureSnapshot(eligibilityErr, freshAccount)
 		}
+	}
+	if api.postRefresh != nil {
+		api.postRefresh(freshAccount)
 	}
 
 	return &OAuthRefreshResult{

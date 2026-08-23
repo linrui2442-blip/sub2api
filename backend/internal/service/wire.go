@@ -168,6 +168,7 @@ func ProvideAccountUsageService(
 	identityCache IdentityCache,
 	tlsFPProfileService *TLSFingerprintProfileService,
 	openAIGatewayService *OpenAIGatewayService,
+	oauthRefreshAPI *OAuthRefreshAPI,
 ) *AccountUsageService {
 	service := NewAccountUsageService(
 		accountRepo,
@@ -183,6 +184,13 @@ func ProvideAccountUsageService(
 		tlsFPProfileService,
 	)
 	service.agentIdentityWS = openAIGatewayService
+	if oauthRefreshAPI != nil {
+		oauthRefreshAPI.SetPostRefreshHook(func(account *Account) {
+			if account != nil && account.Platform == PlatformAntigravity {
+				service.InvalidateAntigravityUsageCache(account.ID)
+			}
+		})
+	}
 	return service
 }
 

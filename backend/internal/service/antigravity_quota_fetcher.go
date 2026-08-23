@@ -27,12 +27,13 @@ const (
 
 // AntigravityQuotaFetcher 从 Antigravity API 获取额度
 type AntigravityQuotaFetcher struct {
-	proxyRepo ProxyRepository
+	proxyRepo     ProxyRepository
+	tokenProvider *AntigravityTokenProvider
 }
 
 // NewAntigravityQuotaFetcher 创建 AntigravityQuotaFetcher
-func NewAntigravityQuotaFetcher(proxyRepo ProxyRepository) *AntigravityQuotaFetcher {
-	return &AntigravityQuotaFetcher{proxyRepo: proxyRepo}
+func NewAntigravityQuotaFetcher(proxyRepo ProxyRepository, tokenProvider *AntigravityTokenProvider) *AntigravityQuotaFetcher {
+	return &AntigravityQuotaFetcher{proxyRepo: proxyRepo, tokenProvider: tokenProvider}
 }
 
 // CanFetch 检查是否可以获取此账户的额度
@@ -40,13 +41,18 @@ func (f *AntigravityQuotaFetcher) CanFetch(account *Account) bool {
 	if account.Platform != PlatformAntigravity {
 		return false
 	}
-	accessToken := account.GetCredential("access_token")
-	return accessToken != ""
+	return account.Type == AccountTypeUpstream || account.Type == AccountTypeOAuth
 }
 
 // FetchQuota 获取 Antigravity 账户额度信息
 func (f *AntigravityQuotaFetcher) FetchQuota(ctx context.Context, account *Account, proxyURL string) (*QuotaResult, error) {
-	accessToken := account.GetCredential("access_token")
+	if f.tokenProvider == nil {
+		return nil, errors.New("antigravity token provider is not configured")
+	}
+	accessToken, err := f.tokenProvider.GetAccessToken(ctx, account)
+	if err != nil {
+		return nil, fmt.Errorf("get antigravity access token: %w", err)
+	}
 	projectID := account.GetCredential("project_id")
 
 	client, err := antigravity.NewClient(proxyURL)
@@ -56,6 +62,13 @@ func (f *AntigravityQuotaFetcher) FetchQuota(ctx context.Context, account *Accou
 
 	// 调用 API 获取配额
 	modelsResp, modelsRaw, err := client.FetchAvailableModels(ctx, accessToken, projectID)
+	if err != nil && isAntigravityUnauthorized(err) && account.Type == AccountTypeOAuth {
+		accessToken, err = f.tokenProvider.ForceRefreshAccessToken(ctx, account)
+		if err != nil {
+			return nil, fmt.Errorf("refresh antigravity access token after 401: %w", err)
+		}
+		modelsResp, modelsRaw, err = client.FetchAvailableModels(ctx, accessToken, projectID)
+	}
 	if err != nil {
 		// 403 Forbidden: 不报错，返回 is_forbidden 标记
 		var forbiddenErr *antigravity.ForbiddenError
@@ -88,6 +101,14 @@ func (f *AntigravityQuotaFetcher) FetchQuota(ctx context.Context, account *Accou
 		UsageInfo: usageInfo,
 		Raw:       modelsRaw,
 	}, nil
+}
+
+func isAntigravityUnauthorized(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "http 401") || strings.Contains(lower, "unauthenticated")
 }
 
 // fetchSubscriptionTier 获取账号订阅等级，失败返回空字符串。

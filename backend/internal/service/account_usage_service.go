@@ -1082,6 +1082,15 @@ func (s *AccountUsageService) getAntigravityUsage(ctx context.Context, account *
 	return usage, nil
 }
 
+// InvalidateAntigravityUsageCache removes a degraded quota result after a
+// successful OAuth refresh so the next UI read performs a fresh probe.
+func (s *AccountUsageService) InvalidateAntigravityUsageCache(accountID int64) {
+	if s == nil || s.cache == nil {
+		return
+	}
+	s.cache.antigravityCache.Delete(accountID)
+}
+
 func (s *AccountUsageService) getGrokUsage(ctx context.Context, account *Account, force bool) (*UsageInfo, error) {
 	if s.grokQuotaFetcher == nil {
 		now := time.Now()
@@ -1284,11 +1293,11 @@ func buildAntigravityDegradedUsage(err error) *UsageInfo {
 	// 错误格式来自 antigravity/client.go: "fetchAvailableModels 失败 (HTTP %d): ..."
 	errStr := err.Error()
 	switch {
-	case strings.Contains(errStr, "HTTP 401") ||
-		strings.Contains(errStr, "UNAUTHENTICATED") ||
-		strings.Contains(errStr, "invalid_grant"):
+	case isAntigravityRefreshCredentialInvalid(err):
 		info.ErrorCode = errorCodeUnauthenticated
 		info.NeedsReauth = true
+	case strings.Contains(errStr, "HTTP 401") || strings.Contains(errStr, "UNAUTHENTICATED"):
+		info.ErrorCode = errorCodeUnauthenticated
 	case strings.Contains(errStr, "HTTP 429"):
 		info.ErrorCode = errorCodeRateLimited
 	default:
@@ -1296,6 +1305,21 @@ func buildAntigravityDegradedUsage(err error) *UsageInfo {
 	}
 
 	return info
+}
+
+func isAntigravityRefreshCredentialInvalid(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "invalid_grant") ||
+		strings.Contains(lower, "refresh token revoked") ||
+		strings.Contains(lower, "refresh_token revoked") ||
+		strings.Contains(lower, "missing refresh_token") ||
+		strings.Contains(lower, "refresh token missing") ||
+		strings.Contains(lower, "refresh token not found") ||
+		strings.Contains(lower, "refresh_token not found") ||
+		strings.Contains(lower, "no refresh token")
 }
 
 // enrichUsageWithAccountError 结合账号错误状态修正 UsageInfo

@@ -87,16 +87,19 @@ func (p *AntigravityTokenProvider) GetAccessToken(ctx context.Context, account *
 
 	cacheKey := AntigravityTokenCacheKey(account)
 
-	// 1) Try cache first.
-	if p.tokenCache != nil {
+	// Durable expiry is authoritative. An expired durable token must never be
+	// masked by an older access token still present in the cache.
+	expiresAt := account.GetCredentialAsTime("expires_at")
+	needsRefresh := expiresAt == nil || time.Until(*expiresAt) <= antigravityTokenRefreshSkew
+
+	// 1) Use cache only while the durable credential is still valid.
+	if !needsRefresh && p.tokenCache != nil {
 		if token, err := p.tokenCache.GetAccessToken(ctx, cacheKey); err == nil && strings.TrimSpace(token) != "" {
 			return token, nil
 		}
 	}
 
 	// 2) Refresh if needed (pre-expiry skew).
-	expiresAt := account.GetCredentialAsTime("expires_at")
-	needsRefresh := expiresAt == nil || time.Until(*expiresAt) <= antigravityTokenRefreshSkew
 	if needsRefresh && p.refreshAPI != nil && p.executor != nil {
 		// 请求路径使用短超时，避免代理不通时阻塞过久（后台刷新服务会继续重试）
 		refreshCtx, cancel := context.WithTimeout(ctx, antigravityRequestRefreshTimeout)
@@ -117,7 +120,13 @@ func (p *AntigravityTokenProvider) GetAccessToken(ctx context.Context, account *
 			// default policy: continue with existing token.
 		} else {
 			account = result.Account
+			if account == nil {
+				return "", errors.New("oauth refresh returned no account")
+			}
 			expiresAt = account.GetCredentialAsTime("expires_at")
+			if result.Refreshed && p.tokenCache != nil {
+				_ = p.tokenCache.DeleteAccessToken(ctx, cacheKey)
+			}
 		}
 	} else if needsRefresh && p.tokenCache != nil {
 		// Backward-compatible test path when refreshAPI is not injected.
@@ -167,14 +176,42 @@ func (p *AntigravityTokenProvider) GetAccessToken(ctx context.Context, account *
 				case until > 0:
 					ttl = until
 				default:
-					ttl = time.Minute
+					ttl = 0
 				}
 			}
-			_ = p.tokenCache.SetAccessToken(ctx, cacheKey, accessToken, ttl)
+			if ttl > 0 {
+				_ = p.tokenCache.SetAccessToken(ctx, cacheKey, accessToken, ttl)
+			}
 		}
 	}
 
 	return accessToken, nil
+}
+
+// ForceRefreshAccessToken performs one refresh through the existing OAuth
+// refresh API. It is intended only for recovery after an upstream 401.
+func (p *AntigravityTokenProvider) ForceRefreshAccessToken(ctx context.Context, account *Account) (string, error) {
+	if account == nil || account.Platform != PlatformAntigravity || account.Type != AccountTypeOAuth {
+		return "", errors.New("antigravity oauth account is required")
+	}
+	if p.refreshAPI == nil || p.executor == nil {
+		return "", errors.New("antigravity oauth refresh is not configured")
+	}
+	result, err := p.refreshAPI.ForceRefresh(ctx, account, p.executor)
+	if err != nil {
+		return "", err
+	}
+	if result == nil || result.Account == nil {
+		return "", errors.New("oauth refresh returned no account")
+	}
+	token := strings.TrimSpace(result.Account.GetCredential("access_token"))
+	if token == "" {
+		return "", errors.New("access_token not found after refresh")
+	}
+	if result.Refreshed && p.tokenCache != nil {
+		_ = p.tokenCache.DeleteAccessToken(ctx, AntigravityTokenCacheKey(result.Account))
+	}
+	return token, nil
 }
 
 // shouldAttemptBackfill checks backfill cooldown.
