@@ -94,10 +94,6 @@ func cloneAccountJSONMap(value map[string]any) (map[string]any, error) {
 var duplicateAccountDiscardedExtraKeys = map[string]struct{}{
 	// A retry identity belongs to the operation that created one copy, not to later copies.
 	duplicateAccountOperationIDExtraKey: {},
-	// External sync identity belongs to one local account only.
-	"crs_account_id": {},
-	"crs_kind":       {},
-	"crs_synced_at":  {},
 	// Local quota usage and derived window timestamps must start fresh.
 	"quota_used":            {},
 	"quota_daily_used":      {},
@@ -1202,8 +1198,8 @@ func (s *adminServiceImpl) propagateProxyToShadows(ctx context.Context, parentID
 }
 
 // propagateAccountProxyToShadows 把母账号的 proxy 同步到其所有 spark 影子(影子 proxy 恒继承母账号)。
-// 供 AdminService 编辑路径与 CRS 同步路径共用——后者改动母账号 proxy 后必须同样传播,否则影子保留
-// 旧 proxy 出现出站漂移(外审第8轮)。
+// 由所有母账号更新路径共用；修改母账号 proxy 后必须同步传播，否则影子会保留旧 proxy
+// 并出现出站漂移。
 func propagateAccountProxyToShadows(ctx context.Context, repo AccountRepository, parentID int64, proxyID *int64) error {
 	shadows, err := repo.ListShadowsByParent(ctx, parentID)
 	if err != nil {

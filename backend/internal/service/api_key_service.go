@@ -229,6 +229,7 @@ type CreateAPIKeyRequest struct {
 type UpdateAPIKeyRequest struct {
 	Name        *string   `json:"name"`
 	GroupID     *int64    `json:"group_id"`
+	GroupIDSet  bool      `json:"-"` // distinguishes omitted group_id from explicit null
 	Status      *string   `json:"status"`
 	IPWhitelist *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
 	IPBlacklist *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
@@ -286,7 +287,6 @@ type APIKeyService struct {
 	apiKeyRepo                APIKeyRepository
 	userRepo                  UserRepository
 	groupRepo                 GroupRepository
-	userGroupRPMOverrideRepo  UserGroupRPMOverrideRepository
 	cache                     APIKeyCache
 	rateLimitCacheInvalid     RateLimitCacheInvalidator // optional: invalidate Redis rate limit cache
 	concurrencyService        *ConcurrencyService
@@ -334,17 +334,15 @@ func NewAPIKeyService(
 	apiKeyRepo APIKeyRepository,
 	userRepo UserRepository,
 	groupRepo GroupRepository,
-	userGroupRPMOverrideRepo UserGroupRPMOverrideRepository,
 	cache APIKeyCache,
 	cfg *config.Config,
 ) *APIKeyService {
 	svc := &APIKeyService{
-		apiKeyRepo:               apiKeyRepo,
-		userRepo:                 userRepo,
-		groupRepo:                groupRepo,
-		userGroupRPMOverrideRepo: userGroupRPMOverrideRepo,
-		cache:                    cache,
-		cfg:                      cfg,
+		apiKeyRepo: apiKeyRepo,
+		userRepo:   userRepo,
+		groupRepo:  groupRepo,
+		cache:      cache,
+		cfg:        cfg,
 	}
 	svc.initAuthCache(cfg)
 	lookupConcurrency := defaultAuthLookupConcurrency
@@ -363,11 +361,10 @@ func NewPersonalAPIKeyService(
 	apiKeyRepo APIKeyRepository,
 	userRepo UserRepository,
 	groupRepo GroupRepository,
-	userGroupRPMOverrideRepo UserGroupRPMOverrideRepository,
 	cache APIKeyCache,
 	cfg *config.Config,
 ) *APIKeyService {
-	return NewAPIKeyService(apiKeyRepo, userRepo, groupRepo, userGroupRPMOverrideRepo, cache, cfg)
+	return NewAPIKeyService(apiKeyRepo, userRepo, groupRepo, cache, cfg)
 }
 
 // SetRateLimitCacheInvalidator sets the optional rate limit cache invalidator.
@@ -801,11 +798,14 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		fields.Name = true
 	}
 
-	if req.GroupID != nil {
-		if *req.GroupID == 0 {
+	if req.GroupIDSet || req.GroupID != nil {
+		if req.GroupID == nil {
 			apiKey.GroupID = nil
 			fields.GroupID = true
 		} else {
+			if *req.GroupID <= 0 {
+				return nil, infraerrors.BadRequest("INVALID_GROUP_ID", "group_id must be a positive integer or null")
+			}
 			// 验证分组权限
 			user, err := s.userRepo.GetByID(ctx, userID)
 			if err != nil {

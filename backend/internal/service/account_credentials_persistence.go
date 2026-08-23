@@ -15,7 +15,7 @@ func persistAccountCredentials(ctx context.Context, repo AccountRepository, acco
 	}
 
 	// 安全不变量:spark 影子账号恒不持凭据(凭据透传母账号)。这是凭据写入的唯一汇聚点
-	// (token 刷新 / 订阅补全 / CRS 创建后刷新等全部经此),在此对影子早返 no-op 是
+	// (token 刷新 / 订阅补全 / 账户导入后刷新等全部经此),在此对影子早返 no-op 是
 	// defense-in-depth——即便某条上游路径漏判,也不会把凭据落到影子行(外审第6轮 P1)。
 	if account.IsCredentialShadow() {
 		slog.Warn("skip persisting credentials to spark shadow account",

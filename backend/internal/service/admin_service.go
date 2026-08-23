@@ -48,8 +48,6 @@ type AdminService interface {
 	DeleteCompositeRoute(ctx context.Context, groupID, routeID int64) error
 	PreviewCompositeRoute(ctx context.Context, groupID int64, input CompositeRoutePreviewRequest) (*CompositeRouteDecision, error)
 	GetGroupAPIKeys(ctx context.Context, groupID int64, page, pageSize int) ([]APIKey, int64, error)
-	ClearGroupRPMOverrides(ctx context.Context, groupID int64) error
-	BatchSetGroupRPMOverrides(ctx context.Context, groupID int64, entries []GroupRPMOverrideInput) error
 	UpdateGroupSortOrders(ctx context.Context, updates []GroupSortOrderUpdate) error
 
 	// API Key management (admin)
@@ -493,7 +491,6 @@ type adminServiceImpl struct {
 	accountDuplicateRepo     AccountDuplicateRepository
 	proxyRepo                ProxyRepository
 	apiKeyRepo               APIKeyRepository
-	userGroupRPMOverrideRepo UserGroupRPMOverrideRepository
 	userRPMCache             UserRPMCache
 	proxyProber              ProxyExitInfoProber
 	proxyLatencyCache        ProxyLatencyCache
@@ -524,7 +521,6 @@ func NewPersonalAdminService(
 	accountRepo AdminAccountRepository,
 	proxyRepo ProxyRepository,
 	apiKeyRepo APIKeyRepository,
-	userGroupRPMOverrideRepo UserGroupRPMOverrideRepository,
 	userRPMCache UserRPMCache,
 	proxyProber ProxyExitInfoProber,
 	proxyLatencyCache ProxyLatencyCache,
@@ -545,7 +541,6 @@ func NewPersonalAdminService(
 		accountDuplicateRepo:     accountRepo,
 		proxyRepo:                proxyRepo,
 		apiKeyRepo:               apiKeyRepo,
-		userGroupRPMOverrideRepo: userGroupRPMOverrideRepo,
 		userRPMCache:             userRPMCache,
 		proxyProber:              proxyProber,
 		proxyLatencyCache:        proxyLatencyCache,

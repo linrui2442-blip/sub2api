@@ -268,12 +268,6 @@ func (s *adminServiceImpl) DeleteUser(ctx context.Context, id int64) error {
 			return err
 		}
 	}
-	if s.userGroupRPMOverrideRepo != nil {
-		if err := s.userGroupRPMOverrideRepo.DeleteByUserID(ctx, id); err != nil {
-			return err
-		}
-	}
-
 	if s.authCacheInvalidator != nil {
 		for _, key := range apiKeys {
 			if keyValue := strings.TrimSpace(key.Key); keyValue != "" {
@@ -457,16 +451,6 @@ func (s *adminServiceImpl) GetUserRPMStatus(ctx context.Context, userID int64) (
 				entry.Source = "group"
 			} else if groupErr != nil {
 				logger.LegacyPrintf("service.admin", "failed to get group rpm status metadata: group_id=%d err=%v", groupID, groupErr)
-			}
-		}
-
-		if s.userGroupRPMOverrideRepo != nil {
-			override, overrideErr := s.userGroupRPMOverrideRepo.GetRPMOverrideByUserAndGroup(ctx, userID, groupID)
-			if overrideErr != nil {
-				logger.LegacyPrintf("service.admin", "failed to get rpm override: user_id=%d group_id=%d err=%v", userID, groupID, overrideErr)
-			} else if override != nil {
-				entry.Limit = *override
-				entry.Source = "override"
 			}
 		}
 

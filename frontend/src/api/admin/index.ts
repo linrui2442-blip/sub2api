@@ -14,7 +14,6 @@ import geminiAPI from './gemini'
 import antigravityAPI from './antigravity'
 import grokAPI from './grok'
 import cnProvidersAPI from './cnProviders'
-import userAttributesAPI from './userAttributes'
 import errorPassthroughAPI from './errorPassthrough'
 import apiKeysAPI from './apiKeys'
 import scheduledTestsAPI from './scheduledTests'
@@ -36,7 +35,6 @@ export const adminAPI = {
   antigravity: antigravityAPI,
   grok: grokAPI,
   cnProviders: cnProvidersAPI,
-  userAttributes: userAttributesAPI,
   errorPassthrough: errorPassthroughAPI,
   apiKeys: apiKeysAPI,
   scheduledTests: scheduledTestsAPI,
@@ -56,7 +54,6 @@ export {
   antigravityAPI,
   grokAPI,
   cnProvidersAPI,
-  userAttributesAPI,
   errorPassthroughAPI,
   apiKeysAPI,
   scheduledTestsAPI,

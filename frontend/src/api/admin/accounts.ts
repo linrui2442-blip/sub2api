@@ -575,65 +575,6 @@ export async function syncUpstreamModelsPreview(params: SyncUpstreamPreviewParam
   return data
 }
 
-export interface CRSPreviewAccount {
-  crs_account_id: string
-  kind: string
-  name: string
-  platform: string
-  type: string
-}
-
-export interface PreviewFromCRSResult {
-  new_accounts: CRSPreviewAccount[]
-  existing_accounts: CRSPreviewAccount[]
-}
-
-export async function previewFromCrs(params: {
-  base_url: string
-  username: string
-  password: string
-}): Promise<PreviewFromCRSResult> {
-  const { data } = await apiClient.post<PreviewFromCRSResult>('/admin/accounts/sync/crs/preview', params)
-  return data
-}
-
-export async function syncFromCrs(params: {
-  base_url: string
-  username: string
-  password: string
-  sync_proxies?: boolean
-  selected_account_ids?: string[]
-}): Promise<{
-  created: number
-  updated: number
-  skipped: number
-  failed: number
-  items: Array<{
-    crs_account_id: string
-    kind: string
-    name: string
-    action: string
-    error?: string
-  }>
-}> {
-  const { data } = await apiClient.post<{
-    created: number
-    updated: number
-    skipped: number
-    failed: number
-    items: Array<{
-      crs_account_id: string
-      kind: string
-      name: string
-      action: string
-      error?: string
-    }>
-  }>('/admin/accounts/sync/crs', params, {
-    timeout: 180000 // 180s timeout: sync refreshes each existing account's OAuth token serially
-  })
-  return data
-}
-
 export async function exportData(options?: {
   ids?: number[]
   filters?: {
@@ -983,8 +924,6 @@ export const accountsAPI = {
   batchCreate,
   batchUpdateCredentials,
   bulkUpdate,
-  previewFromCrs,
-  syncFromCrs,
   exportData,
   importData,
   importCodexSession,

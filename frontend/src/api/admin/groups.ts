@@ -342,51 +342,6 @@ export async function updateSortOrder(
 }
 
 /**
- * RPM override entry for a user in a group
- */
-export interface GroupRPMOverrideEntry {
-  user_id: number
-  user_name: string
-  user_email: string
-  user_notes: string
-  user_status: string
-  rpm_override: number
-}
-
-/**
- * Get RPM overrides for users in a group.
- */
-export async function getGroupRPMOverrides(id: number): Promise<GroupRPMOverrideEntry[]> {
-  const { data } = await apiClient.get<GroupRPMOverrideEntry[]>(
-	`/admin/groups/${id}/rpm-overrides`
-  )
-  return data
-}
-
-/**
- * Batch set RPM overrides for users in a group.
- * Only touches the per-user RPM override column.
- */
-export async function batchSetGroupRPMOverrides(
-  id: number,
-  entries: Array<{ user_id: number; rpm_override: number }>
-): Promise<{ message: string }> {
-  const { data } = await apiClient.put<{ message: string }>(
-    `/admin/groups/${id}/rpm-overrides`,
-    { entries }
-  )
-  return data
-}
-
-/**
- * Clear all per-user RPM overrides for a group.
- */
-export async function clearGroupRPMOverrides(id: number): Promise<{ message: string }> {
-  const { data } = await apiClient.delete<{ message: string }>(`/admin/groups/${id}/rpm-overrides`)
-  return data
-}
-
-/**
  * Get usage summary (today + yesterday + cumulative cost) for all groups
  * @returns Array of group usage summaries
  */
@@ -431,9 +386,6 @@ export const groupsAPI = {
   updateCompositeRoute,
   deleteCompositeRoute,
   previewCompositeRoute,
-  getGroupRPMOverrides,
-  clearGroupRPMOverrides,
-  batchSetGroupRPMOverrides,
   updateSortOrder,
   getUsageSummary,
   getCapacitySummary

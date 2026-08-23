@@ -174,7 +174,6 @@ const mountView = async () => {
         PlatformIcon: true,
         Icon: IconStub,
         GroupCapacityBadge: true,
-        GroupRPMOverridesModal: true,
         VueDraggable: { template: '<div><slot /></div>' },
       },
     },

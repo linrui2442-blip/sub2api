@@ -55,14 +55,8 @@ type AccountRepository interface {
 	GetByIDs(ctx context.Context, ids []int64) ([]*Account, error)
 	// ExistsByID 检查账号是否存在，仅返回布尔值，用于删除前的轻量级存在性检查
 	ExistsByID(ctx context.Context, id int64) (bool, error)
-	// GetByCRSAccountID finds an account previously synced from CRS.
-	// Returns (nil, nil) if not found.
-	GetByCRSAccountID(ctx context.Context, crsAccountID string) (*Account, error)
 	// FindByExtraField 根据 extra 字段中的键值对查找账号
 	FindByExtraField(ctx context.Context, key string, value any) ([]Account, error)
-	// ListCRSAccountIDs returns a map of crs_account_id -> local account ID
-	// for all accounts that have been synced from CRS.
-	ListCRSAccountIDs(ctx context.Context) (map[string]int64, error)
 	Update(ctx context.Context, account *Account) error
 	Delete(ctx context.Context, id int64) error
 

@@ -110,10 +110,7 @@ func registerGroupRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	groups.PUT("/:id", h.Admin.Group.Update)
 	groups.DELETE("/:id", h.Admin.Group.Delete)
 	groups.GET("/:id/stats", h.Admin.Group.GetStats)
-	groups.PUT("/:id/rpm-overrides", h.Admin.Group.BatchSetGroupRPMOverrides)
-	groups.DELETE("/:id/rpm-overrides", h.Admin.Group.ClearGroupRPMOverrides)
 	groups.GET("/:id/api-keys", h.Admin.Group.GetGroupAPIKeys)
-	groups.GET("/:id/rpm-overrides", h.Admin.Group.GetGroupRPMOverrides)
 }
 
 func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth middleware.StepUpAuthMiddleware) {
@@ -124,8 +121,6 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 	accounts.POST("/:id/duplicate", h.Admin.Account.Duplicate)
 	accounts.POST("/check-mixed-channel", h.Admin.Account.CheckMixedChannel)
 	accounts.POST("/import/codex-session", h.Admin.Account.ImportCodexSession)
-	accounts.POST("/sync/crs", h.Admin.Account.SyncFromCRS)
-	accounts.POST("/sync/crs/preview", h.Admin.Account.PreviewFromCRS)
 	accounts.PUT("/:id", h.Admin.Account.Update)
 	accounts.DELETE("/:id", h.Admin.Account.Delete)
 	accounts.POST("/:id/test", h.Admin.Account.Test)

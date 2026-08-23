@@ -362,14 +362,6 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 		},
 	}
 
-	// 填充 (user, group) RPM override —— snapshot 构建时查一次 DB，后续请求零 DB 往返。
-	if apiKey.GroupID != nil && *apiKey.GroupID > 0 && s.userGroupRPMOverrideRepo != nil {
-		override, err := s.userGroupRPMOverrideRepo.GetRPMOverrideByUserAndGroup(ctx, apiKey.UserID, *apiKey.GroupID)
-		if err == nil && override != nil {
-			snapshot.User.UserGroupRPMOverride = override
-		}
-		// 查询失败或无 override 时留 nil，checkRPM 会回退到 DB 查询
-	}
 	if apiKey.Group != nil {
 		snapshot.Group = &APIKeyAuthGroupSnapshot{
 			ID: apiKey.Group.ID, Name: apiKey.Group.Name, Platform: apiKey.Group.Platform,
@@ -410,15 +402,14 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 		RateLimit1d: snapshot.RateLimit1d,
 		RateLimit7d: snapshot.RateLimit7d,
 		User: &User{
-			ID:                   snapshot.User.ID,
-			Status:               snapshot.User.Status,
-			Role:                 snapshot.User.Role,
-			Concurrency:          snapshot.User.Concurrency,
-			AllowedGroups:        snapshot.User.AllowedGroups,
-			Email:                snapshot.User.Email,
-			Username:             snapshot.User.Username,
-			RPMLimit:             snapshot.User.RPMLimit,
-			UserGroupRPMOverride: snapshot.User.UserGroupRPMOverride,
+			ID:            snapshot.User.ID,
+			Status:        snapshot.User.Status,
+			Role:          snapshot.User.Role,
+			Concurrency:   snapshot.User.Concurrency,
+			AllowedGroups: snapshot.User.AllowedGroups,
+			Email:         snapshot.User.Email,
+			Username:      snapshot.User.Username,
+			RPMLimit:      snapshot.User.RPMLimit,
 		},
 	}
 	if snapshot.Group != nil {

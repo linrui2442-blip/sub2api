@@ -7,15 +7,11 @@ import UsersView from '../UsersView.vue'
 const {
   listUsers,
   getAllGroups,
-  getBatchUsersUsage,
-  listEnabledDefinitions,
-  getBatchUserAttributes
+  getBatchUsersUsage
 } = vi.hoisted(() => ({
   listUsers: vi.fn(),
   getAllGroups: vi.fn(),
-  getBatchUsersUsage: vi.fn(),
-  listEnabledDefinitions: vi.fn(),
-  getBatchUserAttributes: vi.fn()
+  getBatchUsersUsage: vi.fn()
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -30,10 +26,6 @@ vi.mock('@/api/admin', () => ({
     },
     dashboard: {
       getBatchUsersUsage
-    },
-    userAttributes: {
-      listEnabledDefinitions,
-      getBatchUserAttributes
     }
   }
 }))
@@ -124,8 +116,6 @@ describe('admin UsersView', () => {
     listUsers.mockReset()
     getAllGroups.mockReset()
     getBatchUsersUsage.mockReset()
-    listEnabledDefinitions.mockReset()
-    getBatchUserAttributes.mockReset()
 
     listUsers.mockResolvedValue({
       items: [createAdminUser()],
@@ -136,8 +126,6 @@ describe('admin UsersView', () => {
     })
     getAllGroups.mockResolvedValue([])
     getBatchUsersUsage.mockResolvedValue({ stats: {} })
-    listEnabledDefinitions.mockResolvedValue([])
-    getBatchUserAttributes.mockResolvedValue({ values: {} })
   })
 
   afterEach(() => {
@@ -158,7 +146,6 @@ describe('admin UsersView', () => {
           EmptyState: true,
           GroupBadge: true,
           Select: true,
-          UserAttributesConfigModal: true,
           UserConcurrencyCell: true,
           UserCreateModal: true,
           UserEditModal: true,
@@ -241,7 +228,6 @@ describe('admin UsersView', () => {
           EmptyState: true,
           GroupBadge: true,
           Select: true,
-          UserAttributesConfigModal: true,
           UserConcurrencyCell: true,
           UserCreateModal: true,
           UserEditModal: true,
@@ -316,7 +302,6 @@ describe('admin UsersView', () => {
           EmptyState: true,
           GroupBadge: true,
           Select: true,
-          UserAttributesConfigModal: true,
           UserConcurrencyCell: true,
           UserCreateModal: true,
           UserEditModal: true,

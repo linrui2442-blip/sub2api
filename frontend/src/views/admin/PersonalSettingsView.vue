@@ -3,9 +3,6 @@
     <div class="mx-auto max-w-5xl space-y-6">
       <div>
         <h1 class="text-2xl font-semibold text-gray-900 dark:text-white">Personal Edition 设置</h1>
-        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          仅保留私人 AI 网关需要的本地运行与账号池入口。商业支付、订阅、营销和 SaaS 运营设置已从 Personal Edition 移除。
-        </p>
       </div>
 
       <div class="grid gap-4 md:grid-cols-2">
@@ -54,9 +51,6 @@
         </div>
       </section>
 
-      <section class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-        Personal Edition 不提供公开注册、充值、商业订阅、优惠码、返利、模型商城或 SaaS 运营后台。需要远程给固定朋友使用时，应通过私有成员/API Key 与受信任网络方式开放，而不是公开暴露管理端。
-      </section>
     </div>
   </AppLayout>
 </template>

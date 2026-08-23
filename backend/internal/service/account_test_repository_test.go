@@ -5,6 +5,14 @@ import (
 	"sync"
 )
 
+func cloneTestMap(source map[string]any) map[string]any {
+	cloned := make(map[string]any, len(source))
+	for key, value := range source {
+		cloned[key] = value
+	}
+	return cloned
+}
+
 // accountTestRepository is the shared in-memory account repository used by
 // provider lifecycle tests. It contains no billing-specific behavior.
 type upstreamBillingProbeAccountRepo struct {
@@ -76,8 +84,8 @@ func (r *upstreamBillingProbeAccountRepo) GetByID(_ context.Context, id int64) (
 		return nil, ErrAccountNotFound
 	}
 	clone := *account
-	clone.Credentials = mergeMap(nil, account.Credentials)
-	clone.Extra = mergeMap(nil, account.Extra)
+	clone.Credentials = cloneTestMap(account.Credentials)
+	clone.Extra = cloneTestMap(account.Extra)
 	return &clone, nil
 }
 

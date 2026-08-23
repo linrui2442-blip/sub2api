@@ -1481,8 +1481,6 @@ export interface UpdateUserRequest {
   rpm_limit?: number
   status?: 'active' | 'disabled'
   allowed_groups?: number[] | null
-  // 用户专属分组倍率配置 (group_id -> rate_multiplier | null)
-  // null 表示删除该分组的专属倍率
 }
 
 export interface ChangePasswordRequest {
@@ -1651,80 +1649,6 @@ export interface AccountUsageStatsResponse {
   models: ModelStat[]
   endpoints: EndpointStat[]
   upstream_endpoints: EndpointStat[]
-}
-
-// ==================== User Attribute Types ====================
-
-export type UserAttributeType = 'text' | 'textarea' | 'number' | 'email' | 'url' | 'date' | 'select' | 'multi_select'
-
-export interface UserAttributeOption {
-  value: string
-  label: string
-  [key: string]: unknown
-}
-
-export interface UserAttributeValidation {
-  min_length?: number
-  max_length?: number
-  min?: number
-  max?: number
-  pattern?: string
-  message?: string
-}
-
-export interface UserAttributeDefinition {
-  id: number
-  key: string
-  name: string
-  description: string
-  type: UserAttributeType
-  options: UserAttributeOption[]
-  required: boolean
-  validation: UserAttributeValidation
-  placeholder: string
-  display_order: number
-  enabled: boolean
-  created_at: string
-  updated_at: string
-}
-
-export interface UserAttributeValue {
-  id: number
-  user_id: number
-  attribute_id: number
-  value: string
-  created_at: string
-  updated_at: string
-}
-
-export interface CreateUserAttributeRequest {
-  key: string
-  name: string
-  description?: string
-  type: UserAttributeType
-  options?: UserAttributeOption[]
-  required?: boolean
-  validation?: UserAttributeValidation
-  placeholder?: string
-  display_order?: number
-  enabled?: boolean
-}
-
-export interface UpdateUserAttributeRequest {
-  key?: string
-  name?: string
-  description?: string
-  type?: UserAttributeType
-  options?: UserAttributeOption[]
-  required?: boolean
-  validation?: UserAttributeValidation
-  placeholder?: string
-  display_order?: number
-  enabled?: boolean
-}
-
-export interface UserAttributeValuesMap {
-  [attributeId: number]: string
 }
 
 // ==================== TOTP (2FA) Types ====================

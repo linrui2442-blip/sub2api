@@ -2,7 +2,9 @@
 package handler
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"math"
 	"strconv"
@@ -48,20 +50,41 @@ type CreateAPIKeyRequest struct {
 
 // UpdateAPIKeyRequest represents the update API key request payload
 type UpdateAPIKeyRequest struct {
-	Name        string    `json:"name"`
-	GroupID     *int64    `json:"group_id"`
-	Status      string    `json:"status" binding:"omitempty,oneof=active inactive"`
-	IPWhitelist *[]string `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
-	IPBlacklist *[]string `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
-	Quota       *float64  `json:"quota"`        // 配额限制 (USD), 0=无限制
-	ExpiresAt   *string   `json:"expires_at"`   // 过期时间 (ISO 8601)
-	ResetQuota  *bool     `json:"reset_quota"`  // 重置已用配额
+	Name        string        `json:"name"`
+	GroupID     nullableInt64 `json:"group_id"`
+	Status      string        `json:"status" binding:"omitempty,oneof=active inactive"`
+	IPWhitelist *[]string     `json:"ip_whitelist"` // IP 白名单（nil 不修改，空数组清空）
+	IPBlacklist *[]string     `json:"ip_blacklist"` // IP 黑名单（nil 不修改，空数组清空）
+	Quota       *float64      `json:"quota"`        // 配额限制 (USD), 0=无限制
+	ExpiresAt   *string       `json:"expires_at"`   // 过期时间 (ISO 8601)
+	ResetQuota  *bool         `json:"reset_quota"`  // 重置已用配额
 
 	// Rate limit fields (nil = no change, 0 = unlimited)
 	RateLimit5h         *float64 `json:"rate_limit_5h"`
 	RateLimit1d         *float64 `json:"rate_limit_1d"`
 	RateLimit7d         *float64 `json:"rate_limit_7d"`
 	ResetRateLimitUsage *bool    `json:"reset_rate_limit_usage"` // 重置限速用量
+}
+
+// nullableInt64 distinguishes an omitted field from an explicit JSON null.
+// API key updates use null to switch a grouped key into Personal unified mode.
+type nullableInt64 struct {
+	Set   bool
+	Value *int64
+}
+
+func (v *nullableInt64) UnmarshalJSON(data []byte) error {
+	v.Set = true
+	if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+		v.Value = nil
+		return nil
+	}
+	var value int64
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	v.Value = &value
+	return nil
 }
 
 func validAPIKeyLimit(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) && v >= 0 }
@@ -264,7 +287,8 @@ func (h *APIKeyHandler) Update(c *gin.Context) {
 	if req.Name != "" {
 		svcReq.Name = &req.Name
 	}
-	svcReq.GroupID = req.GroupID
+	svcReq.GroupIDSet = req.GroupID.Set
+	svcReq.GroupID = req.GroupID.Value
 	if req.Status != "" {
 		svcReq.Status = &req.Status
 	}

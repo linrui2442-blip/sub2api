@@ -611,12 +611,11 @@ func ProvidePersonalAPIKeyService(
 	apiKeyRepo APIKeyRepository,
 	userRepo UserRepository,
 	groupRepo GroupRepository,
-	userGroupRPMOverrideRepo UserGroupRPMOverrideRepository,
 	cache APIKeyCache,
 	cfg *config.Config,
 	concurrencyService *ConcurrencyService,
 ) *APIKeyService {
-	svc := NewPersonalAPIKeyService(apiKeyRepo, userRepo, groupRepo, userGroupRPMOverrideRepo, cache, cfg)
+	svc := NewPersonalAPIKeyService(apiKeyRepo, userRepo, groupRepo, cache, cfg)
 	svc.SetConcurrencyService(concurrencyService)
 	return svc
 }
@@ -672,7 +671,6 @@ var ProviderSet = wire.NewSet(
 	NewUsageRecordWorkerPool,
 	ProvideSchedulerSnapshotService,
 	NewIdentityService,
-	NewCRSSyncService,
 	ProvideUpdateService,
 	ProvideTokenRefreshService,
 	wire.Bind(new(GrokOAuthReconciler), new(*TokenRefreshService)),

@@ -151,7 +151,7 @@ import type { AdminUser, Group, GroupPlatform } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 
-interface GroupRateConfig {
+interface GroupPermissionConfig {
   groupId: number
   groupName: string
   platform: GroupPlatform
@@ -165,7 +165,7 @@ const { t } = useI18n()
 const appStore = useAppStore()
 
 const groups = ref<Group[]>([])
-const groupConfigs = ref<GroupRateConfig[]>([])
+const groupConfigs = ref<GroupPermissionConfig[]>([])
 const loading = ref(false)
 const submitting = ref(false)
 

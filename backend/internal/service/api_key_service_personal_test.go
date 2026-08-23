@@ -8,7 +8,7 @@ import (
 )
 
 func TestPersonalAPIKeyServiceUsesLocalGroupPermissionsWithoutSubscriptions(t *testing.T) {
-	svc := NewPersonalAPIKeyService(nil, nil, nil, nil, nil, nil)
+	svc := NewPersonalAPIKeyService(nil, nil, nil, nil, nil)
 	user := &User{ID: 7, AllowedGroups: []int64{42}}
 
 	allowed := &Group{ID: 42, IsExclusive: true}

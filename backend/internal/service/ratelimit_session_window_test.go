@@ -70,13 +70,7 @@ func (m *sessionWindowMockRepo) GetByIDs(context.Context, []int64) ([]*Account, 
 func (m *sessionWindowMockRepo) ExistsByID(context.Context, int64) (bool, error) {
 	panic("unexpected")
 }
-func (m *sessionWindowMockRepo) GetByCRSAccountID(context.Context, string) (*Account, error) {
-	panic("unexpected")
-}
 func (m *sessionWindowMockRepo) FindByExtraField(context.Context, string, any) ([]Account, error) {
-	panic("unexpected")
-}
-func (m *sessionWindowMockRepo) ListCRSAccountIDs(context.Context) (map[string]int64, error) {
 	panic("unexpected")
 }
 func (m *sessionWindowMockRepo) Update(context.Context, *Account) error { panic("unexpected") }

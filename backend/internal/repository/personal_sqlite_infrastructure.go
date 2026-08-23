@@ -78,20 +78,6 @@ func ensurePersonalSQLiteInfrastructure(ctx context.Context, db *sql.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_personal_refresh_tokens_family
 			ON personal_refresh_tokens (family_id, expires_at)`,
 
-		// Member-specific RPM policies are an access-control and gateway
-		// protection feature. They replace the upstream commercial user-group
-		// pricing table and are intentionally SQLite-native.
-		`CREATE TABLE IF NOT EXISTS user_group_rpm_overrides (
-			user_id INTEGER NOT NULL,
-			group_id INTEGER NOT NULL,
-			rpm_override INTEGER NOT NULL CHECK (rpm_override >= 0),
-			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (user_id, group_id)
-		)`,
-		`CREATE INDEX IF NOT EXISTS idx_user_group_rpm_overrides_group
-			ON user_group_rpm_overrides (group_id, user_id)`,
-
 		// Audit and operational logs are core Personal observability. They are
 		// intentionally local and are not part of Ent's generated schema.
 		`CREATE TABLE IF NOT EXISTS audit_logs (

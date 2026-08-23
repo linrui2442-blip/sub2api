@@ -66,7 +66,6 @@ func setupAccountDataRouter() (*gin.Engine, *stubAdminService) {
 		nil,
 		nil,
 		nil,
-		nil,
 	)
 
 	router.GET("/api/v1/admin/accounts/data", h.ExportData)

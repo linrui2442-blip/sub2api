@@ -81,7 +81,7 @@ func (Account) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "jsonb"}),
 
 		// extra: 扩展数据，存储平台特定的额外信息
-		// 如 CRS 账户的 crs_account_id、组织信息等
+		// 如 Provider 账户标识、组织信息及兼容导入元数据等
 		field.JSON("extra", map[string]any{}).
 			Default(func() map[string]any { return map[string]any{} }).
 			SchemaType(map[string]string{dialect.Postgres: "jsonb"}),

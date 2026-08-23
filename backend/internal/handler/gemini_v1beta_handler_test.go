@@ -29,7 +29,7 @@ func TestGeminiV1BetaHandler_PlatformRoutingInvariant(t *testing.T) {
 			name:            "Antigravity平台使用ForwardGemini",
 			platform:        service.PlatformAntigravity,
 			expectedService: "AntigravityGatewayService.ForwardGemini",
-			description:     "Antigravity 账户通过 CRS 中转，支持 Gemini 协议",
+			description:     "Antigravity 账户通过 Provider Gateway 支持 Gemini 协议",
 		},
 	}
 

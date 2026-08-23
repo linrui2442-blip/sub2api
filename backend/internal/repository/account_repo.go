@@ -362,69 +362,6 @@ func (r *accountRepository) ExistsByID(ctx context.Context, id int64) (bool, err
 	return exists, nil
 }
 
-func (r *accountRepository) GetByCRSAccountID(ctx context.Context, crsAccountID string) (*service.Account, error) {
-	if crsAccountID == "" {
-		return nil, nil
-	}
-
-	// 使用 sqljson.ValueEQ 生成 JSON 路径过滤，避免手写 SQL 片段导致语法兼容问题。
-	// 排除 spark 影子账号(parent_account_id 非空):影子不持凭据,绝不能被 CRS 当作普通账号
-	// 更新而覆盖 type/credentials/proxy。即便影子 Extra 被误写入 crs_account_id 也不会命中
-	// (外审第7轮 P1)。
-	m, err := r.client.Account.Query().
-		Where(dbaccount.ParentAccountIDIsNil()).
-		Where(func(s *entsql.Selector) {
-			s.Where(sqljson.ValueEQ(dbaccount.FieldExtra, crsAccountID, sqljson.Path("crs_account_id")))
-		}).
-		Only(ctx)
-	if err != nil {
-		if dbent.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	accounts, err := r.accountsToService(ctx, []*dbent.Account{m})
-	if err != nil {
-		return nil, err
-	}
-	if len(accounts) == 0 {
-		return nil, nil
-	}
-	return &accounts[0], nil
-}
-
-func (r *accountRepository) ListCRSAccountIDs(ctx context.Context) (map[string]int64, error) {
-	// parent_account_id IS NULL 排除 spark 影子账号:影子不是 CRS 账号,绝不能进 CRS 同步映射
-	// (否则会被当普通账号更新而覆盖 type/credentials/proxy)(外审第7轮 P1)。
-	rows, err := r.sql.QueryContext(ctx, `
-		SELECT id, extra->>'crs_account_id'
-		FROM accounts
-		WHERE deleted_at IS NULL
-			AND parent_account_id IS NULL
-			AND extra->>'crs_account_id' IS NOT NULL
-			AND extra->>'crs_account_id' != ''
-	`)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	result := make(map[string]int64)
-	for rows.Next() {
-		var id int64
-		var crsID string
-		if err := rows.Scan(&id, &crsID); err != nil {
-			return nil, err
-		}
-		result[crsID] = id
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return result, nil
-}
-
 func (r *accountRepository) Update(ctx context.Context, account *service.Account) error {
 	return r.updateAccount(ctx, account)
 }

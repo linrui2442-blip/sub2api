@@ -63,17 +63,10 @@ func (m *mockAccountRepoForGemini) ListSchedulableByGroupIDAndPlatform(ctx conte
 
 // Stub methods to implement AccountRepository interface
 func (m *mockAccountRepoForGemini) Create(ctx context.Context, account *Account) error { return nil }
-func (m *mockAccountRepoForGemini) GetByCRSAccountID(ctx context.Context, crsAccountID string) (*Account, error) {
-	return nil, nil
-}
-
 func (m *mockAccountRepoForGemini) FindByExtraField(ctx context.Context, key string, value any) ([]Account, error) {
 	return nil, nil
 }
 
-func (m *mockAccountRepoForGemini) ListCRSAccountIDs(ctx context.Context) (map[string]int64, error) {
-	return nil, nil
-}
 func (m *mockAccountRepoForGemini) Update(ctx context.Context, account *Account) error { return nil }
 func (m *mockAccountRepoForGemini) Delete(ctx context.Context, id int64) error         { return nil }
 func (m *mockAccountRepoForGemini) List(ctx context.Context, params pagination.PaginationParams) ([]Account, *pagination.PaginationResult, error) {

@@ -72,55 +72,6 @@
               />
             </div>
 
-            <!-- Dynamic Attribute Filters -->
-            <template v-for="(value, attrId) in activeAttributeFilters" :key="attrId">
-              <div
-                v-if="visibleFilters.has(`attr_${attrId}`)"
-                class="relative w-full sm:w-36"
-              >
-                <!-- Text/Email/URL/Textarea/Date type: styled input -->
-                <input
-                  v-if="['text', 'textarea', 'email', 'url', 'date'].includes(getAttributeDefinition(Number(attrId))?.type || 'text')"
-                  :value="value"
-                  @input="(e) => updateAttributeFilter(Number(attrId), (e.target as HTMLInputElement).value)"
-                  @keyup.enter="applyFilter"
-                  :placeholder="getAttributeDefinitionName(Number(attrId))"
-                  class="input w-full"
-                />
-                <!-- Number type: number input -->
-                <input
-                  v-else-if="getAttributeDefinition(Number(attrId))?.type === 'number'"
-                  :value="value"
-                  type="number"
-                  @input="(e) => updateAttributeFilter(Number(attrId), (e.target as HTMLInputElement).value)"
-                  @keyup.enter="applyFilter"
-                  :placeholder="getAttributeDefinitionName(Number(attrId))"
-                  class="input w-full"
-                />
-                <!-- Select/Multi-select type -->
-                <template v-else-if="['select', 'multi_select'].includes(getAttributeDefinition(Number(attrId))?.type || '')">
-                  <div class="w-full">
-                    <Select
-                      :model-value="value"
-                      :options="[
-                        { value: '', label: getAttributeDefinitionName(Number(attrId)) },
-                        ...(getAttributeDefinition(Number(attrId))?.options || [])
-                      ]"
-                      @update:model-value="(val) => { updateAttributeFilter(Number(attrId), String(val ?? '')); applyFilter() }"
-                    />
-                  </div>
-                </template>
-                <!-- Fallback -->
-                <input
-                  v-else
-                  :value="value"
-                  @input="(e) => updateAttributeFilter(Number(attrId), (e.target as HTMLInputElement).value)"
-                  @keyup.enter="applyFilter"
-                  :placeholder="getAttributeDefinitionName(Number(attrId))"
-                  class="input w-full"
-                />
-              </div>
-            </template>
           </div>
 
           <!-- Right: Actions and Settings -->
@@ -161,27 +112,6 @@
                     <span>{{ filter.name }}</span>
                     <Icon
                       v-if="visibleFilters.has(filter.key)"
-                      name="check"
-                      size="sm"
-                      class="text-primary-500"
-                      :stroke-width="2"
-                    />
-                  </button>
-                  <!-- Divider if custom attributes exist -->
-                  <div
-                    v-if="filterableAttributes.length > 0"
-                    class="my-1 border-t border-gray-100 dark:border-dark-700"
-                  ></div>
-                  <!-- Custom attribute filters -->
-                  <button
-                    v-for="attr in filterableAttributes"
-                    :key="attr.id"
-                    @click="toggleAttributeFilter(attr)"
-                    class="flex w-full items-center justify-between px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
-                  >
-                    <span>{{ attr.name }}</span>
-                    <Icon
-                      v-if="visibleFilters.has(`attr_${attr.id}`)"
                       name="check"
                       size="sm"
                       class="text-primary-500"
@@ -231,15 +161,6 @@
                   </button>
                 </div>
               </div>
-              <!-- Attributes Config Button -->
-              <button
-                @click="showAttributesModal = true"
-                class="btn btn-secondary px-2 md:px-3"
-                :title="t('admin.users.attributes.configButton')"
-              >
-                <Icon name="cog" size="sm" class="md:mr-1.5" />
-                <span class="hidden md:inline">{{ t('admin.users.attributes.configButton') }}</span>
-              </button>
             </div>
 
             <button
@@ -309,21 +230,6 @@
             </div>
           </template>
 
-          <!-- Dynamic attribute columns -->
-          <template
-            v-for="def in attributeDefinitions.filter(d => d.enabled)"
-            :key="def.id"
-            #[`cell-attr_${def.id}`]="{ row }"
-          >
-            <div class="max-w-xs">
-              <span
-                class="block truncate text-sm text-gray-700 dark:text-gray-300"
-                :title="getAttributeValue(row.id, def.id)"
-              >
-                {{ getAttributeValue(row.id, def.id) }}
-              </span>
-            </div>
-          </template>
 
           <template #cell-role="{ value }">
             <span :class="['badge', value === 'admin' ? 'badge-purple' : 'badge-gray']">
@@ -659,7 +565,6 @@
     <UserApiKeysModal :show="showApiKeysModal" :user="viewingUser" @close="closeApiKeysModal" />
     <UserAllowedGroupsModal :show="showAllowedGroupsModal" :user="allowedGroupsUser" @close="closeAllowedGroupsModal" @success="loadUsers" />
     <GroupReplaceModal :show="showGroupReplaceModal" :user="groupReplaceUser" :old-group="groupReplaceOldGroup" :all-groups="allGroups" @close="closeGroupReplaceModal" @success="loadUsers" />
-    <UserAttributesConfigModal :show="showAttributesModal" @close="handleAttributesModalClose" />
   </AppLayout>
 </template>
 
@@ -674,7 +579,7 @@ import Icon from '@/components/icons/Icon.vue'
 
 const { t } = useI18n()
 import { adminAPI } from '@/api/admin'
-import type { AdminUser, AdminGroup, UserAttributeDefinition } from '@/types'
+import type { AdminUser, AdminGroup } from '@/types'
 import type { BatchUserUsageStats } from '@/api/admin/dashboard'
 import type { Column } from '@/components/common/types'
 import type { SelectOption } from '@/components/common/Select.vue'
@@ -686,7 +591,6 @@ import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import Select from '@/components/common/Select.vue'
 import { buildApiKeyGroupFilterOptions } from './apiKeyGroupFilterOptions'
-import UserAttributesConfigModal from '@/components/user/UserAttributesConfigModal.vue'
 import UserConcurrencyCell from '@/components/user/UserConcurrencyCell.vue'
 import PlatformUsageBreakdown from '@/components/user/PlatformUsageBreakdown.vue'
 import PlatformCostCell from '@/components/user/PlatformCostCell.vue'
@@ -699,60 +603,12 @@ import GroupReplaceModal from '@/components/admin/user/GroupReplaceModal.vue'
 
 const appStore = useAppStore()
 
-// Generate dynamic attribute columns from enabled definitions
-const attributeColumns = computed<Column[]>(() =>
-  attributeDefinitions.value
-    .filter(def => def.enabled)
-    .map(def => ({
-      key: `attr_${def.id}`,
-      label: def.name,
-      sortable: false
-    }))
-)
-
-// Get formatted attribute value for display in table
-const getAttributeValue = (userId: number, attrId: number): string => {
-  const userAttrs = userAttributeValues.value[userId]
-  if (!userAttrs) return '-'
-  const value = userAttrs[attrId]
-  if (!value) return '-'
-
-  // Find definition for this attribute
-  const def = attributeDefinitions.value.find(d => d.id === attrId)
-  if (!def) return value
-
-  // Format based on type
-  if (def.type === 'multi_select' && value) {
-    try {
-      const arr = JSON.parse(value)
-      if (Array.isArray(arr)) {
-        // Map values to labels
-        return arr.map(v => {
-          const opt = def.options?.find(o => o.value === v)
-          return opt?.label || v
-        }).join(', ')
-      }
-    } catch {
-      return value
-    }
-  }
-
-  if (def.type === 'select' && value && def.options) {
-    const opt = def.options.find(o => o.value === value)
-    return opt?.label || value
-  }
-
-  return value
-}
-
 // All possible columns (for column settings)
 const allColumns = computed<Column[]>(() => [
   { key: 'email', label: t('admin.users.columns.user'), sortable: true },
   { key: 'id', label: t('admin.users.columns.id'), sortable: true },
   { key: 'username', label: t('admin.users.columns.username'), sortable: true },
   { key: 'notes', label: t('admin.users.columns.notes'), sortable: false },
-  // Dynamic attribute columns
-  ...attributeColumns.value,
   { key: 'role', label: t('admin.users.columns.role'), sortable: true },
   { key: 'groups', label: t('admin.users.columns.groups'), sortable: false },
   { key: 'usage', label: t('admin.users.columns.usage'), sortable: false },
@@ -885,9 +741,6 @@ const hasVisibleUsageColumn = computed(
   () => !hiddenColumns.has('usage') || PLATFORM_USAGE_COLUMNS.some((k) => !hiddenColumns.has(k))
 )
 const hasVisibleGroupsColumn = computed(() => !hiddenColumns.has('groups'))
-const hasVisibleAttributeColumns = computed(() =>
-  attributeDefinitions.value.some((def) => def.enabled && !hiddenColumns.has(`attr_${def.id}`))
-)
 
 // Filtered columns based on visibility
 const columns = computed<Column[]>(() =>
@@ -981,14 +834,13 @@ const apiKeyGroupFilterOptions = computed(() =>
   }) as SelectOption[]
 )
 
-// Filter values (role, status, and custom attributes)
+// Filter values
 const filters = reactive({
   role: '',
   status: '',
   group: '',  // group name for fuzzy match, '' = all
   apiKeyGroup: null as number | null  // group id bound to the user's API keys, null = all
 })
-const activeAttributeFilters = reactive<Record<number, string>>({})
 
 // Visible filters tracking (which filters are shown in the UI)
 // Keys: 'role', 'status', 'attr_${id}'
@@ -1006,10 +858,6 @@ const columnDropdownRef = ref<HTMLElement | null>(null)
 const FILTER_VALUES_KEY = 'user-filter-values'
 const VISIBLE_FILTERS_KEY = 'user-visible-filters'
 
-// All filterable attribute definitions (enabled attributes)
-const filterableAttributes = computed(() =>
-  attributeDefinitions.value.filter(def => def.enabled)
-)
 
 // Built-in filter definitions
 const builtInFilters = computed(() => [
@@ -1036,9 +884,6 @@ const loadSavedFilters = () => {
       if (parsed.status) filters.status = parsed.status
       if (parsed.group) filters.group = parsed.group
       if (typeof parsed.apiKeyGroup === 'number') filters.apiKeyGroup = parsed.apiKeyGroup
-      if (parsed.attributes) {
-        Object.assign(activeAttributeFilters, parsed.attributes)
-      }
     }
   } catch (e) {
     console.error('Failed to load saved filters:', e)
@@ -1056,7 +901,6 @@ const saveFiltersToStorage = () => {
       status: filters.status,
       group: filters.group,
       apiKeyGroup: filters.apiKeyGroup,
-      attributes: activeAttributeFilters
     }
     localStorage.setItem(FILTER_VALUES_KEY, JSON.stringify(values))
   } catch (e) {
@@ -1064,10 +908,6 @@ const saveFiltersToStorage = () => {
   }
 }
 
-// Get attribute definition by ID
-const getAttributeDefinition = (attrId: number): UserAttributeDefinition | undefined => {
-  return attributeDefinitions.value.find(d => d.id === attrId)
-}
 const usageStats = ref<Record<string, BatchUserUsageStats>>({})
 
 const getPlatformUsage = (userId: number, platform: string) =>
@@ -1183,9 +1023,6 @@ const handleSelectedKeysUpdate = (keys: Array<string | number>) => {
 const getUserSelectionLabel = (user: AdminUser) =>
   t('admin.users.bulkLimits.selectUser', { email: user.email })
 
-// User attribute definitions and values
-const attributeDefinitions = ref<UserAttributeDefinition[]>([])
-const userAttributeValues = ref<Record<number, Record<number, string>>>({})
 const pagination = reactive({
   page: 1,
   page_size: getPersistedPageSize(),
@@ -1198,7 +1035,6 @@ const showEditModal = ref(false)
 const showBulkEditModal = ref(false)
 const showDeleteDialog = ref(false)
 const showApiKeysModal = ref(false)
-const showAttributesModal = ref(false)
 const editingUser = ref<AdminUser | null>(null)
 const deletingUser = ref<AdminUser | null>(null)
 const viewingUser = ref<AdminUser | null>(null)
@@ -1230,21 +1066,6 @@ const loadUsersSecondaryData = async (
     )
   }
 
-  if (attributeDefinitions.value.length > 0 && hasVisibleAttributeColumns.value) {
-    tasks.push(
-      (async () => {
-        try {
-          const attrResponse = await adminAPI.userAttributes.getBatchUserAttributes(userIds)
-          if (signal?.aborted) return
-          if (typeof expectedSeq === 'number' && expectedSeq !== secondaryDataSeq) return
-          userAttributeValues.value = attrResponse.attributes
-        } catch (e) {
-          if (signal?.aborted) return
-          console.error('Failed to load user attribute values:', e)
-        }
-      })()
-    )
-  }
 
   if (tasks.length > 0) {
     await Promise.allSettled(tasks)
@@ -1359,21 +1180,6 @@ const showGroupReplaceModal = ref(false)
 const groupReplaceUser = ref<AdminUser | null>(null)
 const groupReplaceOldGroup = ref<{ id: number; name: string } | null>(null)
 
-const loadAttributeDefinitions = async () => {
-  try {
-    attributeDefinitions.value = await adminAPI.userAttributes.listEnabledDefinitions()
-  } catch (e) {
-    console.error('Failed to load attribute definitions:', e)
-  }
-}
-
-// Handle attributes modal close - reload definitions and users
-const handleAttributesModalClose = async () => {
-  showAttributesModal.value = false
-  await loadAttributeDefinitions()
-  loadUsers()
-}
-
 const loadUsers = async () => {
   abortController?.abort()
   const currentAbortController = new AbortController()
@@ -1381,14 +1187,6 @@ const loadUsers = async () => {
   const { signal } = currentAbortController
   loading.value = true
   try {
-    // Build attribute filters from active filters
-    const attrFilters: Record<number, string> = {}
-    for (const [attrId, value] of Object.entries(activeAttributeFilters)) {
-      if (value) {
-        attrFilters[Number(attrId)] = value
-      }
-    }
-
     const response = await adminAPI.users.list(
       pagination.page,
       pagination.page_size,
@@ -1398,7 +1196,6 @@ const loadUsers = async () => {
         search: searchQuery.value || undefined,
         group_name: filters.group || undefined,
         api_key_group_id: filters.apiKeyGroup ?? undefined,
-        attributes: Object.keys(attrFilters).length > 0 ? attrFilters : undefined,
         // Subscription metadata remains available to the trusted-member management view.
         include_subscriptions: true,
         sort_by: sortState.sort_by,
@@ -1413,7 +1210,6 @@ const loadUsers = async () => {
     pagination.total = response.total
     pagination.pages = response.pages
     usageStats.value = {}
-    userAttributeValues.value = {}
 
     // Defer heavy secondary data so table can render first.
     if (response.items.length > 0) {
@@ -1474,12 +1270,6 @@ const handleSort = (key: string, order: 'asc' | 'desc') => {
   loadUsers()
 }
 
-// Filter helpers
-const getAttributeDefinitionName = (attrId: number): string => {
-  const def = attributeDefinitions.value.find(d => d.id === attrId)
-  return def?.name || String(attrId)
-}
-
 // Toggle a built-in filter (role/status)
 const toggleBuiltInFilter = (key: string) => {
   if (visibleFilters.has(key)) {
@@ -1496,25 +1286,6 @@ const toggleBuiltInFilter = (key: string) => {
   saveFiltersToStorage()
   pagination.page = 1
   loadUsers()
-}
-
-// Toggle a custom attribute filter
-const toggleAttributeFilter = (attr: UserAttributeDefinition) => {
-  const key = `attr_${attr.id}`
-  if (visibleFilters.has(key)) {
-    visibleFilters.delete(key)
-    delete activeAttributeFilters[attr.id]
-  } else {
-    visibleFilters.add(key)
-    activeAttributeFilters[attr.id] = ''
-  }
-  saveFiltersToStorage()
-  pagination.page = 1
-  loadUsers()
-}
-
-const updateAttributeFilter = (attrId: number, value: string) => {
-  activeAttributeFilters[attrId] = value
 }
 
 // Apply filter and save to localStorage
@@ -1604,8 +1375,7 @@ const handleScroll = () => {
   closeActionMenu()
 }
 
-onMounted(async () => {
-  await loadAttributeDefinitions()
+onMounted(() => {
   loadSavedFilters()
   loadSavedColumns()
   loadUsers()

@@ -120,6 +120,32 @@ func TestAPIKeyUpdate_DeclaresStatusWhenReactivated(t *testing.T) {
 	require.Equal(t, []APIKeyUpdateFields{{Quota: true, Status: true}}, repo.updateFields)
 }
 
+func TestAPIKeyUpdate_ExplicitNullClearsGroupWithoutChangingSecret(t *testing.T) {
+	groupID := int64(9)
+	key := &APIKey{
+		ID: 1, UserID: 7, Key: "sk-secret-must-not-change", Name: "grouped",
+		Status: StatusActive, GroupID: &groupID,
+	}
+	svc, repo := newUpdateFieldsAPIKeyService(key)
+
+	updated, err := svc.Update(context.Background(), 1, 7, UpdateAPIKeyRequest{GroupIDSet: true})
+	require.NoError(t, err)
+	require.Nil(t, updated.GroupID)
+	require.Equal(t, "sk-secret-must-not-change", updated.Key)
+	require.Equal(t, []APIKeyUpdateFields{{GroupID: true}}, repo.updateFields)
+}
+
+func TestAPIKeyUpdate_RejectsInvalidZeroGroup(t *testing.T) {
+	zero := int64(0)
+	svc, repo := newUpdateFieldsAPIKeyService(&APIKey{
+		ID: 1, UserID: 7, Key: "sk-secret-must-not-change", Status: StatusActive,
+	})
+
+	_, err := svc.Update(context.Background(), 1, 7, UpdateAPIKeyRequest{GroupIDSet: true, GroupID: &zero})
+	require.Error(t, err)
+	require.Empty(t, repo.updateFields)
+}
+
 // 计费热路径把 Key 标记为配额耗尽时只写 status，
 // 否则会把刚原子递增的 quota_used 按快照覆盖掉。
 func TestUpdateQuotaUsed_ExhaustedMarkOnlyDeclaresStatus(t *testing.T) {

@@ -21,7 +21,7 @@ export interface BatchUpdateUserLimitsResponse {
  * List all users with pagination
  * @param page - Page number (default: 1)
  * @param pageSize - Items per page (default: 20)
- * @param filters - Optional filters (status, role, search, attributes)
+ * @param filters - Optional filters (status, role, search, groups)
  * @param options - Optional request options (signal)
  * @returns Paginated list of users
  */
@@ -34,7 +34,6 @@ export async function list(
     search?: string
     group_name?: string         // fuzzy filter by allowed group name
     api_key_group_id?: number   // filter users by the group their API keys are bound to
-    attributes?: Record<number, string>  // attributeId -> value
     include_subscriptions?: boolean
     sort_by?: string
     sort_order?: 'asc' | 'desc'
@@ -43,7 +42,6 @@ export async function list(
     signal?: AbortSignal
   }
 ): Promise<PaginatedResponse<AdminUser>> {
-  // Build params with attribute filters in attr[id]=value format
   const params: Record<string, any> = {
     page,
     page_size: pageSize,
@@ -57,14 +55,6 @@ export async function list(
     sort_order: filters?.sort_order
   }
 
-  // Add attribute filters as attr[id]=value
-  if (filters?.attributes) {
-    for (const [attrId, value] of Object.entries(filters.attributes)) {
-      if (value) {
-        params[`attr[${attrId}]`] = value
-      }
-    }
-  }
   const { data } = await apiClient.get<PaginatedResponse<AdminUser>>('/admin/users', {
     params,
     signal: options?.signal

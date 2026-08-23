@@ -2279,7 +2279,7 @@ func (s *AccountTestService) testGeminiAccountConnection(c *gin.Context, account
 }
 
 // routeAntigravityTest 路由 Antigravity 账号的测试请求。
-// APIKey 类型走原生协议（与 gateway_handler 路由一致），OAuth/Upstream 走 CRS 中转。
+// APIKey 类型走原生协议（与 gateway_handler 路由一致），OAuth/Upstream 走 Provider Gateway。
 func (s *AccountTestService) routeAntigravityTest(c *gin.Context, account *Account, modelID string, prompt string) error {
 	if account.Type == AccountTypeAPIKey {
 		if strings.HasPrefix(modelID, "gemini-") {

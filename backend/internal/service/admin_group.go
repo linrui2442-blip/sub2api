@@ -618,12 +618,6 @@ func (s *adminServiceImpl) DeleteGroup(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	if s.userGroupRPMOverrideRepo != nil {
-		if err := s.userGroupRPMOverrideRepo.DeleteByGroupID(ctx, id); err != nil {
-			return err
-		}
-	}
-
 	if s.authCacheInvalidator != nil {
 		for _, key := range groupKeys {
 			s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, key)
@@ -640,50 +634,6 @@ func (s *adminServiceImpl) GetGroupAPIKeys(ctx context.Context, groupID int64, p
 		return nil, 0, err
 	}
 	return keys, result.Total, nil
-}
-
-func (s *adminServiceImpl) ClearGroupRPMOverrides(ctx context.Context, groupID int64) error {
-	if s.userGroupRPMOverrideRepo == nil {
-		return nil
-	}
-	if err := s.userGroupRPMOverrideRepo.ClearGroupRPMOverrides(ctx, groupID); err != nil {
-		return err
-	}
-	// RPM override 已嵌入 auth cache snapshot (v7)，变更后必须失效相关缓存。
-	if s.authCacheInvalidator != nil {
-		s.authCacheInvalidator.InvalidateAuthCacheByGroupID(ctx, groupID)
-	}
-	return nil
-}
-
-func (s *adminServiceImpl) BatchSetGroupRPMOverrides(ctx context.Context, groupID int64, entries []GroupRPMOverrideInput) error {
-	if s.userGroupRPMOverrideRepo == nil {
-		return nil
-	}
-	for _, e := range entries {
-		if e.RPMOverride != nil && *e.RPMOverride < 0 {
-			return infraerrors.BadRequest("INVALID_RPM_OVERRIDE", fmt.Sprintf("rpm_override must be >= 0 (user_id=%d)", e.UserID))
-		}
-	}
-	if err := s.userGroupRPMOverrideRepo.SyncGroupRPMOverrides(ctx, groupID, entries); err != nil {
-		return err
-	}
-	// RPM override 已嵌入 auth cache snapshot (v7)，变更后必须失效相关缓存。
-	if s.authCacheInvalidator != nil {
-		s.authCacheInvalidator.InvalidateAuthCacheByGroupID(ctx, groupID)
-	}
-	return nil
-}
-
-func (s *adminServiceImpl) GetGroupRPMOverrides(ctx context.Context, groupID int64) ([]UserGroupRPMOverrideEntry, error) {
-	if s.userGroupRPMOverrideRepo == nil {
-		return []UserGroupRPMOverrideEntry{}, nil
-	}
-	entries, err := s.userGroupRPMOverrideRepo.ListByGroupID(ctx, groupID)
-	if err != nil {
-		return nil, err
-	}
-	return entries, nil
 }
 
 func (s *adminServiceImpl) UpdateGroupSortOrders(ctx context.Context, updates []GroupSortOrderUpdate) error {

@@ -95,7 +95,6 @@ function mountView() {
         AccountTestModal: true,
         AccountStatsModal: true,
         ScheduledTestsPanel: true,
-        SyncFromCrsModal: true,
         TempUnschedStatusModal: true,
         ErrorPassthroughRulesModal: true,
         TLSFingerprintProfilesModal: true,
