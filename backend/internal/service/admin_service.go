@@ -484,23 +484,23 @@ var ErrRPMStatusUnavailable = infraerrors.New(http.StatusNotImplemented, "RPM_ST
 
 // adminServiceImpl implements AdminService
 type adminServiceImpl struct {
-	userRepo                 UserRepository
-	groupRepo                GroupRepository
-	groupDuplicateRepo       GroupDuplicateRepository
-	accountRepo              AccountRepository
-	accountDuplicateRepo     AccountDuplicateRepository
-	proxyRepo                ProxyRepository
-	apiKeyRepo               APIKeyRepository
-	userRPMCache             UserRPMCache
-	proxyProber              ProxyExitInfoProber
-	proxyLatencyCache        ProxyLatencyCache
-	authCacheInvalidator     APIKeyAuthCacheInvalidator
-	entClient                *dbent.Client // 用于开启数据库事务
-	settingService           *SettingService
-	privacyClientFactory     PrivacyClientFactory
-	runtimeBlocker           AccountRuntimeBlocker
-	compositeRouteRepo       CompositeModelRouteRepository
-	compositeResolver        *CompositeRouteResolver
+	userRepo             UserRepository
+	groupRepo            GroupRepository
+	groupDuplicateRepo   GroupDuplicateRepository
+	accountRepo          AccountRepository
+	accountDuplicateRepo AccountDuplicateRepository
+	proxyRepo            ProxyRepository
+	apiKeyRepo           APIKeyRepository
+	userRPMCache         UserRPMCache
+	proxyProber          ProxyExitInfoProber
+	proxyLatencyCache    ProxyLatencyCache
+	authCacheInvalidator APIKeyAuthCacheInvalidator
+	entClient            *dbent.Client // 用于开启数据库事务
+	settingService       *SettingService
+	privacyClientFactory PrivacyClientFactory
+	runtimeBlocker       AccountRuntimeBlocker
+	compositeRouteRepo   CompositeModelRouteRepository
+	compositeResolver    *CompositeRouteResolver
 	// 分组平台变更后用来失效渠道缓存；可为 nil（缓存会在 TTL 到期后自然重建）
 	channelCacheInvalidator ChannelCacheInvalidator
 }
@@ -534,23 +534,23 @@ func NewPersonalAdminService(
 	channelCacheInvalidator ChannelCacheInvalidator,
 ) AdminService {
 	return &adminServiceImpl{
-		userRepo:                 userRepo,
-		groupRepo:                groupRepo,
-		groupDuplicateRepo:       groupRepo,
-		accountRepo:              accountRepo,
-		accountDuplicateRepo:     accountRepo,
-		proxyRepo:                proxyRepo,
-		apiKeyRepo:               apiKeyRepo,
-		userRPMCache:             userRPMCache,
-		proxyProber:              proxyProber,
-		proxyLatencyCache:        proxyLatencyCache,
-		authCacheInvalidator:     authCacheInvalidator,
-		entClient:                entClient,
-		settingService:           settingService,
-		privacyClientFactory:     privacyClientFactory,
-		runtimeBlocker:           runtimeBlocker,
-		compositeRouteRepo:       compositeRouteRepo,
-		compositeResolver:        compositeResolver,
-		channelCacheInvalidator:  channelCacheInvalidator,
+		userRepo:                userRepo,
+		groupRepo:               groupRepo,
+		groupDuplicateRepo:      groupRepo,
+		accountRepo:             accountRepo,
+		accountDuplicateRepo:    accountRepo,
+		proxyRepo:               proxyRepo,
+		apiKeyRepo:              apiKeyRepo,
+		userRPMCache:            userRPMCache,
+		proxyProber:             proxyProber,
+		proxyLatencyCache:       proxyLatencyCache,
+		authCacheInvalidator:    authCacheInvalidator,
+		entClient:               entClient,
+		settingService:          settingService,
+		privacyClientFactory:    privacyClientFactory,
+		runtimeBlocker:          runtimeBlocker,
+		compositeRouteRepo:      compositeRouteRepo,
+		compositeResolver:       compositeResolver,
+		channelCacheInvalidator: channelCacheInvalidator,
 	}
 }
