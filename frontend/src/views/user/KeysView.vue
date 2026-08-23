@@ -147,7 +147,7 @@
                   :platform="row.group.platform"
                 />
                 <span v-else class="text-sm text-gray-400 dark:text-dark-500">{{
-                  t('keys.noGroup')
+                  t('keys.unifiedGateway')
                 }}</span>
                 <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('keys.selectGroup') }}</span>
                 <svg
@@ -460,6 +460,30 @@
         </div>
 
         <div>
+          <label class="input-label">{{ t('keys.routingMode') }}</label>
+          <div class="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              class="rounded-lg border p-3 text-left"
+              :class="formData.routing_mode === 'unified' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-dark-600'"
+              @click="formData.routing_mode = 'unified'; formData.group_id = null"
+            >
+              <span class="block font-medium">{{ t('keys.unifiedGateway') }}</span>
+              <span class="mt-1 block text-xs text-gray-500">{{ t('keys.unifiedGatewayHint') }}</span>
+            </button>
+            <button
+              type="button"
+              class="rounded-lg border p-3 text-left"
+              :class="formData.routing_mode === 'group' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20' : 'border-gray-200 dark:border-dark-600'"
+              @click="formData.routing_mode = 'group'"
+            >
+              <span class="block font-medium">{{ t('keys.groupPinned') }}</span>
+              <span class="mt-1 block text-xs text-gray-500">{{ t('keys.groupPinnedHint') }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="formData.routing_mode === 'group'">
           <label class="input-label">{{ t('keys.groupLabel') }}</label>
           <Select
             v-model="formData.group_id"
@@ -1293,6 +1317,7 @@ const setGroupButtonRef = (keyId: number, el: Element | ComponentPublicInstance 
 
 const formData = ref({
   name: '',
+  routing_mode: 'unified' as 'unified' | 'group',
   group_id: null as number | null,
   status: 'active' as 'active' | 'inactive',
   use_custom_key: false,
@@ -1512,6 +1537,7 @@ const editKey = (key: ApiKey) => {
   const hasExpiration = !!key.expires_at
   formData.value = {
     name: key.name,
+    routing_mode: key.group_id === null ? 'unified' : 'group',
     group_id: key.group_id,
     status: key.status === 'quota_exhausted' || key.status === 'expired' ? 'inactive' : key.status,
     use_custom_key: false,
@@ -1585,7 +1611,7 @@ const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
   if (key.group_id === newGroupId) return
 
   try {
-    await keysAPI.update(key.id, { group_id: newGroupId })
+    await keysAPI.update(key.id, { group_id: newGroupId ?? 0 })
     appStore.showSuccess(t('keys.groupChangedSuccess'))
     loadApiKeys()
   } catch (error) {
@@ -1611,8 +1637,7 @@ const confirmDelete = (key: ApiKey) => {
 }
 
 const handleSubmit = async () => {
-  // Validate group_id is required
-  if (formData.value.group_id === null) {
+  if (formData.value.routing_mode === 'group' && formData.value.group_id === null) {
     appStore.showError(t('keys.groupRequired'))
     return
   }
@@ -1669,7 +1694,7 @@ const handleSubmit = async () => {
     if (showEditModal.value && selectedKey.value) {
       const updates: UpdateApiKeyRequest = {
         name: formData.value.name,
-        group_id: formData.value.group_id,
+        group_id: formData.value.routing_mode === 'unified' ? 0 : formData.value.group_id,
         ip_whitelist: ipWhitelist,
         ip_blacklist: ipBlacklist,
         quota: quota,
@@ -1733,6 +1758,7 @@ const closeModals = () => {
   selectedKey.value = null
   formData.value = {
     name: '',
+    routing_mode: 'unified',
     group_id: null,
     status: 'active',
     use_custom_key: false,

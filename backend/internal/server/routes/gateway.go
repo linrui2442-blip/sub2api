@@ -37,6 +37,8 @@ func RegisterGatewayRoutes(
 	endpointNorm := handler.InboundEndpointMiddleware()
 	compositeTarget := compositeTargetPlatformMiddleware(compositeResolver)
 	compositeGeminiTarget := compositeGeminiTargetPlatformMiddleware(compositeResolver)
+	personalUnified := personalUnifiedRouterMiddleware("", middleware.AnthropicErrorWriter)
+	personalUnifiedGemini := personalUnifiedRouterMiddleware(service.PlatformGemini, middleware.GoogleErrorWriter)
 
 	// 未分组 Key 拦截中间件（按协议格式区分错误响应）
 	requireGroupAnthropic := middleware.RequireGroupAssignment(settingService, middleware.AnthropicErrorWriter)
@@ -105,6 +107,7 @@ func RegisterGatewayRoutes(
 	gateway.Use(opsErrorLogger)
 	gateway.Use(endpointNorm)
 	gateway.Use(gin.HandlerFunc(apiKeyAuth))
+	gateway.Use(personalUnified)
 	gateway.Use(compositeTarget)
 	gateway.Use(requireGroupAnthropic)
 	{
@@ -172,6 +175,7 @@ func RegisterGatewayRoutes(
 	gemini.Use(opsErrorLogger)
 	gemini.Use(endpointNorm)
 	gemini.Use(middleware.APIKeyAuthGoogle(apiKeyService, cfg))
+	gemini.Use(personalUnifiedGemini)
 	gemini.Use(compositeGeminiTarget)
 	gemini.Use(requireGroupGoogle)
 	{
@@ -189,15 +193,15 @@ func RegisterGatewayRoutes(
 		}
 		h.Gateway.Responses(c)
 	}
-	r.POST("/responses", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic, responsesHandler)
-	r.POST("/responses/*subpath", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic, guardResponsesSubpath(responsesHandler))
+	r.POST("/responses", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), personalUnified, compositeTarget, requireGroupAnthropic, responsesHandler)
+	r.POST("/responses/*subpath", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), personalUnified, compositeTarget, requireGroupAnthropic, guardResponsesSubpath(responsesHandler))
 	r.GET("/responses", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic, func(c *gin.Context) {
 		h.OpenAIGateway.ResponsesWebSocket(c)
 	})
 	r.GET("/models", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), requireGroupAnthropic, modelsHandler)
-	r.POST("/messages/count_tokens", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic, countTokensHandler)
+	r.POST("/messages/count_tokens", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), personalUnified, compositeTarget, requireGroupAnthropic, countTokensHandler)
 	codexDirect := r.Group("/backend-api/codex")
-	codexDirect.Use(bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic)
+	codexDirect.Use(bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), personalUnified, compositeTarget, requireGroupAnthropic)
 	{
 		codexDirect.POST("/responses", responsesHandler)
 		codexDirect.POST("/responses/*subpath", guardResponsesSubpath(responsesHandler))
@@ -207,7 +211,7 @@ func RegisterGatewayRoutes(
 		codexDirect.GET("/models", h.OpenAIGateway.CodexModels)
 	}
 	// OpenAI Chat Completions API（不带v1前缀的别名）— auto-route based on group platform
-	r.POST("/chat/completions", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), compositeTarget, requireGroupAnthropic, func(c *gin.Context) {
+	r.POST("/chat/completions", bodyLimit, clientRequestID, opsErrorLogger, endpointNorm, gin.HandlerFunc(apiKeyAuth), personalUnified, compositeTarget, requireGroupAnthropic, func(c *gin.Context) {
 		if isOpenAIResponsesCompatibleGatewayPlatform(c) {
 			h.OpenAIGateway.ChatCompletions(c)
 			return
@@ -265,6 +269,9 @@ func RegisterGatewayRoutes(
 
 // getGroupPlatform extracts the group platform from the API Key stored in context.
 func getGroupPlatform(c *gin.Context) string {
+	if platform, ok := middleware.GetForcePlatformFromContext(c); ok && strings.TrimSpace(platform) != "" {
+		return platform
+	}
 	apiKey, ok := middleware.GetAPIKeyFromContext(c)
 	if !ok || apiKey.Group == nil {
 		return ""
@@ -275,6 +282,80 @@ func getGroupPlatform(c *gin.Context) string {
 		}
 	}
 	return apiKey.Group.Platform
+}
+
+func personalUnifiedRouterMiddleware(endpointPlatform string, writeError middleware.GatewayErrorWriter) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		apiKey, ok := middleware.GetAPIKeyFromContext(c)
+		if !ok || apiKey == nil || apiKey.GroupID != nil || c.Request == nil || c.Request.Method == http.MethodGet {
+			c.Next()
+			return
+		}
+
+		var body []byte
+		var model, modelPath string
+		if endpointPlatform == service.PlatformGemini {
+			model = compositeGeminiModelFromParams(c)
+		} else {
+			var err error
+			body, err = pkghttputil.ReadRequestBodyWithPrealloc(c.Request)
+			if err != nil {
+				writeError(c, http.StatusBadRequest, "Failed to read request body")
+				c.Abort()
+				return
+			}
+			model, modelPath = compositeJSONRequestModel(body)
+		}
+
+		platform, upstreamModel, err := service.ResolvePersonalProvider(model, endpointPlatform)
+		if err != nil {
+			message := "Unsupported model for Unified Personal API Key"
+			if errors.Is(err, service.ErrPersonalRouteAmbiguous) {
+				message = "Model is available from multiple providers; use an explicit provider namespace (for example gemini/ or antigravity/)"
+			}
+			writeError(c, http.StatusBadRequest, message)
+			c.Abort()
+			return
+		}
+		middleware.SetForcePlatform(c, platform)
+
+		if endpointPlatform == service.PlatformGemini {
+			rewriteGeminiModelParam(c, upstreamModel)
+		} else if modelPath != "" && upstreamModel != model {
+			if rewritten, rewriteErr := sjson.SetBytes(body, modelPath, upstreamModel); rewriteErr == nil {
+				body = rewritten
+			}
+			resetRequestBody(c, body)
+		} else {
+			resetRequestBody(c, body)
+		}
+		c.Next()
+	}
+}
+
+func rewriteGeminiModelParam(c *gin.Context, upstreamModel string) {
+	if value := c.Param("model"); value != "" {
+		for i := range c.Params {
+			if c.Params[i].Key == "model" {
+				c.Params[i].Value = upstreamModel
+				return
+			}
+		}
+	}
+	value := strings.TrimPrefix(c.Param("modelAction"), "/")
+	if value == "" {
+		return
+	}
+	action := ""
+	if idx := strings.LastIndex(value, ":"); idx >= 0 {
+		action = value[idx:]
+	}
+	for i := range c.Params {
+		if c.Params[i].Key == "modelAction" {
+			c.Params[i].Value = "/" + upstreamModel + action
+			return
+		}
+	}
 }
 
 func compositeTargetPlatformMiddleware(resolver *service.CompositeRouteResolver) gin.HandlerFunc {
