@@ -35,7 +35,6 @@ const (
 	AuditActionTokenRefresh           = "auth.token.refresh"
 	AuditActionSessionBindingMismatch = "auth.session_binding.mismatch"
 	AuditActionStepUpVerify           = "auth.step_up.verify"
-	AuditActionAuditLogClear          = "admin.audit_log.clear"
 )
 
 // AuditLog 一条管理面操作审计记录。
@@ -87,10 +86,10 @@ type AuditLogList struct {
 }
 
 // AuditLogRepository 审计日志持久化端口。
-// 注意：接口刻意不提供单条删除能力——审计日志只允许追加与全量清空。
+// 注意：接口刻意不提供单条删除能力——仅允许追加、固定保留期批量清理与全量清空。
 type AuditLogRepository interface {
 	BatchInsert(ctx context.Context, logs []*AuditLog) (int64, error)
-	// Insert 同步写入单条（用于清空留痕等必须落库的记录）。
+	// Insert 同步写入单条审计记录。
 	Insert(ctx context.Context, log *AuditLog) error
 	List(ctx context.Context, filter *AuditLogFilter) (*AuditLogList, error)
 	GetByID(ctx context.Context, id int64) (*AuditLog, error)

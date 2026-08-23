@@ -49,7 +49,7 @@ func RegisterPersonalAdminRoutes(
 	registerErrorPassthroughRoutes(admin, h)
 
 	// Local audit history remains available to the owner.
-	registerAuditLogRoutes(admin, h, stepUpAuth)
+	registerAuditLogRoutes(admin, h)
 }
 
 func registerTLSFingerprintProfileRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
@@ -205,7 +205,7 @@ func registerProxyRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAuth
 	proxies.POST("/batch", h.Admin.Proxy.BatchCreate)
 }
 
-func registerAuditLogRoutes(admin *gin.RouterGroup, h *handler.Handlers, _ middleware.StepUpAuthMiddleware) {
+func registerAuditLogRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	auditLogs := admin.Group("/audit-logs")
 	auditLogs.GET("", h.Admin.AuditLog.List)
 	auditLogs.GET("/:id", h.Admin.AuditLog.Get)

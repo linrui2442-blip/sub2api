@@ -15,18 +15,28 @@ const (
 	auditLogFlushInterval = time.Second
 
 	auditRetentionCheckInterval = 24 * time.Hour
-	auditRetentionStartupDelay  = 5 * time.Minute
 	auditRetentionBatchSize     = 5000
+	auditRetentionPeriod        = 7 * 24 * time.Hour
 )
+
+type auditLogClearResult struct {
+	deleted int64
+	err     error
+}
+
+type auditLogClearRequest struct {
+	ctx    context.Context
+	result chan auditLogClearResult
+}
 
 // AuditLogService 管理面操作审计日志服务。
 // 写入端为非阻塞异步批量落库（不拖慢管理请求）；
-// 读取端提供分页查询；清空端点由 handler 层做 TOTP 强校验后调用 ClearAll。
+// 读取端提供分页查询；Personal Edition 固定仅保留最近 7 天。
 type AuditLogService struct {
-	repo           AuditLogRepository
-	settingService *SettingService
+	repo AuditLogRepository
 
-	queue chan *AuditLog
+	queue         chan *AuditLog
+	clearRequests chan auditLogClearRequest
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -35,22 +45,28 @@ type AuditLogService struct {
 	droppedCount uint64
 	writeFailed  uint64
 	writtenCount uint64
+	started      atomic.Bool
+
+	now               func() time.Time
+	retentionInterval time.Duration
 }
 
-func NewAuditLogService(repo AuditLogRepository, settingService *SettingService) *AuditLogService {
+func NewAuditLogService(repo AuditLogRepository) *AuditLogService {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &AuditLogService{
-		repo:           repo,
-		settingService: settingService,
-		queue:          make(chan *AuditLog, auditLogQueueCapacity),
-		ctx:            ctx,
-		cancel:         cancel,
+		repo:              repo,
+		queue:             make(chan *AuditLog, auditLogQueueCapacity),
+		clearRequests:     make(chan auditLogClearRequest),
+		ctx:               ctx,
+		cancel:            cancel,
+		now:               func() time.Time { return time.Now().UTC() },
+		retentionInterval: auditRetentionCheckInterval,
 	}
 }
 
 // Start 启动异步写入与保留期清理协程。
 func (s *AuditLogService) Start() {
-	if s == nil || s.repo == nil {
+	if s == nil || s.repo == nil || !s.started.CompareAndSwap(false, true) {
 		return
 	}
 	s.wg.Add(2)
@@ -97,32 +113,38 @@ func (s *AuditLogService) GetByID(ctx context.Context, id int64) (*AuditLog, err
 	return s.repo.GetByID(ctx, id)
 }
 
-// ClearAll 全量清空审计日志并写入留痕记录。
-// 调用方（handler）必须先完成 TOTP 验证；本方法负责：
-//  1. 统计并清空全表
-//  2. 同步写入一条 "audit_log.clear" 留痕记录（绕过异步队列，保证落库）
-func (s *AuditLogService) ClearAll(ctx context.Context, trace *AuditLog) (int64, error) {
+// ClearAll 清空全部审计日志。该内部维护操作本身不写审计记录，确保
+// 返回成功后列表确实为空，也避免清理行为递归产生新的审计日志。
+func (s *AuditLogService) ClearAll(ctx context.Context) (int64, error) {
+	if s.started.Load() {
+		result := make(chan auditLogClearResult, 1)
+		request := auditLogClearRequest{ctx: ctx, result: result}
+		select {
+		case s.clearRequests <- request:
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-s.ctx.Done():
+			return 0, context.Canceled
+		}
+		select {
+		case outcome := <-result:
+			return outcome.deleted, outcome.err
+		case <-ctx.Done():
+			return 0, ctx.Err()
+		case <-s.ctx.Done():
+			return 0, context.Canceled
+		}
+	}
+	return s.clearAllDirect(ctx)
+}
+
+func (s *AuditLogService) clearAllDirect(ctx context.Context) (int64, error) {
 	deleted, err := s.repo.Count(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("count audit logs: %w", err)
 	}
 	if err := s.repo.TruncateAll(ctx); err != nil {
 		return 0, fmt.Errorf("truncate audit logs: %w", err)
-	}
-
-	if trace != nil {
-		trace.Action = AuditActionAuditLogClear
-		if trace.CreatedAt.IsZero() {
-			trace.CreatedAt = time.Now().UTC()
-		}
-		if trace.Extra == nil {
-			trace.Extra = map[string]any{}
-		}
-		trace.Extra["deleted_rows"] = deleted
-		if err := s.repo.Insert(ctx, trace); err != nil {
-			// 留痕失败必须显式暴露：清空已发生，但审计链断裂。
-			return deleted, fmt.Errorf("audit logs cleared (%d rows) but failed to persist clear-trace record: %w", deleted, err)
-		}
 	}
 	return deleted, nil
 }
@@ -180,6 +202,19 @@ func (s *AuditLogService) runWriter() {
 			}
 		case <-ticker.C:
 			flush()
+		case request := <-s.clearRequests:
+			// 丢弃尚未落盘的旧审计事件，再清空持久层。清空接口自身由
+			// middleware.SkipAudit 排除，因此成功返回后不会马上重现一条日志。
+			batch = batch[:0]
+			for draining := true; draining; {
+				select {
+				case <-s.queue:
+				default:
+					draining = false
+				}
+			}
+			deleted, err := s.clearAllDirect(request.ctx)
+			request.result <- auditLogClearResult{deleted: deleted, err: err}
 		}
 	}
 }
@@ -189,18 +224,11 @@ func (s *AuditLogService) runWriter() {
 func (s *AuditLogService) runRetentionLoop() {
 	defer s.wg.Done()
 
-	startupTimer := time.NewTimer(auditRetentionStartupDelay)
-	defer startupTimer.Stop()
-	select {
-	case <-s.ctx.Done():
-		return
-	case <-startupTimer.C:
-	}
-
-	ticker := time.NewTicker(auditRetentionCheckInterval)
-	defer ticker.Stop()
-
+	// 启动后立即做一次 best-effort 清理；失败只记录告警，不影响主程序。
 	s.runRetentionOnce()
+
+	ticker := time.NewTicker(s.retentionInterval)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-s.ctx.Done():
@@ -215,14 +243,7 @@ func (s *AuditLogService) runRetentionOnce() {
 	ctx, cancel := context.WithTimeout(s.ctx, 10*time.Minute)
 	defer cancel()
 
-	days := 0
-	if s.settingService != nil {
-		days = s.settingService.GetAuditLogRetentionDays(ctx)
-	}
-	if days <= 0 {
-		return // 0 或负值表示永久保留，仅支持手动清空
-	}
-	cutoff := time.Now().UTC().AddDate(0, 0, -days)
+	cutoff := s.now().UTC().Add(-auditRetentionPeriod)
 	for {
 		deleted, err := s.repo.DeleteBefore(ctx, cutoff, auditRetentionBatchSize)
 		if err != nil {

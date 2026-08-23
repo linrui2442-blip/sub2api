@@ -1,7 +1,7 @@
 export default {
   audit: {
     title: 'Audit Logs',
-    description: 'Records management-plane operations by admins and users. Header credentials keep only their first/last characters and request bodies are redacted. Entries cannot be deleted individually; clearing all requires two-factor verification.',
+    description: 'Records the last 7 days of management-plane operations by admins and users. Header credentials are masked and request bodies are redacted.',
     clearAll: 'Clear All',
     empty: 'No audit logs yet',
     loadFailed: 'Failed to load audit logs',
@@ -42,9 +42,7 @@ export default {
     },
     clearConfirm: {
       title: 'Clear All Audit Logs',
-      message: 'This permanently deletes all audit logs and cannot be undone. The clear action itself is recorded. Continue?',
-      totpTitle: 'Enter Two-Factor Code',
-      totpHint: 'Clearing audit logs requires a fresh TOTP verification.',
+      message: 'Clear all audit logs? This action cannot be undone.',
       success: 'Cleared {count} audit log(s)',
       failed: 'Failed to clear audit logs'
     }

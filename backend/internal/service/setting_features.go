@@ -167,34 +167,6 @@ func (s *SettingService) IsStepUpEnabled(ctx context.Context) bool {
 	return value == "true"
 }
 
-// defaultAuditLogRetentionDays 审计日志默认保留天数。
-const defaultAuditLogRetentionDays = 180
-
-// GetAuditLogRetentionDays 审计日志保留天数（<=0 表示永久保留，仅支持手动清空）。
-func (s *SettingService) GetAuditLogRetentionDays(ctx context.Context) int {
-	value, err := s.settingRepo.GetValue(ctx, SettingKeyAuditLogRetentionDays)
-	if err != nil {
-		return defaultAuditLogRetentionDays
-	}
-	return parseAuditLogRetentionDays(value)
-}
-
-// parseAuditLogRetentionDays 解析保留天数配置，空/非法值回退默认值。
-func parseAuditLogRetentionDays(value string) int {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return defaultAuditLogRetentionDays
-	}
-	n, err := strconv.Atoi(value)
-	if err != nil {
-		return defaultAuditLogRetentionDays
-	}
-	if n < 0 {
-		return 0
-	}
-	return n
-}
-
 // GetSiteName 获取网站名称
 func (s *SettingService) GetSiteName(ctx context.Context) string {
 	value, err := s.settingRepo.GetValue(ctx, SettingKeySiteName)

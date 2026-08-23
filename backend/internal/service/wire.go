@@ -461,8 +461,8 @@ func ProvideOpsSystemLogSink(opsRepo OpsRepository) *OpsSystemLogSink {
 
 // ProvideAuditLogService 创建操作审计日志服务并启动异步写入与保留期清理协程。
 // 停止逻辑挂在 cmd/server 的 provideCleanup。
-func ProvideAuditLogService(repo AuditLogRepository, settingService *SettingService) *AuditLogService {
-	svc := NewAuditLogService(repo, settingService)
+func ProvideAuditLogService(repo AuditLogRepository) *AuditLogService {
+	svc := NewAuditLogService(repo)
 	svc.Start()
 	return svc
 }
