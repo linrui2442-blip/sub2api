@@ -82,6 +82,101 @@ func (c *antigravityProviderCacheStub) AcquireRefreshLock(context.Context, strin
 }
 func (c *antigravityProviderCacheStub) ReleaseRefreshLock(context.Context, string) error { return nil }
 
+type versionedAntigravityCacheStub struct {
+	mu     sync.Mutex
+	tokens map[string]string
+	setKey string
+}
+
+func (c *versionedAntigravityCacheStub) GetAccessToken(_ context.Context, key string) (string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.tokens[key], nil
+}
+func (c *versionedAntigravityCacheStub) SetAccessToken(_ context.Context, key, token string, _ time.Duration) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.tokens == nil {
+		c.tokens = make(map[string]string)
+	}
+	c.tokens[key] = token
+	c.setKey = key
+	return nil
+}
+func (c *versionedAntigravityCacheStub) DeleteAccessToken(_ context.Context, key string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.tokens, key)
+	return nil
+}
+func (c *versionedAntigravityCacheStub) AcquireRefreshLock(context.Context, string, time.Duration) (bool, error) {
+	return true, nil
+}
+func (c *versionedAntigravityCacheStub) ReleaseRefreshLock(context.Context, string) error {
+	return nil
+}
+
+func TestAntigravityTokenProvider_StaleSnapshotCannotHitOldVersionCache(t *testing.T) {
+	now := time.Now()
+	snapshot := &Account{ID: 98, Platform: PlatformAntigravity, Type: AccountTypeOAuth, Status: StatusActive, Credentials: map[string]any{
+		"access_token": "old-db-token", "expires_at": now.Add(time.Hour).Unix(), "_token_version": int64(100),
+	}}
+	durable := &Account{ID: 98, Platform: PlatformAntigravity, Type: AccountTypeOAuth, Status: StatusActive, Credentials: map[string]any{
+		"access_token": "fresh-db-token", "expires_at": now.Add(time.Hour).Unix(), "_token_version": int64(101),
+	}}
+	repo := &refreshAPIAccountRepo{account: durable}
+	cache := &versionedAntigravityCacheStub{tokens: map[string]string{
+		"ag:account:98:v:100": "stale-cache-token",
+	}}
+	provider := NewAntigravityTokenProvider(repo, cache, nil)
+
+	token, err := provider.GetAccessToken(context.Background(), snapshot)
+	require.NoError(t, err)
+	require.Equal(t, "fresh-db-token", token)
+	require.NotEqual(t, "stale-cache-token", token)
+	require.Equal(t, "ag:account:98:v:101", cache.setKey)
+}
+
+func TestAntigravityTokenProvider_CurrentVersionHitsVersionedCache(t *testing.T) {
+	account := &Account{ID: 99, Platform: PlatformAntigravity, Type: AccountTypeOAuth, Status: StatusActive, Credentials: map[string]any{
+		"access_token": "db-token", "expires_at": time.Now().Add(time.Hour).Unix(), "_token_version": int64(101),
+	}}
+	repo := &refreshAPIAccountRepo{account: account}
+	cache := &versionedAntigravityCacheStub{tokens: map[string]string{
+		"ag:account:99:v:101": "current-cache-token",
+	}}
+	provider := NewAntigravityTokenProvider(repo, cache, nil)
+
+	token, err := provider.GetAccessToken(context.Background(), account)
+	require.NoError(t, err)
+	require.Equal(t, "current-cache-token", token)
+}
+
+func TestAntigravityTokenProvider_RefreshPublishesOnlyNewVersionKey(t *testing.T) {
+	account := &Account{ID: 100, Platform: PlatformAntigravity, Type: AccountTypeOAuth, Status: StatusActive, Credentials: map[string]any{
+		"access_token": "old-token", "refresh_token": "refresh", "expires_at": time.Now().Add(-time.Minute).Unix(), "_token_version": int64(101),
+	}}
+	repo := &refreshAPIAccountRepo{account: account}
+	cache := &versionedAntigravityCacheStub{tokens: map[string]string{
+		"ag:account:100:v:101": "stale-cache-token",
+	}}
+	executor := &refreshAPIExecutorStub{needsRefresh: true, credentials: map[string]any{
+		"access_token": "new-token", "refresh_token": "refresh", "expires_at": time.Now().Add(time.Hour).Unix(),
+	}}
+	provider := NewAntigravityTokenProvider(repo, cache, nil)
+	provider.SetRefreshAPI(NewOAuthRefreshAPI(repo, cache), executor)
+
+	token, err := provider.GetAccessToken(context.Background(), account)
+	require.NoError(t, err)
+	require.Equal(t, "new-token", token)
+	newVersion := repo.account.GetCredentialAsInt64("_token_version")
+	require.Greater(t, newVersion, int64(101))
+	newKey := AntigravityTokenCacheKey(repo.account)
+	require.Equal(t, newKey, cache.setKey)
+	require.Equal(t, "new-token", cache.tokens[newKey])
+	require.NotEqual(t, "stale-cache-token", cache.tokens[newKey])
+}
+
 func TestAntigravityTokenProvider_ExpiredDurableTokenBypassesStaleCache(t *testing.T) {
 	account := &Account{
 		ID: 91, Platform: PlatformAntigravity, Type: AccountTypeOAuth, Status: StatusActive,

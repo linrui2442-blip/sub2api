@@ -86,6 +86,18 @@ func (p *AntigravityTokenProvider) GetAccessToken(ctx context.Context, account *
 		return "", errors.New("not an antigravity oauth account")
 	}
 
+	// The durable credential version is authoritative for cache identity. A
+	// stale request snapshot must never be allowed to address an older cache
+	// entry after another worker has published a newer credential version.
+	if latestAccount, isStale := CheckTokenVersion(ctx, account, p.accountRepo); isStale && latestAccount != nil {
+		slog.Debug("antigravity_cache_version_mismatch",
+			"account_id", account.ID,
+			"snapshot_version", account.GetCredentialAsInt64("_token_version"),
+			"durable_version", latestAccount.GetCredentialAsInt64("_token_version"),
+		)
+		account = latestAccount
+	}
+
 	cacheKey := AntigravityTokenCacheKey(account)
 
 	// Durable expiry is authoritative. An expired durable token must never be
@@ -128,6 +140,11 @@ func (p *AntigravityTokenProvider) GetAccessToken(ctx context.Context, account *
 				return "", err
 			}
 		} else if result.LockHeld {
+			if latestAccount, isStale := CheckTokenVersion(ctx, account, p.accountRepo); isStale && latestAccount != nil {
+				account = latestAccount
+				cacheKey = AntigravityTokenCacheKey(account)
+				expiresAt = account.GetCredentialAsTime("expires_at")
+			}
 			if p.refreshPolicy.OnLockHeld == ProviderLockHeldWaitForCache && p.tokenCache != nil {
 				if token, cacheErr := p.tokenCache.GetAccessToken(ctx, cacheKey); cacheErr == nil && strings.TrimSpace(token) != "" {
 					return token, nil
@@ -143,6 +160,7 @@ func (p *AntigravityTokenProvider) GetAccessToken(ctx context.Context, account *
 			if result.Refreshed && p.tokenCache != nil {
 				_ = p.tokenCache.DeleteAccessToken(ctx, cacheKey)
 			}
+			cacheKey = AntigravityTokenCacheKey(account)
 		}
 	} else if needsRefresh && p.tokenCache != nil {
 		// Backward-compatible test path when refreshAPI is not injected.
@@ -301,9 +319,9 @@ func (p *AntigravityTokenProvider) markBackfillAttempted(accountID int64) {
 }
 
 func AntigravityTokenCacheKey(account *Account) string {
-	projectID := strings.TrimSpace(account.GetCredential("project_id"))
-	if projectID != "" {
-		return "ag:" + projectID
+	if account == nil {
+		return "ag:account:0:v:0"
 	}
-	return "ag:account:" + strconv.FormatInt(account.ID, 10)
+	return "ag:account:" + strconv.FormatInt(account.ID, 10) +
+		":v:" + strconv.FormatInt(account.GetCredentialAsInt64("_token_version"), 10)
 }

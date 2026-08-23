@@ -102,3 +102,49 @@ func TestAntigravityQuotaFetcher_InvalidGrantRequiresReauth(t *testing.T) {
 	require.True(t, buildAntigravityDegradedUsage(err).NeedsReauth)
 	require.Equal(t, 1, executor.refreshCalls)
 }
+
+func TestAccountUsageService_IgnoresUsageFromOlderCredentialVersion(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/v1internal:fetchAvailableModels":
+			_, _ = w.Write([]byte(`{"models":{}}`))
+		case "/v1internal:loadCodeAssist":
+			_, _ = w.Write([]byte(`{}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+	oldURLs := antigravity.BaseURLs
+	antigravity.BaseURLs = []string{server.URL}
+	defer func() { antigravity.BaseURLs = oldURLs }()
+
+	durable := &Account{
+		ID: 103, Platform: PlatformAntigravity, Type: AccountTypeOAuth, Status: StatusActive,
+		Credentials: map[string]any{
+			"access_token": "fresh-token", "expires_at": time.Now().Add(time.Hour).Unix(),
+			"project_id": "project-103", "_token_version": int64(101),
+		},
+	}
+	snapshot := snapshotOAuthRefreshAccount(durable)
+	snapshot.Credentials["_token_version"] = int64(100)
+	repo := &refreshAPIAccountRepo{account: durable}
+	provider := NewAntigravityTokenProvider(repo, nil, nil)
+	usageCache := NewUsageCache()
+	usageCache.antigravityCache.Store(durable.ID, &antigravityUsageCache{
+		usageInfo: &UsageInfo{NeedsReauth: true, Error: "stale"},
+		timestamp: time.Now(), tokenVersion: 100,
+	})
+	usageService := &AccountUsageService{
+		accountRepo: repo, antigravityQuotaFetcher: NewAntigravityQuotaFetcher(nil, provider), cache: usageCache,
+	}
+
+	usage, err := usageService.getAntigravityUsage(context.Background(), snapshot)
+	require.NoError(t, err)
+	require.False(t, usage.NeedsReauth)
+	require.NotEqual(t, "stale", usage.Error)
+	cached, ok := usageCache.antigravityCache.Load(durable.ID)
+	require.True(t, ok)
+	require.Equal(t, int64(101), cached.(*antigravityUsageCache).tokenVersion)
+}

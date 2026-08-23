@@ -100,8 +100,9 @@ type windowStatsCache struct {
 
 // antigravityUsageCache 缓存 Antigravity 额度数据
 type antigravityUsageCache struct {
-	usageInfo *UsageInfo
-	timestamp time.Time
+	usageInfo    *UsageInfo
+	timestamp    time.Time
+	tokenVersion int64
 }
 
 const (
@@ -1016,12 +1017,21 @@ func (s *AccountUsageService) getAntigravityUsage(ctx context.Context, account *
 		now := time.Now()
 		return &UsageInfo{UpdatedAt: &now}, nil
 	}
+	if latestAccount, isStale := CheckTokenVersion(ctx, account, s.accountRepo); isStale && latestAccount != nil {
+		slog.Debug("antigravity_usage_cache_version_mismatch",
+			"account_id", account.ID,
+			"snapshot_version", account.GetCredentialAsInt64("_token_version"),
+			"durable_version", latestAccount.GetCredentialAsInt64("_token_version"),
+		)
+		account = latestAccount
+	}
+	tokenVersion := account.GetCredentialAsInt64("_token_version")
 
 	// 1. 检查缓存
 	if cached, ok := s.cache.antigravityCache.Load(account.ID); ok {
 		if cache, ok := cached.(*antigravityUsageCache); ok {
 			ttl := antigravityCacheTTL(cache.usageInfo)
-			if time.Since(cache.timestamp) < ttl {
+			if cache.tokenVersion == tokenVersion && time.Since(cache.timestamp) < ttl {
 				usage := cache.usageInfo
 				if usage.FiveHour != nil && usage.FiveHour.ResetsAt != nil {
 					usage.FiveHour.RemainingSeconds = int(time.Until(*usage.FiveHour.ResetsAt).Seconds())
@@ -1038,7 +1048,7 @@ func (s *AccountUsageService) getAntigravityUsage(ctx context.Context, account *
 		if cached, ok := s.cache.antigravityCache.Load(account.ID); ok {
 			if cache, ok := cached.(*antigravityUsageCache); ok {
 				ttl := antigravityCacheTTL(cache.usageInfo)
-				if time.Since(cache.timestamp) < ttl {
+				if cache.tokenVersion == tokenVersion && time.Since(cache.timestamp) < ttl {
 					usage := cache.usageInfo
 					// 重新计算 RemainingSeconds，避免返回过时的剩余秒数
 					recalcAntigravityRemainingSeconds(usage)
@@ -1057,16 +1067,18 @@ func (s *AccountUsageService) getAntigravityUsage(ctx context.Context, account *
 			degraded := buildAntigravityDegradedUsage(err)
 			enrichUsageWithAccountError(degraded, account)
 			s.cache.antigravityCache.Store(account.ID, &antigravityUsageCache{
-				usageInfo: degraded,
-				timestamp: time.Now(),
+				usageInfo:    degraded,
+				timestamp:    time.Now(),
+				tokenVersion: tokenVersion,
 			})
 			return degraded, nil
 		}
 
 		enrichUsageWithAccountError(fetchResult.UsageInfo, account)
 		s.cache.antigravityCache.Store(account.ID, &antigravityUsageCache{
-			usageInfo: fetchResult.UsageInfo,
-			timestamp: time.Now(),
+			usageInfo:    fetchResult.UsageInfo,
+			timestamp:    time.Now(),
+			tokenVersion: tokenVersion,
 		})
 		return fetchResult.UsageInfo, nil
 	})

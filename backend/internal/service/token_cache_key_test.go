@@ -94,7 +94,7 @@ func TestAntigravityTokenCacheKey(t *testing.T) {
 					"project_id": "ag-project-456",
 				},
 			},
-			expected: "ag:ag-project-456",
+			expected: "ag:account:200:v:0",
 		},
 		{
 			name: "project_id_with_whitespace",
@@ -104,7 +104,7 @@ func TestAntigravityTokenCacheKey(t *testing.T) {
 					"project_id": "  ag-project-spaces  ",
 				},
 			},
-			expected: "ag:ag-project-spaces",
+			expected: "ag:account:201:v:0",
 		},
 		{
 			name: "empty_project_id_fallback_to_account_id",
@@ -114,7 +114,7 @@ func TestAntigravityTokenCacheKey(t *testing.T) {
 					"project_id": "",
 				},
 			},
-			expected: "ag:account:202",
+			expected: "ag:account:202:v:0",
 		},
 		{
 			name: "whitespace_only_project_id_fallback_to_account_id",
@@ -124,7 +124,7 @@ func TestAntigravityTokenCacheKey(t *testing.T) {
 					"project_id": "   ",
 				},
 			},
-			expected: "ag:account:203",
+			expected: "ag:account:203:v:0",
 		},
 		{
 			name: "no_project_id_key_fallback_to_account_id",
@@ -132,7 +132,7 @@ func TestAntigravityTokenCacheKey(t *testing.T) {
 				ID:          204,
 				Credentials: map[string]any{},
 			},
-			expected: "ag:account:204",
+			expected: "ag:account:204:v:0",
 		},
 		{
 			name: "nil_credentials_fallback_to_account_id",
@@ -140,7 +140,18 @@ func TestAntigravityTokenCacheKey(t *testing.T) {
 				ID:          205,
 				Credentials: nil,
 			},
-			expected: "ag:account:205",
+			expected: "ag:account:205:v:0",
+		},
+		{
+			name: "credential_version_is_part_of_identity",
+			account: &Account{
+				ID: 206,
+				Credentials: map[string]any{
+					"project_id":     "shared-project",
+					"_token_version": int64(101),
+				},
+			},
+			expected: "ag:account:206:v:101",
 		},
 	}
 
