@@ -974,6 +974,21 @@ func (s *TokenRefreshService) refreshWithRetryWithRateGate(
 			// possible WAF or shared provider failure.
 			return &providerCycleContainmentRefreshError{err: err}
 		}
+		if account.Platform == PlatformAntigravity {
+			if class, ok := antigravityFailureClass(err); ok {
+				switch class {
+				case antigravityAuthFailureProviderConfig, antigravityAuthFailurePolicyBlocked:
+					return &providerConfigurationRefreshError{err: err}
+				case antigravityAuthFailureReauthRequired:
+					// The unified refresh API already re-read durable credentials and
+					// attempted race recovery. Only this final class may permanently
+					// block an Antigravity OAuth account below.
+				case antigravityAuthFailureAccessTokenRejected, antigravityAuthFailureTransient:
+					// Continue through the normal retry/cooldown path. Neither class
+					// is durable evidence that OAuth authorization was revoked.
+				}
+			}
+		}
 
 		// Provider-wide OAuth client/scope failures are not evidence that every
 		// account is invalid. Return a typed internal signal so the cycle contains

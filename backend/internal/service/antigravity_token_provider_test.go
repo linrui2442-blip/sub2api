@@ -86,20 +86,45 @@ func TestAntigravityTokenProvider_ValidDurableTokenUsesCacheWithoutRefresh(t *te
 func TestBuildAntigravityDegradedUsage_ReauthSemantics(t *testing.T) {
 	tests := []struct {
 		name        string
-		err         string
+		err         error
 		needsReauth bool
 	}{
-		{name: "invalid grant", err: "refresh failed: invalid_grant", needsReauth: true},
-		{name: "transient 401", err: "FetchAvailableModels failed HTTP 401 UNAUTHENTICATED"},
-		{name: "rate limited", err: "HTTP 429 RESOURCE_EXHAUSTED"},
-		{name: "not found", err: "HTTP 404 NOT_FOUND"},
-		{name: "server error", err: "HTTP 503 UNAVAILABLE"},
-		{name: "network", err: "dial tcp: i/o timeout"},
+		{name: "final invalid grant", err: classifyFinalAntigravityRefreshError(stringError("refresh failed: invalid_grant")), needsReauth: true},
+		{name: "raw invalid grant is not authoritative", err: stringError("business API returned invalid_grant")},
+		{name: "transient 401", err: stringError("FetchAvailableModels failed HTTP 401 UNAUTHENTICATED")},
+		{name: "rate limited", err: stringError("HTTP 429 RESOURCE_EXHAUSTED")},
+		{name: "not found", err: stringError("HTTP 404 NOT_FOUND")},
+		{name: "server error", err: stringError("HTTP 503 UNAVAILABLE")},
+		{name: "network", err: stringError("dial tcp: i/o timeout")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			info := buildAntigravityDegradedUsage(stringError(tt.err))
+			info := buildAntigravityDegradedUsage(tt.err)
 			require.Equal(t, tt.needsReauth, info.NeedsReauth)
+		})
+	}
+}
+
+func TestClassifyFinalAntigravityRefreshError(t *testing.T) {
+	tests := []struct {
+		name  string
+		err   string
+		class antigravityAuthFailureClass
+	}{
+		{name: "invalid grant", err: "invalid_grant", class: antigravityAuthFailureReauthRequired},
+		{name: "invalid rapt", err: "invalid_grant: invalid_rapt", class: antigravityAuthFailureReauthRequired},
+		{name: "missing refresh", err: "no refresh token available", class: antigravityAuthFailureReauthRequired},
+		{name: "invalid client", err: "invalid_client", class: antigravityAuthFailureProviderConfig},
+		{name: "unauthorized client", err: "unauthorized_client", class: antigravityAuthFailureProviderConfig},
+		{name: "admin policy", err: "admin_policy_enforced", class: antigravityAuthFailurePolicyBlocked},
+		{name: "access token rejected", err: "HTTP 401 UNAUTHENTICATED", class: antigravityAuthFailureAccessTokenRejected},
+		{name: "network", err: "dial tcp timeout", class: antigravityAuthFailureTransient},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			class, ok := antigravityFailureClass(classifyFinalAntigravityRefreshError(stringError(tt.err)))
+			require.True(t, ok)
+			require.Equal(t, tt.class, class)
 		})
 	}
 }

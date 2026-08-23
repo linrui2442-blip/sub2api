@@ -1308,18 +1308,8 @@ func buildAntigravityDegradedUsage(err error) *UsageInfo {
 }
 
 func isAntigravityRefreshCredentialInvalid(err error) bool {
-	if err == nil {
-		return false
-	}
-	lower := strings.ToLower(err.Error())
-	return strings.Contains(lower, "invalid_grant") ||
-		strings.Contains(lower, "refresh token revoked") ||
-		strings.Contains(lower, "refresh_token revoked") ||
-		strings.Contains(lower, "missing refresh_token") ||
-		strings.Contains(lower, "refresh token missing") ||
-		strings.Contains(lower, "refresh token not found") ||
-		strings.Contains(lower, "refresh_token not found") ||
-		strings.Contains(lower, "no refresh token")
+	class, ok := antigravityFailureClass(err)
+	return ok && class == antigravityAuthFailureReauthRequired
 }
 
 // enrichUsageWithAccountError 结合账号错误状态修正 UsageInfo

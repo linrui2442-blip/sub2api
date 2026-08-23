@@ -267,6 +267,11 @@ func (api *OAuthRefreshAPI) refresh(
 		}
 	}
 	if !executor.CanRefresh(freshAccount) {
+		if freshAccount.Platform == PlatformAntigravity && freshAccount.Type == AccountTypeOAuth &&
+			strings.TrimSpace(freshAccount.GetCredential("refresh_token")) == "" {
+			return &OAuthRefreshResult{Account: snapshotOAuthRefreshAccount(freshAccount)},
+				classifyFinalAntigravityRefreshError(errors.New("refresh token missing"))
+		}
 		if requestPath && freshAccount.IsGrokOAuth() && strings.TrimSpace(freshAccount.GetGrokRefreshToken()) == "" {
 			return nil, withGrokCredentialFailureSnapshot(errGrokOAuthRefreshTokenMissing, freshAccount)
 		}
@@ -316,6 +321,9 @@ func (api *OAuthRefreshAPI) refresh(
 		result := &OAuthRefreshResult{Account: attemptedAccount}
 		if requestPath && attemptedAccount.Platform == PlatformGrok {
 			return result, withGrokCredentialFailureSnapshot(refreshErr, attemptedAccount)
+		}
+		if attemptedAccount.Platform == PlatformAntigravity {
+			return result, classifyFinalAntigravityRefreshError(refreshErr)
 		}
 		return result, refreshErr
 	}
@@ -456,16 +464,38 @@ func (api *OAuthRefreshAPI) tryRecoverFromRefreshRace(ctx context.Context, usedA
 	if err != nil || reReadAccount == nil {
 		return nil, false
 	}
+	usedVersion := credentialTokenVersion(usedAccount.Credentials)
+	currentVersion := credentialTokenVersion(reReadAccount.Credentials)
+	if currentVersion > usedVersion {
+		return reReadAccount, true
+	}
 	usedRT := usedAccount.GetCredential("refresh_token")
 	currentRT := reReadAccount.GetCredential("refresh_token")
-	if usedRT == "" || currentRT == "" {
-		return nil, false
-	}
-	// refresh_token 不同 → 另一个 worker 已成功刷新
-	if usedRT != currentRT {
+	// Older rows may not have a version. A rotated refresh token remains valid
+	// evidence that another worker won the refresh race.
+	if usedRT != "" && currentRT != "" && usedRT != currentRT {
 		return reReadAccount, true
 	}
 	return nil, false
+}
+
+func credentialTokenVersion(credentials map[string]any) int64 {
+	if credentials == nil {
+		return 0
+	}
+	switch value := credentials["_token_version"].(type) {
+	case int64:
+		return value
+	case int:
+		return int64(value)
+	case float64:
+		return int64(value)
+	case string:
+		version, _ := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+		return version
+	default:
+		return 0
+	}
 }
 
 // MergeCredentials 将旧 credentials 中不存在于新 map 的字段保留到新 map 中
