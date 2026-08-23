@@ -495,6 +495,7 @@ func (s *AntigravityGatewayService) antigravityRetryLoop(p antigravityRetryLoopP
 
 	var resp *http.Response
 	var usedBaseURL string
+	authRecoveryAttempted := false
 	logBody := p.settingService != nil && p.settingService.cfg != nil && p.settingService.cfg.Gateway.LogUpstreamErrorBody
 	maxBytes := 2048
 	if p.settingService != nil && p.settingService.cfg != nil && p.settingService.cfg.Gateway.LogUpstreamErrorBodyMaxBytes > 0 {
@@ -560,6 +561,27 @@ urlFallbackLoop:
 			if resp.StatusCode >= 400 {
 				respBody := s.readUpstreamErrorBody(resp)
 				_ = resp.Body.Close()
+
+				// A Google business-endpoint 401 gets one credential recovery and
+				// one replay before any response bytes are committed to the client.
+				// The token provider performs its conditional check under the shared
+				// OAuth lock, preventing concurrent 401s from refreshing repeatedly.
+				if resp.StatusCode == http.StatusUnauthorized && !authRecoveryAttempted &&
+					p.account.Type == AccountTypeOAuth && s.tokenProvider != nil {
+					authRecoveryAttempted = true
+					freshToken, refreshErr := s.tokenProvider.RecoverRejectedAccessToken(p.ctx, p.account, p.accessToken)
+					if refreshErr != nil {
+						logger.LegacyPrintf("service.antigravity_gateway", "%s status=401 credential_recovery_failed account=%d error=%v", p.prefix, p.account.ID, refreshErr)
+						resp = &http.Response{
+							StatusCode: http.StatusUnauthorized,
+							Header:     resp.Header.Clone(),
+							Body:       io.NopCloser(bytes.NewReader(respBody)),
+						}
+						break urlFallbackLoop
+					}
+					p.accessToken = freshToken
+					continue
+				}
 
 				if overagesInjected && shouldMarkCreditsExhausted(resp, respBody, nil) {
 					modelKey := resolveCreditsOveragesModelKey(p.ctx, p.account, "", p.requestedModel)

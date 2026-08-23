@@ -498,7 +498,7 @@ type adminServiceImpl struct {
 	settingService           *SettingService
 	privacyClientFactory     PrivacyClientFactory
 	antigravityTokenProvider antigravityAccessTokenProvider
-	antigravityPrivacySetter func(context.Context, string, string, string) string
+	antigravityPrivacySetter func(context.Context, string, string, string) (string, error)
 	runtimeBlocker           AccountRuntimeBlocker
 	compositeRouteRepo       CompositeModelRouteRepository
 	compositeResolver        *CompositeRouteResolver
@@ -551,7 +551,7 @@ func NewPersonalAdminService(
 		settingService:           settingService,
 		privacyClientFactory:     privacyClientFactory,
 		antigravityTokenProvider: antigravityTokenProvider,
-		antigravityPrivacySetter: setAntigravityPrivacy,
+		antigravityPrivacySetter: setAntigravityPrivacyWithError,
 		runtimeBlocker:           runtimeBlocker,
 		compositeRouteRepo:       compositeRouteRepo,
 		compositeResolver:        compositeResolver,

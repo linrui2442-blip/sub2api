@@ -180,7 +180,7 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 	executor OAuthRefreshExecutor,
 	refreshWindow time.Duration,
 ) (*OAuthRefreshResult, error) {
-	return api.refresh(ctx, account, executor, refreshWindow, false)
+	return api.refresh(ctx, account, executor, refreshWindow, false, "", 0, false)
 }
 
 // ForceRefresh executes the existing locked OAuth refresh flow even when the
@@ -191,7 +191,20 @@ func (api *OAuthRefreshAPI) ForceRefresh(
 	account *Account,
 	executor OAuthRefreshExecutor,
 ) (*OAuthRefreshResult, error) {
-	return api.refresh(ctx, account, executor, 0, true)
+	return api.refresh(ctx, account, executor, 0, true, "", 0, false)
+}
+
+// RecoverRejectedAccessToken refreshes only while the durable credential still
+// matches the token/version rejected by a business API. The comparison is made
+// under the existing refresh lock so concurrent 401 responses share one refresh.
+func (api *OAuthRefreshAPI) RecoverRejectedAccessToken(
+	ctx context.Context,
+	account *Account,
+	executor OAuthRefreshExecutor,
+	rejectedToken string,
+	rejectedVersion int64,
+) (*OAuthRefreshResult, error) {
+	return api.refresh(ctx, account, executor, 0, true, rejectedToken, rejectedVersion, true)
 }
 
 func (api *OAuthRefreshAPI) refresh(
@@ -200,6 +213,9 @@ func (api *OAuthRefreshAPI) refresh(
 	executor OAuthRefreshExecutor,
 	refreshWindow time.Duration,
 	force bool,
+	rejectedToken string,
+	rejectedVersion int64,
+	conditionalRecovery bool,
 ) (*OAuthRefreshResult, error) {
 	if api == nil || api.accountRepo == nil {
 		return nil, errors.New("oauth refresh account repository is not configured")
@@ -279,6 +295,14 @@ func (api *OAuthRefreshAPI) refresh(
 			return nil, fmt.Errorf("%w: account is no longer refreshable", errOAuthRefreshAccountStateChanged)
 		}
 		return &OAuthRefreshResult{Account: freshAccount}, nil
+	}
+
+	if conditionalRecovery {
+		currentToken := strings.TrimSpace(freshAccount.GetCredential("access_token"))
+		currentVersion := freshAccount.GetCredentialAsInt64("_token_version")
+		if currentToken != strings.TrimSpace(rejectedToken) || currentVersion > rejectedVersion {
+			return &OAuthRefreshResult{Account: freshAccount}, nil
+		}
 	}
 
 	// 3. 二次检查是否仍需刷新（另一条路径可能已刷新）

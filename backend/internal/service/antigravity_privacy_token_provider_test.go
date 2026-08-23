@@ -11,14 +11,67 @@ import (
 )
 
 type privacyTokenProviderStub struct {
-	token string
-	err   error
-	calls int
+	token          string
+	recoveredToken string
+	err            error
+	calls          int
+	recoverCalls   int
 }
 
 func (s *privacyTokenProviderStub) GetAccessToken(context.Context, *Account) (string, error) {
 	s.calls++
 	return s.token, s.err
+}
+
+func (s *privacyTokenProviderStub) RecoverRejectedAccessToken(context.Context, *Account, string) (string, error) {
+	s.calls++
+	s.recoverCalls++
+	if s.recoveredToken != "" {
+		return s.recoveredToken, s.err
+	}
+	return s.token, s.err
+}
+
+func TestEnsureAntigravityPrivacyFirst401RecoversAndReplaysOnce(t *testing.T) {
+	provider := &privacyTokenProviderStub{token: "rejected-token", recoveredToken: "fresh-token"}
+	repo := &privacyAccountRepoStub{}
+	var tokens []string
+	service := &adminServiceImpl{
+		accountRepo: repo, antigravityTokenProvider: provider,
+		antigravityPrivacySetter: func(_ context.Context, token, _, _ string) (string, error) {
+			tokens = append(tokens, token)
+			if len(tokens) == 1 {
+				return "", errors.New("HTTP 401 UNAUTHENTICATED")
+			}
+			return AntigravityPrivacySet, nil
+		},
+	}
+	account := &Account{ID: 104, Platform: PlatformAntigravity, Type: AccountTypeOAuth, Credentials: map[string]any{"project_id": "project-104"}}
+
+	mode := service.EnsureAntigravityPrivacy(context.Background(), account)
+
+	require.Equal(t, AntigravityPrivacySet, mode)
+	require.Equal(t, []string{"rejected-token", "fresh-token"}, tokens)
+	require.Equal(t, 1, provider.recoverCalls)
+}
+
+func TestEnsureAntigravityPrivacySecond401Stops(t *testing.T) {
+	provider := &privacyTokenProviderStub{token: "rejected-token", recoveredToken: "fresh-token"}
+	privacyCalls := 0
+	service := &adminServiceImpl{
+		antigravityTokenProvider: provider,
+		antigravityPrivacySetter: func(context.Context, string, string, string) (string, error) {
+			privacyCalls++
+			return "", errors.New("HTTP 401 UNAUTHENTICATED")
+		},
+	}
+	account := &Account{ID: 105, Platform: PlatformAntigravity, Type: AccountTypeOAuth, Credentials: map[string]any{}}
+
+	mode := service.EnsureAntigravityPrivacy(context.Background(), account)
+
+	require.Empty(t, mode)
+	require.Equal(t, 2, privacyCalls)
+	require.Equal(t, 1, provider.recoverCalls)
 }
 
 type privacyAccountRepoStub struct {
@@ -38,9 +91,9 @@ func TestEnsureAntigravityPrivacyUsesTokenProviderResult(t *testing.T) {
 	service := &adminServiceImpl{
 		accountRepo:              repo,
 		antigravityTokenProvider: provider,
-		antigravityPrivacySetter: func(_ context.Context, token, _, _ string) string {
+		antigravityPrivacySetter: func(_ context.Context, token, _, _ string) (string, error) {
 			receivedToken = token
-			return AntigravityPrivacySet
+			return AntigravityPrivacySet, nil
 		},
 	}
 	account := &Account{
@@ -68,9 +121,9 @@ func TestForceAntigravityPrivacyUsesTokenProviderOnce(t *testing.T) {
 	service := &adminServiceImpl{
 		accountRepo:              repo,
 		antigravityTokenProvider: provider,
-		antigravityPrivacySetter: func(_ context.Context, token, _, _ string) string {
+		antigravityPrivacySetter: func(_ context.Context, token, _, _ string) (string, error) {
 			receivedToken = token
-			return AntigravityPrivacySet
+			return AntigravityPrivacySet, nil
 		},
 	}
 	account := &Account{
@@ -96,9 +149,9 @@ func TestEnsureAntigravityPrivacyStopsWhenTokenProviderFails(t *testing.T) {
 	privacyCalls := 0
 	service := &adminServiceImpl{
 		antigravityTokenProvider: provider,
-		antigravityPrivacySetter: func(context.Context, string, string, string) string {
+		antigravityPrivacySetter: func(context.Context, string, string, string) (string, error) {
 			privacyCalls++
-			return AntigravityPrivacySet
+			return AntigravityPrivacySet, nil
 		},
 	}
 	account := &Account{

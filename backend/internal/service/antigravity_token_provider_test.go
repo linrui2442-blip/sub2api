@@ -4,11 +4,58 @@ package service
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+type concurrentRejectedTokenRepo struct {
+	mockAccountRepoForGemini
+	mu      sync.Mutex
+	account *Account
+}
+
+func (r *concurrentRejectedTokenRepo) GetByID(context.Context, int64) (*Account, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return snapshotOAuthRefreshAccount(r.account), nil
+}
+
+func (r *concurrentRejectedTokenRepo) UpdateCredentials(_ context.Context, _ int64, credentials map[string]any) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.account.Credentials = shallowCopyMap(credentials)
+	return nil
+}
+
+type concurrentRejectedTokenExecutor struct {
+	mu           sync.Mutex
+	refreshCalls int
+	credentials  map[string]any
+}
+
+func (e *concurrentRejectedTokenExecutor) CanRefresh(*Account) bool { return true }
+func (e *concurrentRejectedTokenExecutor) NeedsRefresh(*Account, time.Duration) bool {
+	return true
+}
+func (e *concurrentRejectedTokenExecutor) CacheKey(account *Account) string {
+	return AntigravityTokenCacheKey(account)
+}
+func (e *concurrentRejectedTokenExecutor) Refresh(context.Context, *Account) (map[string]any, error) {
+	e.mu.Lock()
+	e.refreshCalls++
+	e.mu.Unlock()
+	time.Sleep(10 * time.Millisecond)
+	return shallowCopyMap(e.credentials), nil
+}
+
+func (e *concurrentRejectedTokenExecutor) calls() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.refreshCalls
+}
 
 type antigravityProviderCacheStub struct {
 	token       string
@@ -81,6 +128,50 @@ func TestAntigravityTokenProvider_ValidDurableTokenUsesCacheWithoutRefresh(t *te
 	require.NoError(t, err)
 	require.Equal(t, "valid-cache-token", token)
 	require.Zero(t, executor.refreshCalls)
+}
+
+func TestOAuthRefreshAPI_ConcurrentRejectedTokenRefreshesOnce(t *testing.T) {
+	const callers = 20
+	account := &Account{
+		ID: 93, Platform: PlatformAntigravity, Type: AccountTypeOAuth, Status: StatusActive,
+		Credentials: map[string]any{
+			"access_token": "rejected-token", "refresh_token": "valid-refresh",
+			"expires_at": time.Now().Add(time.Hour).Unix(), "_token_version": int64(100),
+		},
+	}
+	repo := &concurrentRejectedTokenRepo{account: snapshotOAuthRefreshAccount(account)}
+	executor := &concurrentRejectedTokenExecutor{credentials: map[string]any{
+		"access_token": "fresh-token", "refresh_token": "valid-refresh",
+		"expires_at": time.Now().Add(time.Hour).Unix(),
+	}}
+	api := NewOAuthRefreshAPI(repo, nil)
+
+	var wg sync.WaitGroup
+	errs := make(chan error, callers)
+	results := make(chan string, callers)
+	for range callers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			result, err := api.RecoverRejectedAccessToken(context.Background(), account, executor, "rejected-token", 100)
+			if err != nil {
+				errs <- err
+				return
+			}
+			results <- result.Account.GetCredential("access_token")
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	close(results)
+
+	for err := range errs {
+		require.NoError(t, err)
+	}
+	for token := range results {
+		require.Equal(t, "fresh-token", token)
+	}
+	require.Equal(t, 1, executor.calls())
 }
 
 func TestBuildAntigravityDegradedUsage_ReauthSemantics(t *testing.T) {

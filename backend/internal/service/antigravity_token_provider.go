@@ -191,13 +191,30 @@ func (p *AntigravityTokenProvider) GetAccessToken(ctx context.Context, account *
 // ForceRefreshAccessToken performs one refresh through the existing OAuth
 // refresh API. It is intended only for recovery after an upstream 401.
 func (p *AntigravityTokenProvider) ForceRefreshAccessToken(ctx context.Context, account *Account) (string, error) {
+	rejectedToken := ""
+	if account != nil {
+		rejectedToken = account.GetCredential("access_token")
+	}
+	return p.RecoverRejectedAccessToken(ctx, account, rejectedToken)
+}
+
+// RecoverRejectedAccessToken performs at most one locked recovery for a token
+// rejected by a Google business endpoint. A concurrent winner is reused rather
+// than causing another provider refresh.
+func (p *AntigravityTokenProvider) RecoverRejectedAccessToken(ctx context.Context, account *Account, rejectedToken string) (string, error) {
 	if account == nil || account.Platform != PlatformAntigravity || account.Type != AccountTypeOAuth {
 		return "", errors.New("antigravity oauth account is required")
 	}
 	if p.refreshAPI == nil || p.executor == nil {
 		return "", errors.New("antigravity oauth refresh is not configured")
 	}
-	result, err := p.refreshAPI.ForceRefresh(ctx, account, p.executor)
+	result, err := p.refreshAPI.RecoverRejectedAccessToken(
+		ctx,
+		account,
+		p.executor,
+		rejectedToken,
+		account.GetCredentialAsInt64("_token_version"),
+	)
 	if err != nil {
 		return "", err
 	}

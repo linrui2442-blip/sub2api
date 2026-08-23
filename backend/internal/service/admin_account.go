@@ -1378,7 +1378,12 @@ func (s *adminServiceImpl) EnsureAntigravityPrivacy(ctx context.Context, account
 		}
 	}
 
-	mode := s.setAntigravityPrivacy(ctx, token, projectID, proxyURL)
+	mode, privacyErr := s.setAntigravityPrivacy(ctx, token, projectID, proxyURL)
+	if privacyErr != nil && isAntigravityUnauthorized(privacyErr) {
+		if freshToken, refreshErr := s.antigravityTokenProvider.RecoverRejectedAccessToken(ctx, account, token); refreshErr == nil {
+			mode, _ = s.setAntigravityPrivacy(ctx, freshToken, projectID, proxyURL)
+		}
+	}
 	if mode == "" {
 		return ""
 	}
@@ -1412,7 +1417,12 @@ func (s *adminServiceImpl) ForceAntigravityPrivacy(ctx context.Context, account 
 		}
 	}
 
-	mode := s.setAntigravityPrivacy(ctx, token, projectID, proxyURL)
+	mode, privacyErr := s.setAntigravityPrivacy(ctx, token, projectID, proxyURL)
+	if privacyErr != nil && isAntigravityUnauthorized(privacyErr) {
+		if freshToken, refreshErr := s.antigravityTokenProvider.RecoverRejectedAccessToken(ctx, account, token); refreshErr == nil {
+			mode, _ = s.setAntigravityPrivacy(ctx, freshToken, projectID, proxyURL)
+		}
+	}
 	if mode == "" {
 		return ""
 	}
@@ -1427,6 +1437,7 @@ func (s *adminServiceImpl) ForceAntigravityPrivacy(ctx context.Context, account 
 
 type antigravityAccessTokenProvider interface {
 	GetAccessToken(context.Context, *Account) (string, error)
+	RecoverRejectedAccessToken(context.Context, *Account, string) (string, error)
 }
 
 func (s *adminServiceImpl) antigravityAccessToken(ctx context.Context, account *Account) (string, error) {
@@ -1436,9 +1447,9 @@ func (s *adminServiceImpl) antigravityAccessToken(ctx context.Context, account *
 	return s.antigravityTokenProvider.GetAccessToken(ctx, account)
 }
 
-func (s *adminServiceImpl) setAntigravityPrivacy(ctx context.Context, token, projectID, proxyURL string) string {
+func (s *adminServiceImpl) setAntigravityPrivacy(ctx context.Context, token, projectID, proxyURL string) (string, error) {
 	if s != nil && s.antigravityPrivacySetter != nil {
 		return s.antigravityPrivacySetter(ctx, token, projectID, proxyURL)
 	}
-	return setAntigravityPrivacy(ctx, token, projectID, proxyURL)
+	return setAntigravityPrivacyWithError(ctx, token, projectID, proxyURL)
 }
