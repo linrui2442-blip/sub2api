@@ -761,7 +761,7 @@ func logPrefix(sessionID, accountName string) string {
 
 func (s *AntigravityGatewayService) shouldFailoverUpstreamError(statusCode int) bool {
 	switch statusCode {
-	case 401, 403, 429, 529:
+	case 401, 403, 404, 429, 529:
 		return true
 	default:
 		return statusCode >= 500
@@ -1182,6 +1182,23 @@ func (s *AntigravityGatewayService) handleUpstreamError(
 ) *handleModelRateLimitResult {
 	// 遵守自定义错误码策略：未命中则跳过所有限流处理
 	if !account.ShouldHandleErrorCode(statusCode) {
+		return nil
+	}
+	// A model-not-found response is scoped to this account and final model key.
+	// Handle it before the generic quota parser so it produces exactly one
+	// account+model exclusion and never an account-wide quarantine.
+	if statusCode == http.StatusNotFound {
+		modelKey := resolveFinalAntigravityModelKey(ctx, account, requestedModel)
+		if strings.TrimSpace(modelKey) == "" {
+			modelKey = resolveAntigravityModelKey(requestedModel)
+		}
+		if modelKey != "" {
+			resetAt := time.Now().Add(s.getDefaultRateLimitDuration())
+			if setModelRateLimitByModelName(ctx, s.accountRepo, account.ID, modelKey, prefix, statusCode, resetAt, false) {
+				s.updateAccountModelRateLimitInCache(ctx, account, modelKey, resetAt)
+			}
+			logger.LegacyPrintf("service.antigravity_gateway", "%s status=404 unsupported_model account=%d model=%s scope=account_model", prefix, account.ID, modelKey)
+		}
 		return nil
 	}
 	// 模型级限流处理（优先）

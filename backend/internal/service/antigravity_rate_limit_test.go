@@ -225,6 +225,21 @@ func TestHandleUpstreamError_429_NonModelRateLimit_UsesMappedModelKey(t *testing
 	require.Equal(t, "claude-opus-4-6-thinking", repo.modelRateLimitCalls[0].modelKey)
 }
 
+func TestHandleUpstreamError_404ScopesUnsupportedToAccountAndModel(t *testing.T) {
+	repo := &stubAntigravityAccountRepo{}
+	svc := &AntigravityGatewayService{accountRepo: repo}
+	account := &Account{ID: 21, Name: "acc-21", Platform: PlatformAntigravity}
+
+	result := svc.handleUpstreamError(context.Background(), "[test]", account, http.StatusNotFound, http.Header{}, []byte(`{"error":{"message":"model not found"}}`), "gemini-3.6-flash", 0, "", false)
+
+	require.Nil(t, result)
+	require.Len(t, repo.modelRateLimitCalls, 1)
+	require.Equal(t, account.ID, repo.modelRateLimitCalls[0].accountID)
+	require.Equal(t, "gemini-3.6-flash", repo.modelRateLimitCalls[0].modelKey)
+	require.Empty(t, repo.rateCalls, "unsupported model must not rate-limit the whole account")
+	require.True(t, svc.shouldFailoverUpstreamError(http.StatusNotFound), "existing failover should try another account")
+}
+
 // TestHandleUpstreamError_503_ModelCapacityExhausted 测试 503 模型容量不足场景
 // MODEL_CAPACITY_EXHAUSTED 时应等待重试，不切换账号
 func TestHandleUpstreamError_503_ModelCapacityExhausted(t *testing.T) {

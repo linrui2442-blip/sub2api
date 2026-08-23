@@ -2559,8 +2559,14 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 
 	// Handle Antigravity accounts: return Claude + Gemini models
 	if account.Platform == service.PlatformAntigravity {
-		// 直接复用 antigravity.DefaultModels()，与 /v1/models 端点保持同步
-		response.Success(c, antigravity.DefaultModels())
+		if c.Query("catalog") == "1" {
+			response.Success(c, antigravity.PersonalModelCatalog())
+			return
+		}
+		// Account testing is an availability surface, not a compatibility registry.
+		// Keep known 404s and aliases out of the normal picker while retaining them
+		// in the separate compatibility mapping catalog.
+		response.Success(c, antigravity.VerifiedModelsForAccountTest())
 		return
 	}
 
@@ -2694,7 +2700,26 @@ func (h *AccountHandler) SyncUpstreamModels(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, gin.H{"models": models})
+	checkedAt := time.Now().UTC()
+	if account.Platform == service.PlatformAntigravity {
+		if err := h.adminService.UpdateAccountExtra(c.Request.Context(), accountID, map[string]any{
+			antigravity.ModelAvailabilityExtraKey: map[string]any{
+				"models":     models,
+				"checked_at": checkedAt.Format(time.RFC3339),
+				"source":     "upstream_discovery",
+			},
+		}); err != nil {
+			slog.Warn("persist_upstream_model_availability_failed", "account_id", accountID, "error", err)
+			response.InternalError(c, "Models were discovered but the account availability snapshot could not be saved")
+			return
+		}
+	}
+
+	response.Success(c, gin.H{
+		"models":     models,
+		"checked_at": checkedAt.Format(time.RFC3339),
+		"source":     "upstream_discovery",
+	})
 }
 
 // SyncUpstreamModelsPreview handles syncing live supported models using provided credentials (no account ID needed).

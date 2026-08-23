@@ -191,10 +191,12 @@ var geminiModels = []modelDef{
 
 // ClaudeModel Claude API 模型格式
 type ClaudeModel struct {
-	ID          string `json:"id"`
-	Type        string `json:"type"`
-	DisplayName string `json:"display_name"`
-	CreatedAt   string `json:"created_at"`
+	ID           string `json:"id"`
+	Type         string `json:"type"`
+	DisplayName  string `json:"display_name"`
+	CreatedAt    string `json:"created_at"`
+	Availability string `json:"availability,omitempty"`
+	Recommended  bool   `json:"recommended,omitempty"`
 }
 
 // DefaultModels 返回 Claude API 格式的模型列表（Claude + Gemini）

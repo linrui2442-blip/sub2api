@@ -555,6 +555,15 @@ export interface ClaudeModel {
   type: string
   display_name: string
   created_at: string
+  availability?: 'recommended' | 'verified' | 'currently_unavailable'
+  recommended?: boolean
+}
+
+export interface AntigravityModelCatalogEntry {
+  id: string
+  display_name: string
+  availability: 'recommended' | 'verified' | 'currently_unavailable'
+  recommended: boolean
 }
 
 export interface Proxy {

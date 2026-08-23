@@ -537,8 +537,15 @@ export async function getAvailableModels(id: number): Promise<ClaudeModel[]> {
   return data
 }
 
+export async function getAntigravityModelCatalog(id: number): Promise<import('@/types').AntigravityModelCatalogEntry[]> {
+  const { data } = await apiClient.get<import('@/types').AntigravityModelCatalogEntry[]>(`/admin/accounts/${id}/models?catalog=1`)
+  return data
+}
+
 export interface SyncUpstreamModelsResult {
   models: string[]
+  checked_at?: string
+  source?: 'upstream_discovery'
 }
 
 /**
@@ -977,6 +984,7 @@ export const accountsAPI = {
   resetTempUnschedulable,
   setSchedulable,
   getAvailableModels,
+  getAntigravityModelCatalog,
   syncUpstreamModels,
   syncUpstreamModelsPreview,
   generateAuthUrl,

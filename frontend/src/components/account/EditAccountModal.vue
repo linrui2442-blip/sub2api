@@ -1199,6 +1199,25 @@
             </button>
           </div>
 
+          <div
+            v-if="antigravityLiveModels.length > 0"
+            class="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-900/20"
+          >
+            <div class="text-xs font-medium text-emerald-800 dark:text-emerald-300">
+              {{ t('admin.accounts.liveAvailableModels', { count: antigravityLiveModels.length }) }}
+            </div>
+            <div class="mt-2 flex flex-wrap gap-1.5">
+              <span
+                v-for="model in antigravityLiveModels"
+                :key="model"
+                class="rounded bg-white px-2 py-1 font-mono text-[11px] text-emerald-700 dark:bg-dark-700 dark:text-emerald-300"
+              >{{ model }}</span>
+            </div>
+            <p v-if="antigravityLiveModelsCheckedAt" class="mt-2 text-[11px] text-emerald-600 dark:text-emerald-400">
+              {{ t('admin.accounts.liveAvailabilityCheckedAt', { time: antigravityLiveModelsCheckedAt }) }}
+            </p>
+          </div>
+
           <div v-if="antigravityModelMappings.length > 0" class="mb-3 space-y-2">
             <div
               v-for="(mapping, index) in antigravityModelMappings"
@@ -2985,6 +3004,8 @@ const antigravityModelRestrictionMode = ref<'whitelist' | 'mapping'>('whitelist'
 const antigravityWhitelistModels = ref<string[]>([])
 const antigravityModelMappings = ref<ModelMapping[]>([])
 const isSyncingAntigravityUpstream = ref(false)
+const antigravityLiveModels = ref<string[]>([])
+const antigravityLiveModelsCheckedAt = ref('')
 const tempUnschedEnabled = ref(false)
 const accountSchedulingThresholdOverrideEnabled = ref(false)
 const accountSchedulingThresholdOverrideValue = ref(100)
@@ -3614,6 +3635,16 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   // Load antigravity model mapping (Antigravity 只支持映射模式)
   if (newAccount.platform === 'antigravity') {
     const credentials = newAccount.credentials as Record<string, unknown> | undefined
+    const availability = extra?.antigravity_model_availability as
+      | { models?: unknown; checked_at?: unknown }
+      | undefined
+    antigravityLiveModels.value = Array.isArray(availability?.models)
+      ? availability.models.map((model) => String(model).trim()).filter(Boolean)
+      : []
+    antigravityLiveModelsCheckedAt.value =
+      typeof availability?.checked_at === 'string'
+        ? new Date(availability.checked_at).toLocaleString()
+        : ''
 
     // Antigravity 始终使用映射模式
     antigravityModelRestrictionMode.value = 'mapping'
@@ -3641,6 +3672,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     antigravityModelRestrictionMode.value = 'mapping'
     antigravityWhitelistModels.value = []
     antigravityModelMappings.value = []
+    antigravityLiveModels.value = []
+    antigravityLiveModelsCheckedAt.value = ''
   }
 
   // Load quota control settings (Anthropic OAuth/SetupToken only)
@@ -3874,20 +3907,11 @@ const syncAntigravityUpstreamModels = async () => {
       return
     }
 
-    let addedCount = 0
-    for (const model of upstreamModels) {
-      const exists = antigravityModelMappings.value.some((mapping) => mapping.from === model)
-      if (!exists) {
-        antigravityModelMappings.value.push({ from: model, to: model })
-        addedCount += 1
-      }
-    }
-
-    if (addedCount > 0) {
-      appStore.showSuccess(t('admin.accounts.syncUpstreamModelsSuccess', { count: addedCount, total: upstreamModels.length }))
-    } else {
-      appStore.showInfo(t('admin.accounts.syncUpstreamModelsNoChanges', { count: upstreamModels.length }))
-    }
+    antigravityLiveModels.value = upstreamModels
+    antigravityLiveModelsCheckedAt.value = result.checked_at
+      ? new Date(result.checked_at).toLocaleString()
+      : new Date().toLocaleString()
+    appStore.showSuccess(t('admin.accounts.syncUpstreamModelsSuccess', { count: upstreamModels.length, total: upstreamModels.length }))
   } catch (error) {
     const message = error instanceof Error ? error.message : t('admin.accounts.syncUpstreamModelsFailed')
     appStore.showError(t('admin.accounts.syncUpstreamModelsError', { message }))
