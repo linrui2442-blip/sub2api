@@ -13,6 +13,7 @@ import (
 const (
 	antigravityTokenRefreshSkew = 3 * time.Minute
 	antigravityTokenCacheSkew   = 5 * time.Minute
+	antigravityTokenFallbackMin = time.Minute
 	antigravityBackfillCooldown = 5 * time.Minute
 	// antigravityRequestRefreshTimeout 请求路径上 token 刷新的最大等待时间。
 	// 超过此时间直接放弃刷新、标记账号临时不可调度并触发 failover，
@@ -106,6 +107,21 @@ func (p *AntigravityTokenProvider) GetAccessToken(ctx context.Context, account *
 		defer cancel()
 		result, err := p.refreshAPI.RefreshIfNeeded(refreshCtx, account, p.executor, antigravityTokenRefreshSkew)
 		if err != nil {
+			// Proactive refresh is best-effort while the durable access token still
+			// has a safe lifetime. Only transient provider/network failures may use
+			// this fallback; a token rejected by a business endpoint comes through
+			// RecoverRejectedAccessToken and can never reach this path.
+			if class, ok := antigravityFailureClass(err); ok && class == antigravityAuthFailureTransient &&
+				expiresAt != nil && time.Until(*expiresAt) > antigravityTokenFallbackMin {
+				slog.Warn("antigravity_old_token_transient_fallback",
+					"account_id", account.ID,
+					"remaining", time.Until(*expiresAt).Round(time.Second),
+				)
+				accessToken := strings.TrimSpace(account.GetCredential("access_token"))
+				if accessToken != "" {
+					return accessToken, nil
+				}
+			}
 			// 标记账号临时不可调度，避免后续请求继续命中
 			p.markTempUnschedulable(account, err)
 			if p.refreshPolicy.OnRefreshError == ProviderRefreshErrorReturn {

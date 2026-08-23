@@ -4,6 +4,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 	"time"
@@ -128,6 +129,42 @@ func TestAntigravityTokenProvider_ValidDurableTokenUsesCacheWithoutRefresh(t *te
 	require.NoError(t, err)
 	require.Equal(t, "valid-cache-token", token)
 	require.Zero(t, executor.refreshCalls)
+}
+
+func TestAntigravityTokenProvider_TransientProactiveRefreshUsesStillSafeToken(t *testing.T) {
+	account := &Account{
+		ID: 96, Platform: PlatformAntigravity, Type: AccountTypeOAuth, Status: StatusActive,
+		Credentials: map[string]any{
+			"access_token": "still-safe-token", "refresh_token": "valid-refresh",
+			"expires_at": time.Now().Add(2 * time.Minute).Unix(),
+		},
+	}
+	repo := &refreshAPIAccountRepo{account: account}
+	executor := &refreshAPIExecutorStub{needsRefresh: true, err: errors.New("dial tcp: i/o timeout")}
+	provider := NewAntigravityTokenProvider(repo, nil, nil)
+	provider.SetRefreshAPI(NewOAuthRefreshAPI(repo, nil), executor)
+
+	token, err := provider.GetAccessToken(context.Background(), account)
+	require.NoError(t, err)
+	require.Equal(t, "still-safe-token", token)
+	require.Equal(t, 1, executor.refreshCalls)
+}
+
+func TestAntigravityTokenProvider_TransientRefreshDoesNotFallbackInsideSafetyMargin(t *testing.T) {
+	account := &Account{
+		ID: 97, Platform: PlatformAntigravity, Type: AccountTypeOAuth, Status: StatusActive,
+		Credentials: map[string]any{
+			"access_token": "nearly-expired-token", "refresh_token": "valid-refresh",
+			"expires_at": time.Now().Add(30 * time.Second).Unix(),
+		},
+	}
+	repo := &refreshAPIAccountRepo{account: account}
+	executor := &refreshAPIExecutorStub{needsRefresh: true, err: errors.New("HTTP 503 UNAVAILABLE")}
+	provider := NewAntigravityTokenProvider(repo, nil, nil)
+	provider.SetRefreshAPI(NewOAuthRefreshAPI(repo, nil), executor)
+
+	_, err := provider.GetAccessToken(context.Background(), account)
+	require.Error(t, err)
 }
 
 func TestOAuthRefreshAPI_ConcurrentRejectedTokenRefreshesOnce(t *testing.T) {
