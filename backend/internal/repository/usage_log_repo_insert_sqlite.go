@@ -68,7 +68,7 @@ func batchInsertUsageLogsSQLite(db *sql.DB, keys []string, preparedByKey map[str
 	if err != nil {
 		return nil, nil, true, err
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	insertedMap := make(map[string]bool, len(keys))
 	stateMap := make(map[string]usageLogBatchState, len(keys))
@@ -91,6 +91,9 @@ func batchInsertUsageLogsSQLite(db *sql.DB, keys []string, preparedByKey map[str
 			return insertedMap, stateMap, false, scanErr
 		}
 		stateMap[key] = state
+	}
+	if err := stmt.Close(); err != nil {
+		return insertedMap, stateMap, false, err
 	}
 	if err := tx.Commit(); err != nil {
 		return insertedMap, stateMap, false, err

@@ -86,7 +86,7 @@ func TestPersonalSQLiteUsageBatchNonStreamAndStream(t *testing.T) {
 	}
 	rows, err := repo.db.Query("SELECT request_id, stream, requested_model, upstream_model, input_tokens, output_tokens FROM usage_logs ORDER BY request_id")
 	require.NoError(t, err)
-	defer rows.Close()
+	defer func() { require.NoError(t, rows.Close()) }()
 	seen := map[string]bool{}
 	for rows.Next() {
 		var requestID, requested, upstream string
