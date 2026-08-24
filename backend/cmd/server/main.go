@@ -52,9 +52,6 @@ func main() {
 	logger.InitBootstrap()
 	defer logger.Sync()
 
-	// Personal Edition is the only runtime shipped by this branch.
-	personal.PrepareEnvironment("personal")
-
 	setupMode := flag.Bool("setup", false, "Run setup wizard in CLI mode")
 	showVersion := flag.Bool("version", false, "Show version information")
 	consoleMode := flag.Bool("console", false, "Run Personal Edition in the foreground console")
@@ -64,6 +61,24 @@ func main() {
 		log.Printf("Sub2API %s (commit: %s, built: %s, build-type: %s)\n", Version, Commit, Date, BuildType)
 		return
 	}
+
+	desktopMode := BuildType == "personal" && personal.DesktopSupported() && !*consoleMode
+	if desktopMode {
+		releaseInstance, alreadyRunning, err := personal.AcquireDesktopInstance()
+		if err != nil {
+			log.Printf("Failed to acquire Windows desktop instance lock: %v", err)
+			return
+		}
+		if alreadyRunning {
+			log.Println("Sub2API Personal desktop is already running")
+			return
+		}
+		defer releaseInstance()
+	}
+
+	// Personal Edition is the only runtime shipped by this branch. Desktop
+	// mode acquires its single-instance guard before touching runtime data.
+	personal.PrepareEnvironment("personal")
 
 	log.Println("Personal Edition runtime enabled: private routes + upstream SIMPLE semantics")
 
@@ -77,7 +92,7 @@ func main() {
 		setupCompleted = true
 	}
 
-	if BuildType == "personal" && personal.DesktopSupported() && !*consoleMode {
+	if desktopMode {
 		runDesktopServer(!setupCompleted)
 		return
 	}
