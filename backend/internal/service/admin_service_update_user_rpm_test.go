@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// rpmUserRepoStub 复用 admin_service_update_balance_test.go 的基础 stub 结构，
+// rpmUserRepoStub 复用通用用户仓储 stub 结构，
 // 只在 Update 时把入参克隆一份，便于断言修改后的 RPMLimit。
 type rpmUserRepoStub struct {
 	*userRepoStub
@@ -34,7 +34,6 @@ func TestAdminService_UpdateUser_InvalidatesAuthCacheOnRPMLimitChange(t *testing
 	invalidator := &authCacheInvalidatorStub{}
 	svc := &adminServiceImpl{
 		userRepo:             repo,
-		redeemCodeRepo:       &redeemRepoStub{},
 		authCacheInvalidator: invalidator,
 	}
 
@@ -54,7 +53,6 @@ func TestAdminService_UpdateUser_NoInvalidateWhenRPMLimitUnchanged(t *testing.T)
 	invalidator := &authCacheInvalidatorStub{}
 	svc := &adminServiceImpl{
 		userRepo:             repo,
-		redeemCodeRepo:       &redeemRepoStub{},
 		authCacheInvalidator: invalidator,
 	}
 

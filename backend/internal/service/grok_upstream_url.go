@@ -12,6 +12,37 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 )
 
+// GrokMediaEndpoint is retained only by the admin account-connectivity probe.
+// Personal Gateway does not register media routes or provide media forwarding.
+type GrokMediaEndpoint string
+
+const (
+	GrokMediaEndpointImagesGenerations GrokMediaEndpoint = "images_generations"
+	GrokMediaEndpointImagesEdits       GrokMediaEndpoint = "images_edits"
+	GrokMediaEndpointVideosGenerations GrokMediaEndpoint = "videos_generations"
+	GrokMediaEndpointVideosEdits       GrokMediaEndpoint = "videos_edits"
+	GrokMediaEndpointVideosExtensions  GrokMediaEndpoint = "videos_extensions"
+	GrokMediaEndpointVideoStatus       GrokMediaEndpoint = "video_status"
+	GrokMediaEndpointVideoContent      GrokMediaEndpoint = "video_content"
+)
+
+func isGrokCLIProxyTarget(rawURL string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	return err == nil && strings.EqualFold(parsed.Hostname(), "cli-chat-proxy.grok.com")
+}
+
+func grokMediaImageObject(imageURL string) map[string]string {
+	return map[string]string{"url": imageURL, "type": "image_url"}
+}
+
+func NormalizeGrokMediaModelForEndpoint(endpoint GrokMediaEndpoint, model string, _ bool) string {
+	model = strings.TrimSpace(model)
+	if (endpoint == GrokMediaEndpointImagesGenerations || endpoint == GrokMediaEndpointImagesEdits) && model == "grok-imagine" {
+		return "grok-imagine-image-quality"
+	}
+	return model
+}
+
 func grokBaseURLValidator(account *Account, cfg *config.Config) (xai.BaseURLValidator, error) {
 	if account == nil || !account.IsGrok() {
 		return nil, fmt.Errorf("grok account is required")

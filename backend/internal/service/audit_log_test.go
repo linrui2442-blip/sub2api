@@ -76,9 +76,8 @@ func TestRedactAuditBody_BareSessionKeyRedacted(t *testing.T) {
 	}
 }
 
-// TestRedactAuditBody_AuthoritativeTablesSynced 覆盖曾经漏网的凭证字段：
-// 账号 credentials 敏感子键、支付渠道无分隔符密钥、字符串值内嵌凭证的 proxy_key / custom_key，
-// 以及 camelCase 等命名变体（归一化比对）。
+// TestRedactAuditBody_AuthoritativeTablesSynced covers provider credentials,
+// proxy credentials, custom secrets, and normalized camelCase key variants.
 func TestRedactAuditBody_AuthoritativeTablesSynced(t *testing.T) {
 	raw := []byte(`{
 		"credentials": {
@@ -89,13 +88,10 @@ func TestRedactAuditBody_AuthoritativeTablesSynced(t *testing.T) {
 		"proxy_key": "socks5|1.2.3.4|1080|proxyuser|proxypass-ddd",
 		"custom_key": "sk-custom-eee",
 		"config": {
-			"pkey": "easypay-merchant-fff",
-			"privateKey": "alipay-pem-ggg",
-			"apiv3key": "wxpay-v3-hhh",
-			"SecretKey": "stripe-sk-iii",
-			"webhookSecret": "whsec-jjj"
+			"privateKey": "provider-pem-fff",
+			"SecretKey": "provider-secret-ggg"
 		},
-		"provider_key": "stripe",
+		"provider_key": "openai",
 		"name": "instance-1"
 	}`)
 	out := RedactAuditBody(raw, "application/json")
@@ -103,15 +99,14 @@ func TestRedactAuditBody_AuthoritativeTablesSynced(t *testing.T) {
 	for _, secret := range []string{
 		"sk-session-aaa", "pem-body-bbb", "sa-blob-ccc",
 		"proxypass-ddd", "sk-custom-eee",
-		"easypay-merchant-fff", "alipay-pem-ggg", "wxpay-v3-hhh",
-		"stripe-sk-iii", "whsec-jjj",
+		"provider-pem-fff", "provider-secret-ggg",
 	} {
 		if strings.Contains(out, secret) {
 			t.Fatalf("redacted body still contains secret %q: %s", secret, out)
 		}
 	}
 	// provider_key 是渠道标识而非密钥，必须保留以便追责。
-	if !strings.Contains(out, `"provider_key":"stripe"`) {
+	if !strings.Contains(out, `"provider_key":"openai"`) {
 		t.Fatalf("provider_key should be preserved for accountability: %s", out)
 	}
 	if !strings.Contains(out, "instance-1") {
@@ -124,13 +119,6 @@ func TestAuditSensitiveKeys_CoverCredentialTable(t *testing.T) {
 	for _, k := range SensitiveCredentialKeys {
 		if !isAuditSensitiveBodyKey(k) {
 			t.Fatalf("credential key %q is not covered by audit redaction", k)
-		}
-	}
-	for provider, fields := range providerSensitiveConfigFields {
-		for k := range fields {
-			if !isAuditSensitiveBodyKey(k) {
-				t.Fatalf("payment provider %q sensitive field %q is not covered by audit redaction", provider, k)
-			}
 		}
 	}
 }
@@ -180,21 +168,5 @@ func TestSessionBindingHash(t *testing.T) {
 	var nilBinding *SessionBinding
 	if nilBinding.Hash() != "" {
 		t.Fatalf("nil binding must hash to empty string")
-	}
-}
-
-func TestParseAuditLogRetentionDays(t *testing.T) {
-	cases := map[string]int{
-		"":       defaultAuditLogRetentionDays,
-		"abc":    defaultAuditLogRetentionDays,
-		"90":     90,
-		"0":      0,
-		"-1":     0,
-		"  30  ": 30,
-	}
-	for in, want := range cases {
-		if got := parseAuditLogRetentionDays(in); got != want {
-			t.Fatalf("parseAuditLogRetentionDays(%q) = %d, want %d", in, got, want)
-		}
 	}
 }

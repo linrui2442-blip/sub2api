@@ -53,6 +53,44 @@
           label-key="display_name"
           :placeholder="loadingModels ? t('common.loading') + '...' : t('admin.accounts.selectTestModel')"
         />
+        <template v-if="isAntigravityAccount">
+          <details
+            v-if="advancedVerifiedModels.length > 0"
+            class="mt-2 rounded-lg border border-gray-200 p-2 dark:border-dark-500"
+          >
+            <summary class="cursor-pointer text-xs font-medium text-gray-600 dark:text-gray-300">
+              {{ t('admin.accounts.advancedVerifiedModels', { count: advancedVerifiedModels.length }) }}
+            </summary>
+            <div class="mt-2 flex flex-wrap gap-1.5">
+              <button
+                v-for="model in advancedVerifiedModels"
+                :key="model.id"
+                type="button"
+                class="rounded border border-gray-200 px-2 py-1 text-left text-[11px] hover:border-primary-400 hover:text-primary-600 dark:border-dark-500"
+                @click="selectedModelId = model.id"
+              >
+                {{ model.display_name }}
+              </button>
+            </div>
+          </details>
+          <details
+            v-if="currentlyUnavailableModels.length > 0"
+            class="mt-2 rounded-lg border border-amber-200 p-2 dark:border-amber-900"
+          >
+            <summary class="cursor-pointer text-xs font-medium text-amber-700 dark:text-amber-400">
+              {{ t('admin.accounts.currentlyUnavailableModels', { count: currentlyUnavailableModels.length }) }}
+            </summary>
+            <div class="mt-2 flex flex-wrap gap-1.5 text-[11px] text-gray-500">
+              <span
+                v-for="model in currentlyUnavailableModels"
+                :key="model.id"
+                class="rounded bg-gray-100 px-2 py-1 dark:bg-dark-600"
+              >
+                {{ model.display_name }} · 404
+              </span>
+            </div>
+          </details>
+        </template>
       </div>
 
       <div v-if="isOpenAIAccount" class="space-y-1.5">
@@ -251,7 +289,7 @@ import { Icon } from '@/components/icons'
 import { useClipboard } from '@/composables/useClipboard'
 import { buildApiUrl } from '@/api/client'
 import { adminAPI } from '@/api/admin'
-import type { Account, ClaudeModel } from '@/types'
+import type { Account, AntigravityModelCatalogEntry, ClaudeModel } from '@/types'
 
 const { t } = useI18n()
 const { copyToClipboard } = useClipboard()
@@ -288,6 +326,14 @@ let abortController: AbortController | null = null
 const generatedImages = ref<PreviewImage[]>([])
 const testMode = ref<'default' | 'compact'>('default')
 const isOpenAIAccount = computed(() => props.account?.platform === 'openai')
+const isAntigravityAccount = computed(() => props.account?.platform === 'antigravity')
+const antigravityCatalog = ref<AntigravityModelCatalogEntry[]>([])
+const advancedVerifiedModels = computed(() =>
+  antigravityCatalog.value.filter((model) => model.availability === 'verified')
+)
+const currentlyUnavailableModels = computed(() =>
+  antigravityCatalog.value.filter((model) => model.availability === 'currently_unavailable')
+)
 const openAITestModeOptions = computed(() => [
   { value: 'default', label: t('admin.accounts.openai.testModeDefault') },
   { value: 'compact', label: t('admin.accounts.openai.testModeCompact') }
@@ -347,9 +393,17 @@ const loadAvailableModels = async () => {
   loadingModels.value = true
   selectedModelId.value = '' // Reset selection before loading
   try {
-    const models = await adminAPI.accounts.getAvailableModels(props.account.id)
+    const [models, catalog] = await Promise.all([
+      adminAPI.accounts.getAvailableModels(props.account.id),
+      props.account.platform === 'antigravity'
+        ? adminAPI.accounts.getAntigravityModelCatalog(props.account.id)
+        : Promise.resolve([])
+    ])
+    antigravityCatalog.value = catalog
     availableModels.value = props.account.platform === 'gemini' || props.account.platform === 'antigravity'
-      ? sortTestModels(models)
+      ? props.account.platform === 'antigravity'
+        ? models.filter((model) => model.recommended)
+        : sortTestModels(models)
       : models
     // Default selection by platform
     if (availableModels.value.length > 0) {

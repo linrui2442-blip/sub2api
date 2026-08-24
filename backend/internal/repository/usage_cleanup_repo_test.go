@@ -419,14 +419,9 @@ func TestUsageCleanupRepositoryDeleteUsageLogsBatch(t *testing.T) {
 	}
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(`SELECT id FROM usage_group_rollup_state.*FOR UPDATE`).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 	mock.ExpectQuery("DELETE FROM usage_logs").
 		WithArgs(start, end, userID, "gpt-4", 2).
 		WillReturnRows(sqlmock.NewRows([]string{"created_at"}).AddRow(start.Add(time.Hour)).AddRow(start.Add(2 * time.Hour)))
-	mock.ExpectExec(`UPDATE usage_group_rollup_state`).
-		WithArgs(start.Add(time.Hour), "Asia/Shanghai").
-		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
 	deleted, err := repo.DeleteUsageLogsBatch(context.Background(), filters, 2)
@@ -447,16 +442,11 @@ func TestUsageCleanupRepositoryDeleteUsageLogsBatchAtomicallyInvalidatesGroupRol
 	filters := service.UsageCleanupFilters{StartTime: start, EndTime: end}
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(`SELECT id FROM usage_group_rollup_state.*FOR UPDATE`).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 	mock.ExpectQuery(`(?s)DELETE FROM usage_logs.*RETURNING created_at`).
 		WithArgs(start, end, 2).
 		WillReturnRows(sqlmock.NewRows([]string{"created_at"}).
 			AddRow(firstDeletedAt).
 			AddRow(secondDeletedAt))
-	mock.ExpectExec(`UPDATE usage_group_rollup_state`).
-		WithArgs(firstDeletedAt, "Asia/Shanghai").
-		WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectCommit()
 
 	deleted, err := repo.DeleteUsageLogsBatch(context.Background(), filters, 2)
@@ -465,7 +455,7 @@ func TestUsageCleanupRepositoryDeleteUsageLogsBatchAtomicallyInvalidatesGroupRol
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
-func TestUsageCleanupRepositoryDeleteUsageLogsBatchRollsBackWhenInvalidationFails(t *testing.T) {
+func TestUsageCleanupRepositoryDeleteUsageLogsBatchCommitsWithoutCommercialRollup(t *testing.T) {
 	setUsageCleanupRollupTestTimezone(t)
 	db, mock := newSQLMock(t)
 	repo := &usageCleanupRepository{sql: db}
@@ -476,18 +466,14 @@ func TestUsageCleanupRepositoryDeleteUsageLogsBatchRollsBackWhenInvalidationFail
 	filters := service.UsageCleanupFilters{StartTime: start, EndTime: end}
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(`SELECT id FROM usage_group_rollup_state.*FOR UPDATE`).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 	mock.ExpectQuery(`(?s)DELETE FROM usage_logs.*RETURNING created_at`).
 		WithArgs(start, end, 1).
 		WillReturnRows(sqlmock.NewRows([]string{"created_at"}).AddRow(deletedAt))
-	mock.ExpectExec(`UPDATE usage_group_rollup_state`).
-		WithArgs(deletedAt, "Asia/Shanghai").
-		WillReturnError(sql.ErrConnDone)
-	mock.ExpectRollback()
+	mock.ExpectCommit()
 
-	_, err := repo.DeleteUsageLogsBatch(context.Background(), filters, 1)
-	require.ErrorIs(t, err, sql.ErrConnDone)
+	deleted, err := repo.DeleteUsageLogsBatch(context.Background(), filters, 1)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), deleted)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -500,8 +486,6 @@ func TestUsageCleanupRepositoryDeleteUsageLogsBatchQueryError(t *testing.T) {
 	filters := service.UsageCleanupFilters{StartTime: start, EndTime: end}
 
 	mock.ExpectBegin()
-	mock.ExpectQuery(`SELECT id FROM usage_group_rollup_state.*FOR UPDATE`).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
 	mock.ExpectQuery("DELETE FROM usage_logs").
 		WithArgs(start, end, 5).
 		WillReturnError(sql.ErrConnDone)
@@ -521,22 +505,20 @@ func TestBuildUsageCleanupWhere(t *testing.T) {
 	groupID := int64(4)
 	model := " gpt-4 "
 	stream := true
-	billingType := int8(2)
 
 	where, args := buildUsageCleanupWhere(service.UsageCleanupFilters{
-		StartTime:   start,
-		EndTime:     end,
-		UserID:      &userID,
-		APIKeyID:    &apiKeyID,
-		AccountID:   &accountID,
-		GroupID:     &groupID,
-		Model:       &model,
-		Stream:      &stream,
-		BillingType: &billingType,
+		StartTime: start,
+		EndTime:   end,
+		UserID:    &userID,
+		APIKeyID:  &apiKeyID,
+		AccountID: &accountID,
+		GroupID:   &groupID,
+		Model:     &model,
+		Stream:    &stream,
 	})
 
-	require.Equal(t, "created_at >= $1 AND created_at <= $2 AND user_id = $3 AND api_key_id = $4 AND account_id = $5 AND group_id = $6 AND model = $7 AND stream = $8 AND billing_type = $9", where)
-	require.Equal(t, []any{start, end, userID, apiKeyID, accountID, groupID, "gpt-4", stream, billingType}, args)
+	require.Equal(t, "created_at >= $1 AND created_at <= $2 AND user_id = $3 AND api_key_id = $4 AND account_id = $5 AND group_id = $6 AND model = $7 AND stream = $8", where)
+	require.Equal(t, []any{start, end, userID, apiKeyID, accountID, groupID, "gpt-4", stream}, args)
 }
 
 func TestBuildUsageCleanupWhereRequestTypePriority(t *testing.T) {

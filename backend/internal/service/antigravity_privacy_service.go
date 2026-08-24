@@ -21,8 +21,13 @@ const (
 //
 // 返回 privacy_mode 值："privacy_set" 成功，"privacy_set_failed" 失败，空串表示无法执行。
 func setAntigravityPrivacy(ctx context.Context, accessToken, projectID, proxyURL string) string {
+	mode, _ := setAntigravityPrivacyWithError(ctx, accessToken, projectID, proxyURL)
+	return mode
+}
+
+func setAntigravityPrivacyWithError(ctx context.Context, accessToken, projectID, proxyURL string) (string, error) {
 	if accessToken == "" {
-		return ""
+		return "", nil
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -31,41 +36,41 @@ func setAntigravityPrivacy(ctx context.Context, accessToken, projectID, proxyURL
 	client, err := antigravity.NewClient(proxyURL)
 	if err != nil {
 		slog.Warn("antigravity_privacy_client_error", "error", err.Error())
-		return AntigravityPrivacyFailed
+		return AntigravityPrivacyFailed, err
 	}
 
 	// 第 1 步：调用 setUserSettings，检查返回值
 	setResp, err := client.SetUserSettings(ctx, accessToken)
 	if err != nil {
 		slog.Warn("antigravity_privacy_set_failed", "error", err.Error())
-		return AntigravityPrivacyFailed
+		return AntigravityPrivacyFailed, err
 	}
 	if !setResp.IsSuccess() {
 		slog.Warn("antigravity_privacy_set_response_not_empty",
 			"user_settings", setResp.UserSettings,
 		)
-		return AntigravityPrivacyFailed
+		return AntigravityPrivacyFailed, nil
 	}
 
 	// 第 2 步：调用 fetchUserInfo 二次验证隐私是否已生效
 	if strings.TrimSpace(projectID) == "" {
 		slog.Warn("antigravity_privacy_missing_project_id")
-		return AntigravityPrivacyFailed
+		return AntigravityPrivacyFailed, nil
 	}
 	userInfo, err := client.FetchUserInfo(ctx, accessToken, projectID)
 	if err != nil {
 		slog.Warn("antigravity_privacy_verify_failed", "error", err.Error())
-		return AntigravityPrivacyFailed
+		return AntigravityPrivacyFailed, err
 	}
 	if !userInfo.IsPrivate() {
 		slog.Warn("antigravity_privacy_verify_not_private",
 			"user_settings", userInfo.UserSettings,
 		)
-		return AntigravityPrivacyFailed
+		return AntigravityPrivacyFailed, nil
 	}
 
 	slog.Info("antigravity_privacy_set_success")
-	return AntigravityPrivacySet
+	return AntigravityPrivacySet, nil
 }
 
 func applyAntigravityPrivacyMode(account *Account, mode string) {

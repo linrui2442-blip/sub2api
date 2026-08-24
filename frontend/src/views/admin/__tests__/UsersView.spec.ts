@@ -7,15 +7,11 @@ import UsersView from '../UsersView.vue'
 const {
   listUsers,
   getAllGroups,
-  getBatchUsersUsage,
-  listEnabledDefinitions,
-  getBatchUserAttributes
+  getBatchUsersUsage
 } = vi.hoisted(() => ({
   listUsers: vi.fn(),
   getAllGroups: vi.fn(),
-  getBatchUsersUsage: vi.fn(),
-  listEnabledDefinitions: vi.fn(),
-  getBatchUserAttributes: vi.fn()
+  getBatchUsersUsage: vi.fn()
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -30,10 +26,6 @@ vi.mock('@/api/admin', () => ({
     },
     dashboard: {
       getBatchUsersUsage
-    },
-    userAttributes: {
-      listEnabledDefinitions,
-      getBatchUserAttributes
     }
   }
 }))
@@ -64,9 +56,6 @@ const createAdminUser = (overrides: Partial<AdminUser> = {}): AdminUser => ({
   concurrency: 1,
   status: 'active',
   allowed_groups: [],
-  balance_notify_enabled: false,
-  balance_notify_threshold: null,
-  balance_notify_extra_emails: [],
   created_at: '2026-04-17T00:00:00Z',
   updated_at: '2026-04-17T00:00:00Z',
   notes: '',
@@ -127,8 +116,6 @@ describe('admin UsersView', () => {
     listUsers.mockReset()
     getAllGroups.mockReset()
     getBatchUsersUsage.mockReset()
-    listEnabledDefinitions.mockReset()
-    getBatchUserAttributes.mockReset()
 
     listUsers.mockResolvedValue({
       items: [createAdminUser()],
@@ -139,8 +126,6 @@ describe('admin UsersView', () => {
     })
     getAllGroups.mockResolvedValue([])
     getBatchUsersUsage.mockResolvedValue({ stats: {} })
-    listEnabledDefinitions.mockResolvedValue([])
-    getBatchUserAttributes.mockResolvedValue({ values: {} })
   })
 
   afterEach(() => {
@@ -161,16 +146,12 @@ describe('admin UsersView', () => {
           EmptyState: true,
           GroupBadge: true,
           Select: true,
-          UserAttributesConfigModal: true,
           UserConcurrencyCell: true,
           UserCreateModal: true,
           UserEditModal: true,
           BulkEditUserModal: BulkEditUserModalStub,
-          UserPlatformQuotaModal: true,
           UserApiKeysModal: true,
           UserAllowedGroupsModal: true,
-          UserBalanceModal: true,
-          UserBalanceHistoryModal: true,
           GroupReplaceModal: true,
           Icon: true,
           Teleport: true
@@ -229,8 +210,8 @@ describe('admin UsersView', () => {
     })
     getBatchUsersUsage.mockResolvedValue({
       stats: {
-        1: { user_id: 1, today_actual_cost: 1, total_actual_cost: 1, by_platform: [] },
-        2: { user_id: 2, today_actual_cost: 9, total_actual_cost: 9, by_platform: [] }
+        1: { user_id: 1, today_requests: 1, today_tokens: 10, total_requests: 1, total_tokens: 10, by_platform: [] },
+        2: { user_id: 2, today_requests: 9, today_tokens: 90, total_requests: 9, total_tokens: 90, by_platform: [] }
       }
     })
 
@@ -247,16 +228,12 @@ describe('admin UsersView', () => {
           EmptyState: true,
           GroupBadge: true,
           Select: true,
-          UserAttributesConfigModal: true,
           UserConcurrencyCell: true,
           UserCreateModal: true,
           UserEditModal: true,
           BulkEditUserModal: BulkEditUserModalStub,
-          UserPlatformQuotaModal: true,
           UserApiKeysModal: true,
           UserAllowedGroupsModal: true,
-          UserBalanceModal: true,
-          UserBalanceHistoryModal: true,
           GroupReplaceModal: true,
           Icon: true,
           Teleport: true
@@ -325,16 +302,12 @@ describe('admin UsersView', () => {
           EmptyState: true,
           GroupBadge: true,
           Select: true,
-          UserAttributesConfigModal: true,
           UserConcurrencyCell: true,
           UserCreateModal: true,
           UserEditModal: true,
           BulkEditUserModal: BulkEditUserModalStub,
-          UserPlatformQuotaModal: true,
           UserApiKeysModal: true,
           UserAllowedGroupsModal: true,
-          UserBalanceModal: true,
-          UserBalanceHistoryModal: true,
           GroupReplaceModal: true,
           Icon: true,
           Teleport: true

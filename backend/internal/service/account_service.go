@@ -55,14 +55,8 @@ type AccountRepository interface {
 	GetByIDs(ctx context.Context, ids []int64) ([]*Account, error)
 	// ExistsByID 检查账号是否存在，仅返回布尔值，用于删除前的轻量级存在性检查
 	ExistsByID(ctx context.Context, id int64) (bool, error)
-	// GetByCRSAccountID finds an account previously synced from CRS.
-	// Returns (nil, nil) if not found.
-	GetByCRSAccountID(ctx context.Context, crsAccountID string) (*Account, error)
 	// FindByExtraField 根据 extra 字段中的键值对查找账号
 	FindByExtraField(ctx context.Context, key string, value any) ([]Account, error)
-	// ListCRSAccountIDs returns a map of crs_account_id -> local account ID
-	// for all accounts that have been synced from CRS.
-	ListCRSAccountIDs(ctx context.Context) (map[string]int64, error)
 	Update(ctx context.Context, account *Account) error
 	Delete(ctx context.Context, id int64) error
 
@@ -131,41 +125,25 @@ type AccountDuplicateRepository interface {
 	CreateWithAccountGroups(ctx context.Context, account *Account, groups []AccountGroup) error
 }
 
-// AccountBillingSettingsRepository applies an admin edit without overwriting a
-// rate_multiplier that a successful upstream probe synchronized after the edit
-// form was loaded. A nil rateMultiplier means the request did not edit it.
-type AccountBillingSettingsRepository interface {
-	UpdateWithAccountBillingSettings(
-		ctx context.Context,
-		account *Account,
-		probeEnabled *bool,
-		rateSyncEnabled *bool,
-		rateMultiplier *float64,
-	) error
-}
-
 // AdminAccountRepository makes the account-duplication write capability an explicit
 // construction dependency without forcing read-only gateway test doubles to implement it.
 type AdminAccountRepository interface {
 	AccountRepository
 	AccountDuplicateRepository
-	AccountBillingSettingsRepository
 }
 
 // AccountBulkUpdate describes the fields that can be updated in a bulk operation.
 // Nil pointers mean "do not change".
 type AccountBulkUpdate struct {
-	Name           *string
-	ProxyID        *int64
-	Concurrency    *int
-	Priority       *int
-	RateMultiplier *float64
-	LoadFactor     *int
-	Status         *string
-	Schedulable    *bool
-	Credentials    map[string]any
-	Extra          map[string]any
-	ProbeEnabled   *bool
+	Name        *string
+	ProxyID     *int64
+	Concurrency *int
+	Priority    *int
+	LoadFactor  *int
+	Status      *string
+	Schedulable *bool
+	Credentials map[string]any
+	Extra       map[string]any
 	// EnsureCodexFingerprintSeed asks the repository to atomically preserve an
 	// existing valid Codex fingerprint seed or create one for eligible rows.
 	EnsureCodexFingerprintSeed bool

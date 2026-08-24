@@ -1,10 +1,7 @@
 package admin
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -13,7 +10,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
-	"github.com/Wei-Shaw/sub2api/internal/platform/liveattestation"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -24,65 +20,6 @@ type GroupHandler struct {
 	adminService         service.AdminService
 	dashboardService     *service.DashboardService
 	groupCapacityService *service.GroupCapacityService
-}
-
-// GetLiveCapability 返回当前服务端是否具备生成 Live attestation 的运行环境。
-func (h *GroupHandler) GetLiveCapability(c *gin.Context) {
-	err := liveattestation.NewProvider().Check(c.Request.Context())
-	result := gin.H{"supported": err == nil}
-	if err != nil {
-		result["reason"] = err.Error()
-	}
-	response.Success(c, result)
-}
-
-type optionalLimitField struct {
-	set   bool
-	value *float64
-}
-
-func (f *optionalLimitField) UnmarshalJSON(data []byte) error {
-	f.set = true
-
-	trimmed := bytes.TrimSpace(data)
-	if bytes.Equal(trimmed, []byte("null")) {
-		f.value = nil
-		return nil
-	}
-
-	var number float64
-	if err := json.Unmarshal(trimmed, &number); err == nil {
-		f.value = &number
-		return nil
-	}
-
-	var text string
-	if err := json.Unmarshal(trimmed, &text); err == nil {
-		text = strings.TrimSpace(text)
-		if text == "" {
-			f.value = nil
-			return nil
-		}
-		number, err = strconv.ParseFloat(text, 64)
-		if err != nil {
-			return fmt.Errorf("invalid numeric limit value %q: %w", text, err)
-		}
-		f.value = &number
-		return nil
-	}
-
-	return fmt.Errorf("invalid limit value: %s", string(trimmed))
-}
-
-func (f optionalLimitField) ToServiceInput() *float64 {
-	if !f.set {
-		return nil
-	}
-	if f.value != nil {
-		return f.value
-	}
-	zero := 0.0
-	return &zero
 }
 
 // NewGroupHandler creates a new admin group handler
@@ -96,48 +33,13 @@ func NewGroupHandler(adminService service.AdminService, dashboardService *servic
 
 // CreateGroupRequest represents create group request
 type CreateGroupRequest struct {
-	Name                      string                        `json:"name" binding:"required"`
-	Description               string                        `json:"description"`
-	Platform                  string                        `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity grok kimi zhipu deepseek composite"`
-	RateMultiplier            float64                       `json:"rate_multiplier"`
-	IsExclusive               bool                          `json:"is_exclusive"`
-	SubscriptionType          string                        `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
-	DailyLimitUSD             optionalLimitField            `json:"daily_limit_usd"`
-	WeeklyLimitUSD            optionalLimitField            `json:"weekly_limit_usd"`
-	MonthlyLimitUSD           optionalLimitField            `json:"monthly_limit_usd"`
-	LongContextPricingEnabled bool                          `json:"long_context_pricing_enabled"`
-	ModelPricing              []service.ChannelModelPricing `json:"model_pricing"`
-	// 图片生成计费配置（antigravity 和 gemini 平台使用，负数表示清除配置）
-	AllowImageGeneration            bool                          `json:"allow_image_generation"`
-	AllowBatchImageGeneration       bool                          `json:"allow_batch_image_generation"`
-	ImageRateIndependent            bool                          `json:"image_rate_independent"`
-	ImageRateMultiplier             *float64                      `json:"image_rate_multiplier"`
-	BatchImageDiscountMultiplier    *float64                      `json:"batch_image_discount_multiplier"`
-	BatchImageHoldMultiplier        *float64                      `json:"batch_image_hold_multiplier"`
-	VideoRateIndependent            bool                          `json:"video_rate_independent"`
-	VideoRateMultiplier             *float64                      `json:"video_rate_multiplier"`
-	PeakRateEnabled                 bool                          `json:"peak_rate_enabled"`
-	PeakStart                       string                        `json:"peak_start"`
-	PeakEnd                         string                        `json:"peak_end"`
-	PeakRateMultiplier              *float64                      `json:"peak_rate_multiplier"`
-	ProfitControlEnabled            bool                          `json:"profit_control_enabled"`
-	ProfitMinMargin                 *float64                      `json:"profit_min_margin"`
-	ProfitSafetyBuffer              *float64                      `json:"profit_safety_buffer"`
-	ImagePrice1K                    *float64                      `json:"image_price_1k"`
-	ImagePrice2K                    *float64                      `json:"image_price_2k"`
-	ImagePrice4K                    *float64                      `json:"image_price_4k"`
-	VideoPrice480P                  *float64                      `json:"video_price_480p"`
-	VideoPrice720P                  *float64                      `json:"video_price_720p"`
-	VideoPrice1080P                 *float64                      `json:"video_price_1080p"`
-	VideoModelPrices                map[string]map[string]float64 `json:"video_model_prices,omitempty"`
-	WebSearchPricePerCall           *float64                      `json:"web_search_price_per_call"`
-	SearchPricePer1k                *float64                      `json:"search_price_per_1k"`
-	AudioRealtimePricePerMin        *float64                      `json:"audio_realtime_price_per_min"`
-	AudioTtsPricePerMillionChars    *float64                      `json:"audio_tts_price_per_million_chars"`
-	AudioSttPricePerHour            *float64                      `json:"audio_stt_price_per_hour"`
-	ClaudeCodeOnly                  bool                          `json:"claude_code_only"`
-	FallbackGroupID                 *int64                        `json:"fallback_group_id"`
-	FallbackGroupIDOnInvalidRequest *int64                        `json:"fallback_group_id_on_invalid_request"`
+	Name                            string `json:"name" binding:"required"`
+	Description                     string `json:"description"`
+	Platform                        string `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity grok kimi zhipu deepseek composite"`
+	IsExclusive                     bool   `json:"is_exclusive"`
+	ClaudeCodeOnly                  bool   `json:"claude_code_only"`
+	FallbackGroupID                 *int64 `json:"fallback_group_id"`
+	FallbackGroupIDOnInvalidRequest *int64 `json:"fallback_group_id_on_invalid_request"`
 	// 模型路由配置（仅 anthropic 平台使用）
 	ModelRouting        map[string][]int64 `json:"model_routing"`
 	ModelRoutingEnabled bool               `json:"model_routing_enabled"`
@@ -164,49 +66,14 @@ type CreateGroupRequest struct {
 
 // UpdateGroupRequest represents update group request
 type UpdateGroupRequest struct {
-	Name                      string                         `json:"name"`
-	Description               *string                        `json:"description"`
-	Platform                  string                         `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity grok kimi zhipu deepseek composite"`
-	RateMultiplier            *float64                       `json:"rate_multiplier"`
-	IsExclusive               *bool                          `json:"is_exclusive"`
-	Status                    string                         `json:"status" binding:"omitempty,oneof=active inactive"`
-	SubscriptionType          string                         `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
-	DailyLimitUSD             optionalLimitField             `json:"daily_limit_usd"`
-	WeeklyLimitUSD            optionalLimitField             `json:"weekly_limit_usd"`
-	MonthlyLimitUSD           optionalLimitField             `json:"monthly_limit_usd"`
-	LongContextPricingEnabled *bool                          `json:"long_context_pricing_enabled"`
-	ModelPricing              *[]service.ChannelModelPricing `json:"model_pricing"`
-	// 图片生成计费配置（antigravity 和 gemini 平台使用，负数表示清除配置）
-	AllowImageGeneration            *bool                         `json:"allow_image_generation"`
-	AllowBatchImageGeneration       *bool                         `json:"allow_batch_image_generation"`
-	ImageRateIndependent            *bool                         `json:"image_rate_independent"`
-	ImageRateMultiplier             *float64                      `json:"image_rate_multiplier"`
-	BatchImageDiscountMultiplier    *float64                      `json:"batch_image_discount_multiplier"`
-	BatchImageHoldMultiplier        *float64                      `json:"batch_image_hold_multiplier"`
-	VideoRateIndependent            *bool                         `json:"video_rate_independent"`
-	VideoRateMultiplier             *float64                      `json:"video_rate_multiplier"`
-	PeakRateEnabled                 *bool                         `json:"peak_rate_enabled"`
-	PeakStart                       *string                       `json:"peak_start"`
-	PeakEnd                         *string                       `json:"peak_end"`
-	PeakRateMultiplier              *float64                      `json:"peak_rate_multiplier"`
-	ProfitControlEnabled            *bool                         `json:"profit_control_enabled"`
-	ProfitMinMargin                 *float64                      `json:"profit_min_margin"`
-	ProfitSafetyBuffer              *float64                      `json:"profit_safety_buffer"`
-	ImagePrice1K                    *float64                      `json:"image_price_1k"`
-	ImagePrice2K                    *float64                      `json:"image_price_2k"`
-	ImagePrice4K                    *float64                      `json:"image_price_4k"`
-	VideoPrice480P                  *float64                      `json:"video_price_480p"`
-	VideoPrice720P                  *float64                      `json:"video_price_720p"`
-	VideoPrice1080P                 *float64                      `json:"video_price_1080p"`
-	VideoModelPrices                map[string]map[string]float64 `json:"video_model_prices,omitempty"`
-	WebSearchPricePerCall           *float64                      `json:"web_search_price_per_call"`
-	SearchPricePer1k                *float64                      `json:"search_price_per_1k"`
-	AudioRealtimePricePerMin        *float64                      `json:"audio_realtime_price_per_min"`
-	AudioTtsPricePerMillionChars    *float64                      `json:"audio_tts_price_per_million_chars"`
-	AudioSttPricePerHour            *float64                      `json:"audio_stt_price_per_hour"`
-	ClaudeCodeOnly                  *bool                         `json:"claude_code_only"`
-	FallbackGroupID                 *int64                        `json:"fallback_group_id"`
-	FallbackGroupIDOnInvalidRequest *int64                        `json:"fallback_group_id_on_invalid_request"`
+	Name                            string  `json:"name"`
+	Description                     *string `json:"description"`
+	Platform                        string  `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity grok kimi zhipu deepseek composite"`
+	IsExclusive                     *bool   `json:"is_exclusive"`
+	Status                          string  `json:"status" binding:"omitempty,oneof=active inactive"`
+	ClaudeCodeOnly                  *bool   `json:"claude_code_only"`
+	FallbackGroupID                 *int64  `json:"fallback_group_id"`
+	FallbackGroupIDOnInvalidRequest *int64  `json:"fallback_group_id_on_invalid_request"`
 	// 模型路由配置（仅 anthropic 平台使用）
 	ModelRouting        map[string][]int64 `json:"model_routing"`
 	ModelRoutingEnabled *bool              `json:"model_routing_enabled"`
@@ -490,57 +357,11 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		return
 	}
 
-	if err := service.ValidatePeakRateConfig(req.SubscriptionType, req.PeakRateEnabled, req.PeakStart, req.PeakEnd, float64ValueOrDefault(req.PeakRateMultiplier, 1.0)); err != nil {
-		response.BadRequest(c, err.Error())
-		return
-	}
-
-	// platform 是 omitempty：预校验必须用与 CreateGroup 落库一致的归一化平台，
-	// 否则省略 platform 的请求会被误判成「平台不支持利润控制」。
-	if err := service.ValidateProfitControlConfig(service.NormalizeGroupPlatform(req.Platform), req.ProfitControlEnabled, float64ValueOrDefault(req.ProfitMinMargin, 0), float64ValueOrDefault(req.ProfitSafetyBuffer, 0)); err != nil {
-		response.BadRequest(c, err.Error())
-		return
-	}
-
 	group, err := h.adminService.CreateGroup(c.Request.Context(), &service.CreateGroupInput{
 		Name:                            req.Name,
 		Description:                     req.Description,
 		Platform:                        req.Platform,
-		RateMultiplier:                  req.RateMultiplier,
 		IsExclusive:                     req.IsExclusive,
-		SubscriptionType:                req.SubscriptionType,
-		DailyLimitUSD:                   req.DailyLimitUSD.ToServiceInput(),
-		WeeklyLimitUSD:                  req.WeeklyLimitUSD.ToServiceInput(),
-		MonthlyLimitUSD:                 req.MonthlyLimitUSD.ToServiceInput(),
-		LongContextPricingEnabled:       req.LongContextPricingEnabled,
-		ModelPricing:                    req.ModelPricing,
-		AllowImageGeneration:            req.AllowImageGeneration,
-		AllowBatchImageGeneration:       req.AllowBatchImageGeneration,
-		ImageRateIndependent:            req.ImageRateIndependent,
-		ImageRateMultiplier:             req.ImageRateMultiplier,
-		BatchImageDiscountMultiplier:    req.BatchImageDiscountMultiplier,
-		BatchImageHoldMultiplier:        req.BatchImageHoldMultiplier,
-		VideoRateIndependent:            req.VideoRateIndependent,
-		VideoRateMultiplier:             req.VideoRateMultiplier,
-		PeakRateEnabled:                 req.PeakRateEnabled,
-		PeakStart:                       req.PeakStart,
-		PeakEnd:                         req.PeakEnd,
-		PeakRateMultiplier:              req.PeakRateMultiplier,
-		ProfitControlEnabled:            req.ProfitControlEnabled,
-		ProfitMinMargin:                 req.ProfitMinMargin,
-		ProfitSafetyBuffer:              req.ProfitSafetyBuffer,
-		ImagePrice1K:                    req.ImagePrice1K,
-		ImagePrice2K:                    req.ImagePrice2K,
-		ImagePrice4K:                    req.ImagePrice4K,
-		VideoPrice480P:                  req.VideoPrice480P,
-		VideoPrice720P:                  req.VideoPrice720P,
-		VideoPrice1080P:                 req.VideoPrice1080P,
-		VideoModelPrices:                req.VideoModelPrices,
-		WebSearchPricePerCall:           req.WebSearchPricePerCall,
-		SearchPricePer1k:                req.SearchPricePer1k,
-		AudioRealtimePricePerMin:        req.AudioRealtimePricePerMin,
-		AudioTTSPricePerMillionChars:    req.AudioTtsPricePerMillionChars,
-		AudioSTTPricePerHour:            req.AudioSttPricePerHour,
 		ClaudeCodeOnly:                  req.ClaudeCodeOnly,
 		FallbackGroupID:                 req.FallbackGroupID,
 		FallbackGroupIDOnInvalidRequest: req.FallbackGroupIDOnInvalidRequest,
@@ -634,42 +455,8 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		Name:                            req.Name,
 		Description:                     req.Description,
 		Platform:                        req.Platform,
-		RateMultiplier:                  req.RateMultiplier,
 		IsExclusive:                     req.IsExclusive,
 		Status:                          req.Status,
-		SubscriptionType:                req.SubscriptionType,
-		DailyLimitUSD:                   req.DailyLimitUSD.ToServiceInput(),
-		WeeklyLimitUSD:                  req.WeeklyLimitUSD.ToServiceInput(),
-		MonthlyLimitUSD:                 req.MonthlyLimitUSD.ToServiceInput(),
-		LongContextPricingEnabled:       req.LongContextPricingEnabled,
-		ModelPricing:                    req.ModelPricing,
-		AllowImageGeneration:            req.AllowImageGeneration,
-		AllowBatchImageGeneration:       req.AllowBatchImageGeneration,
-		ImageRateIndependent:            req.ImageRateIndependent,
-		ImageRateMultiplier:             req.ImageRateMultiplier,
-		BatchImageDiscountMultiplier:    req.BatchImageDiscountMultiplier,
-		BatchImageHoldMultiplier:        req.BatchImageHoldMultiplier,
-		VideoRateIndependent:            req.VideoRateIndependent,
-		VideoRateMultiplier:             req.VideoRateMultiplier,
-		PeakRateEnabled:                 req.PeakRateEnabled,
-		PeakStart:                       req.PeakStart,
-		PeakEnd:                         req.PeakEnd,
-		PeakRateMultiplier:              req.PeakRateMultiplier,
-		ProfitControlEnabled:            req.ProfitControlEnabled,
-		ProfitMinMargin:                 req.ProfitMinMargin,
-		ProfitSafetyBuffer:              req.ProfitSafetyBuffer,
-		ImagePrice1K:                    req.ImagePrice1K,
-		ImagePrice2K:                    req.ImagePrice2K,
-		ImagePrice4K:                    req.ImagePrice4K,
-		VideoPrice480P:                  req.VideoPrice480P,
-		VideoPrice720P:                  req.VideoPrice720P,
-		VideoPrice1080P:                 req.VideoPrice1080P,
-		VideoModelPrices:                req.VideoModelPrices,
-		WebSearchPricePerCall:           req.WebSearchPricePerCall,
-		SearchPricePer1k:                req.SearchPricePer1k,
-		AudioRealtimePricePerMin:        req.AudioRealtimePricePerMin,
-		AudioTTSPricePerMillionChars:    req.AudioTtsPricePerMillionChars,
-		AudioSTTPricePerHour:            req.AudioSttPricePerHour,
 		ClaudeCodeOnly:                  req.ClaudeCodeOnly,
 		FallbackGroupID:                 req.FallbackGroupID,
 		FallbackGroupIDOnInvalidRequest: req.FallbackGroupIDOnInvalidRequest,
@@ -781,117 +568,6 @@ func (h *GroupHandler) GetGroupAPIKeys(c *gin.Context) {
 		outKeys = append(outKeys, *dto.APIKeyFromService(&keys[i]))
 	}
 	response.Paginated(c, outKeys, total, page, pageSize)
-}
-
-// GetGroupRateMultipliers handles getting rate multipliers for users in a group
-// GET /api/v1/admin/groups/:id/rate-multipliers
-func (h *GroupHandler) GetGroupRateMultipliers(c *gin.Context) {
-	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid group ID")
-		return
-	}
-
-	entries, err := h.adminService.GetGroupRateMultipliers(c.Request.Context(), groupID)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	if entries == nil {
-		entries = []service.UserGroupRateEntry{}
-	}
-	response.Success(c, entries)
-}
-
-// ClearGroupRateMultipliers handles clearing all rate multipliers for a group
-// DELETE /api/v1/admin/groups/:id/rate-multipliers
-func (h *GroupHandler) ClearGroupRateMultipliers(c *gin.Context) {
-	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid group ID")
-		return
-	}
-
-	if err := h.adminService.ClearGroupRateMultipliers(c.Request.Context(), groupID); err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	response.Success(c, gin.H{"message": "Rate multipliers cleared successfully"})
-}
-
-// BatchSetGroupRateMultipliersRequest represents batch set rate multipliers request
-type BatchSetGroupRateMultipliersRequest struct {
-	Entries []service.GroupRateMultiplierInput `json:"entries" binding:"required"`
-}
-
-// BatchSetGroupRateMultipliers handles batch setting rate multipliers for a group
-// PUT /api/v1/admin/groups/:id/rate-multipliers
-func (h *GroupHandler) BatchSetGroupRateMultipliers(c *gin.Context) {
-	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid group ID")
-		return
-	}
-
-	var req BatchSetGroupRateMultipliersRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-
-	if err := h.adminService.BatchSetGroupRateMultipliers(c.Request.Context(), groupID, req.Entries); err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	response.Success(c, gin.H{"message": "Rate multipliers updated successfully"})
-}
-
-// BatchSetGroupRPMOverridesRequest represents batch set rpm_override request
-type BatchSetGroupRPMOverridesRequest struct {
-	Entries []service.GroupRPMOverrideInput `json:"entries" binding:"required"`
-}
-
-// BatchSetGroupRPMOverrides handles batch setting rpm_override for users in a group
-// PUT /api/v1/admin/groups/:id/rpm-overrides
-func (h *GroupHandler) BatchSetGroupRPMOverrides(c *gin.Context) {
-	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid group ID")
-		return
-	}
-
-	var req BatchSetGroupRPMOverridesRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(c, "Invalid request: "+err.Error())
-		return
-	}
-
-	if err := h.adminService.BatchSetGroupRPMOverrides(c.Request.Context(), groupID, req.Entries); err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	response.Success(c, gin.H{"message": "RPM overrides updated successfully"})
-}
-
-// ClearGroupRPMOverrides handles clearing all rpm_override for a group
-// DELETE /api/v1/admin/groups/:id/rpm-overrides
-func (h *GroupHandler) ClearGroupRPMOverrides(c *gin.Context) {
-	groupID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "Invalid group ID")
-		return
-	}
-
-	if err := h.adminService.ClearGroupRPMOverrides(c.Request.Context(), groupID); err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	response.Success(c, gin.H{"message": "RPM overrides cleared successfully"})
 }
 
 // UpdateSortOrderRequest represents the request to update group sort orders

@@ -78,7 +78,6 @@ func TestDuplicateAccountCopiesConfigurationAndResetsRuntimeState(t *testing.T) 
 	notes := "keep this note"
 	proxyID := int64(17)
 	originalProxyID := int64(11)
-	rateMultiplier := 1.25
 	loadFactor := 9
 	expiresAt := time.Date(2027, time.March, 4, 5, 6, 7, 0, time.UTC)
 	rateLimitedAt := time.Now().Add(-time.Minute)
@@ -97,7 +96,6 @@ func TestDuplicateAccountCopiesConfigurationAndResetsRuntimeState(t *testing.T) 
 		ProxyFallbackOriginID: &originalProxyID,
 		Concurrency:           6,
 		Priority:              40,
-		RateMultiplier:        &rateMultiplier,
 		LoadFactor:            &loadFactor,
 		Status:                StatusError,
 		Schedulable:           true,
@@ -125,9 +123,6 @@ func TestDuplicateAccountCopiesConfigurationAndResetsRuntimeState(t *testing.T) 
 			"passive_usage_sampled_at":        "2026-07-15T00:00:00Z",
 			"antigravity_force_token_refresh": true,
 			"antigravity_credits_overages":    map[string]any{"enabled": true},
-			"crs_account_id":                  "remote-42",
-			"crs_kind":                        "openai-api-key",
-			"crs_synced_at":                   "2026-07-15T00:00:00Z",
 		},
 		GroupIDs:                []int64{7, 3},
 		AccountGroups:           []AccountGroup{{GroupID: 7, Priority: 50}, {GroupID: 3, Priority: 7}},
@@ -140,9 +135,6 @@ func TestDuplicateAccountCopiesConfigurationAndResetsRuntimeState(t *testing.T) 
 		SessionWindowEnd:        &sessionWindowEnd,
 		SessionWindowStatus:     "active",
 	}
-	source.Extra[UpstreamBillingProbeEnabledExtraKey] = true
-	source.Extra[UpstreamBillingRateSyncEnabledExtraKey] = true
-	source.Extra[UpstreamBillingProbeExtraKey] = map[string]any{"status": "ok"}
 	require.NoError(t, repo.Create(ctx, source))
 
 	duplicate, err := svc.DuplicateAccount(ctx, source.ID, "admin:1", "")
@@ -163,12 +155,10 @@ func TestDuplicateAccountCopiesConfigurationAndResetsRuntimeState(t *testing.T) 
 		"quota_limit":    float64(1000),
 		"codex_cli_only": true,
 	}, duplicate.Extra)
-	require.NotContains(t, duplicate.Extra, UpstreamBillingRateSyncEnabledExtraKey)
 	require.NotNil(t, duplicate.ExpiresAt)
 	require.True(t, source.ExpiresAt.Equal(*duplicate.ExpiresAt))
 	require.Equal(t, source.Notes, duplicate.Notes)
 	require.Equal(t, source.ProxyFallbackOriginID, duplicate.ProxyID)
-	require.Equal(t, source.RateMultiplier, duplicate.RateMultiplier)
 	require.Equal(t, source.LoadFactor, duplicate.LoadFactor)
 	require.Equal(t, source.GroupIDs, repo.groupsOf[duplicate.ID])
 	require.Equal(t, []AccountGroup{
@@ -197,7 +187,6 @@ func TestDuplicateAccountCopiesConfigurationAndResetsRuntimeState(t *testing.T) 
 	require.Equal(t, "source-token", storedSource.Credentials["nested"].(map[string]any)["token"])
 	require.Equal(t, "us-east-1", storedSource.Extra["config"].(map[string]any)["region"])
 	require.Equal(t, true, storedSource.Extra["items"].([]any)[0].(map[string]any)["enabled"])
-	require.Equal(t, "remote-42", storedSource.Extra["crs_account_id"])
 }
 
 func TestDuplicateAccountRejectsCredentialShadow(t *testing.T) {

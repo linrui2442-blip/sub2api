@@ -1199,6 +1199,25 @@
             </button>
           </div>
 
+          <div
+            v-if="antigravityLiveModels.length > 0"
+            class="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-900 dark:bg-emerald-900/20"
+          >
+            <div class="text-xs font-medium text-emerald-800 dark:text-emerald-300">
+              {{ t('admin.accounts.liveAvailableModels', { count: antigravityLiveModels.length }) }}
+            </div>
+            <div class="mt-2 flex flex-wrap gap-1.5">
+              <span
+                v-for="model in antigravityLiveModels"
+                :key="model"
+                class="rounded bg-white px-2 py-1 font-mono text-[11px] text-emerald-700 dark:bg-dark-700 dark:text-emerald-300"
+              >{{ model }}</span>
+            </div>
+            <p v-if="antigravityLiveModelsCheckedAt" class="mt-2 text-[11px] text-emerald-600 dark:text-emerald-400">
+              {{ t('admin.accounts.liveAvailabilityCheckedAt', { time: antigravityLiveModelsCheckedAt }) }}
+            </p>
+          </div>
+
           <div v-if="antigravityModelMappings.length > 0" class="mb-3 space-y-2">
             <div
               v-for="(mapping, index) in antigravityModelMappings"
@@ -1495,12 +1514,11 @@
       <div v-if="!isSparkShadow">
         <div class="mb-1 flex items-center gap-2">
           <label class="input-label mb-0">{{ t('admin.accounts.proxy') }}</label>
-          <ProxyAdBanner />
         </div>
         <ProxySelector v-model="form.proxy_id" :proxies="proxies" />
       </div>
 
-      <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div class="grid grid-cols-2 gap-4 lg:grid-cols-3">
         <div>
           <label class="input-label">{{ t('admin.accounts.concurrency') }}</label>
           <input v-model.number="form.concurrency" type="number" min="1" class="input"
@@ -1523,46 +1541,6 @@
             data-tour="account-form-priority"
           />
           <p class="input-hint">{{ t('admin.accounts.priorityHint') }}</p>
-        </div>
-        <div>
-          <label class="input-label">{{ t('admin.accounts.billingRateMultiplier') }}</label>
-          <input
-            v-model.number="form.rate_multiplier"
-            type="number"
-            min="0"
-            step="0.001"
-            class="input disabled:cursor-not-allowed disabled:opacity-60"
-            data-testid="account-rate-multiplier"
-            :disabled="upstreamBillingRateSyncEnabled"
-          />
-          <p class="input-hint">
-            {{
-              t(
-                upstreamBillingRateSyncEnabled
-                  ? 'admin.accounts.upstreamBilling.syncRateManagedHint'
-                  : 'admin.accounts.billingRateMultiplierHint'
-              )
-            }}
-          </p>
-          <div
-            v-if="account?.type === 'apikey'"
-            class="mt-3 flex items-center justify-between gap-3"
-          >
-            <div class="min-w-0">
-              <p class="text-xs font-medium text-gray-700 dark:text-gray-200">
-                {{ t('admin.accounts.upstreamBilling.syncRate') }}
-              </p>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {{ t('admin.accounts.upstreamBilling.syncRateHint') }}
-              </p>
-            </div>
-            <Toggle
-              :model-value="upstreamBillingRateSyncEnabled"
-              data-testid="upstream-billing-rate-sync"
-              :aria-label="t('admin.accounts.upstreamBilling.syncRate')"
-              @update:model-value="handleUpstreamBillingRateSyncChange"
-            />
-          </div>
         </div>
       </div>
       <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
@@ -1769,24 +1747,6 @@
         </div>
       </div>
 
-      <div
-        v-if="account?.type === 'apikey'"
-        class="flex items-center justify-between gap-4 border-t border-gray-200 pt-4 dark:border-dark-600"
-      >
-        <div>
-          <label class="input-label mb-0">{{ t('admin.accounts.upstreamBilling.autoProbe') }}</label>
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            {{ t('admin.accounts.upstreamBilling.autoProbeHint') }}
-          </p>
-        </div>
-        <Toggle
-          :model-value="upstreamBillingAutoProbeEnabled"
-          data-testid="upstream-billing-auto-probe"
-          :aria-label="t('admin.accounts.upstreamBilling.autoProbe')"
-          @update:model-value="handleUpstreamBillingAutoProbeChange"
-        />
-      </div>
-
       <OllamaCloudUsageSettings
         v-if="account?.ollama_cloud_usage?.eligible"
         :account="account"
@@ -1962,39 +1922,6 @@
           @update:quotaNotifyTotalThreshold="quotaNotifyState.total.threshold = $event"
           @update:quotaNotifyTotalThresholdType="quotaNotifyState.total.thresholdType = $event"
         />
-      </div>
-
-      <!-- OpenAI API 长上下文计费开关 -->
-      <div
-        v-if="account?.platform === 'openai' && !isSparkShadow && (account?.type === 'oauth' || account?.type === 'setup-token' || account?.type === 'apikey')"
-        class="border-t border-gray-200 pt-4 dark:border-dark-600"
-      >
-        <div class="flex items-center justify-between gap-4">
-          <div>
-            <label class="input-label mb-0">{{ t('admin.accounts.openai.longContextBilling') }}</label>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {{ t('admin.accounts.openai.longContextBillingDesc') }}
-            </p>
-          </div>
-          <button
-            type="button"
-            data-testid="openai-long-context-billing-toggle"
-            role="switch"
-            :aria-checked="openAILongContextBillingEnabled"
-            @click="openAILongContextBillingEnabled = !openAILongContextBillingEnabled"
-            :class="[
-              'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
-              openAILongContextBillingEnabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-dark-600'
-            ]"
-          >
-            <span
-              :class="[
-                'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
-                openAILongContextBillingEnabled ? 'translate-x-5' : 'translate-x-0'
-              ]"
-            />
-          </button>
-        </div>
       </div>
 
       <div
@@ -2783,7 +2710,6 @@ import Select from '@/components/common/Select.vue'
 import Toggle from '@/components/common/Toggle.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
-import ProxyAdBanner from '@/components/common/ProxyAdBanner.vue'
 import GroupSelector from '@/components/common/GroupSelector.vue'
 import ModelWhitelistSelector from '@/components/account/ModelWhitelistSelector.vue'
 import QuotaLimitCard from '@/components/account/QuotaLimitCard.vue'
@@ -3036,8 +2962,6 @@ const autoPause5hThreshold = ref<number | null>(null)
 const autoPause7dThreshold = ref<number | null>(null)
 const autoPause5hDisabled = ref(false)
 const autoPause7dDisabled = ref(false)
-const upstreamBillingAutoProbeEnabled = ref(false)
-const upstreamBillingRateSyncEnabled = ref(false)
 const mixedScheduling = ref(false) // For antigravity accounts: enable mixed scheduling
 const allowOverages = ref(false) // For antigravity accounts: enable AI Credits overages
 const antigravityProjectId = ref('')
@@ -3045,6 +2969,8 @@ const antigravityModelRestrictionMode = ref<'whitelist' | 'mapping'>('whitelist'
 const antigravityWhitelistModels = ref<string[]>([])
 const antigravityModelMappings = ref<ModelMapping[]>([])
 const isSyncingAntigravityUpstream = ref(false)
+const antigravityLiveModels = ref<string[]>([])
+const antigravityLiveModelsCheckedAt = ref('')
 const tempUnschedEnabled = ref(false)
 const accountSchedulingThresholdOverrideEnabled = ref(false)
 const accountSchedulingThresholdOverrideValue = ref(100)
@@ -3096,7 +3022,6 @@ const customBaseUrl = ref('')
 const openaiPassthroughEnabled = ref(false)
 // OpenAI Codex namespace 工具摊平兼容开关（仅 OAuth），缺省关闭即原样保留
 const openaiFlattenNamespacesEnabled = ref(false)
-const openAILongContextBillingEnabled = ref(false)
 // OpenAI 订阅档位（Plus/Pro/Free）手动覆盖值,存于 credentials.plan_type;'' 表示清空/自动识别
 const editPlanType = ref<string>('')
 const openAICompactMode = ref<OpenAICompactMode>('auto')
@@ -3124,10 +3049,8 @@ const {
   reset: resetQuotaNotify,
 } = useQuotaNotifyState()
 
-// Load global feature states once
-adminAPI.settings.getWebSearchEmulationConfig().then(cfg => {
-  webSearchGlobalEnabled.value = cfg?.enabled === true && (cfg?.providers?.length ?? 0) > 0
-}).catch(() => { webSearchGlobalEnabled.value = false })
+  // SaaS web-search emulation is not part of Personal Edition.
+  webSearchGlobalEnabled.value = false
 
 loadQuotaNotifyGlobal()
 const editQuotaLimit = ref<number | null>(null)
@@ -3425,25 +3348,10 @@ const form = reactive({
   concurrency: 1,
   load_factor: null as number | null,
   priority: 1,
-  rate_multiplier: 1,
   status: 'active' as 'active' | 'inactive' | 'error',
   group_ids: [] as number[],
   expires_at: null as number | null
 })
-
-const handleUpstreamBillingRateSyncChange = (enabled: boolean) => {
-  upstreamBillingRateSyncEnabled.value = enabled
-  if (enabled) {
-    upstreamBillingAutoProbeEnabled.value = true
-  }
-}
-
-const handleUpstreamBillingAutoProbeChange = (enabled: boolean) => {
-  upstreamBillingAutoProbeEnabled.value = enabled
-  if (!enabled) {
-    upstreamBillingRateSyncEnabled.value = false
-  }
-}
 
 const statusOptions = computed(() => {
   const options = [
@@ -3533,7 +3441,6 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   form.concurrency = newAccount.concurrency
   form.load_factor = newAccount.load_factor ?? null
   form.priority = newAccount.priority
-  form.rate_multiplier = newAccount.rate_multiplier ?? 1
   form.status = (newAccount.status === 'active' || newAccount.status === 'inactive' || newAccount.status === 'error')
     ? newAccount.status
     : 'active'
@@ -3564,14 +3471,10 @@ const syncFormFromAccount = (newAccount: Account | null) => {
 	autoPause7dThreshold.value = typeof extra?.auto_pause_7d_threshold === 'number' ? extra.auto_pause_7d_threshold * 100 : null
 	autoPause5hDisabled.value = extra?.auto_pause_5h_disabled === true
 	autoPause7dDisabled.value = extra?.auto_pause_7d_disabled === true
-	upstreamBillingAutoProbeEnabled.value = extra?.upstream_billing_probe_enabled === true
-  upstreamBillingRateSyncEnabled.value =
-    upstreamBillingAutoProbeEnabled.value && extra?.upstream_billing_rate_sync_enabled === true
 
   // Load OpenAI passthrough toggle (OpenAI OAuth/SetupToken/API Key)
   openaiPassthroughEnabled.value = false
   openaiFlattenNamespacesEnabled.value = false
-  openAILongContextBillingEnabled.value = false
   editPlanType.value = ''
   openAICompactMode.value = 'auto'
   openAIResponsesMode.value = 'auto'
@@ -3590,8 +3493,6 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     openaiPassthroughEnabled.value = extra?.openai_passthrough === true || extra?.openai_oauth_passthrough === true
     openaiFlattenNamespacesEnabled.value =
       newAccount.type === 'oauth' && extra?.openai_responses_flatten_namespaces === true
-    const longContextBillingValue = extra?.openai_long_context_billing_enabled
-    openAILongContextBillingEnabled.value = longContextBillingValue === true
     // plan_type 手动覆盖仅 OAuth 有实际调度语义(IsOpenAIChatGPTSubscription 要求 oauth),故只对 oauth 回填
     editPlanType.value = newAccount.type === 'oauth'
       ? readPlanType(newAccount.credentials as Record<string, unknown> | undefined)
@@ -3695,6 +3596,16 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   // Load antigravity model mapping (Antigravity 只支持映射模式)
   if (newAccount.platform === 'antigravity') {
     const credentials = newAccount.credentials as Record<string, unknown> | undefined
+    const availability = extra?.antigravity_model_availability as
+      | { models?: unknown; checked_at?: unknown }
+      | undefined
+    antigravityLiveModels.value = Array.isArray(availability?.models)
+      ? availability.models.map((model) => String(model).trim()).filter(Boolean)
+      : []
+    antigravityLiveModelsCheckedAt.value =
+      typeof availability?.checked_at === 'string'
+        ? new Date(availability.checked_at).toLocaleString()
+        : ''
 
     // Antigravity 始终使用映射模式
     antigravityModelRestrictionMode.value = 'mapping'
@@ -3722,6 +3633,8 @@ const syncFormFromAccount = (newAccount: Account | null) => {
     antigravityModelRestrictionMode.value = 'mapping'
     antigravityWhitelistModels.value = []
     antigravityModelMappings.value = []
+    antigravityLiveModels.value = []
+    antigravityLiveModelsCheckedAt.value = ''
   }
 
   // Load quota control settings (Anthropic OAuth/SetupToken only)
@@ -3955,20 +3868,11 @@ const syncAntigravityUpstreamModels = async () => {
       return
     }
 
-    let addedCount = 0
-    for (const model of upstreamModels) {
-      const exists = antigravityModelMappings.value.some((mapping) => mapping.from === model)
-      if (!exists) {
-        antigravityModelMappings.value.push({ from: model, to: model })
-        addedCount += 1
-      }
-    }
-
-    if (addedCount > 0) {
-      appStore.showSuccess(t('admin.accounts.syncUpstreamModelsSuccess', { count: addedCount, total: upstreamModels.length }))
-    } else {
-      appStore.showInfo(t('admin.accounts.syncUpstreamModelsNoChanges', { count: upstreamModels.length }))
-    }
+    antigravityLiveModels.value = upstreamModels
+    antigravityLiveModelsCheckedAt.value = result.checked_at
+      ? new Date(result.checked_at).toLocaleString()
+      : new Date().toLocaleString()
+    appStore.showSuccess(t('admin.accounts.syncUpstreamModelsSuccess', { count: upstreamModels.length, total: upstreamModels.length }))
   } catch (error) {
     const message = error instanceof Error ? error.message : t('admin.accounts.syncUpstreamModelsFailed')
     appStore.showError(t('admin.accounts.syncUpstreamModelsError', { message }))
@@ -4434,14 +4338,6 @@ const handleSubmit = async () => {
       updatePayload.load_factor = 0
     }
     updatePayload.auto_pause_on_expired = autoPauseOnExpired.value
-    if (props.account.type === 'apikey') {
-      updatePayload.upstream_billing_probe_enabled = upstreamBillingAutoProbeEnabled.value
-      updatePayload.upstream_billing_rate_sync_enabled = upstreamBillingRateSyncEnabled.value
-      if (upstreamBillingRateSyncEnabled.value) {
-        delete updatePayload.rate_multiplier
-      }
-    }
-
     // For apikey type, handle credentials update
     if (props.account.type === 'apikey') {
       const currentCredentials = (props.account.credentials as Record<string, unknown>) || {}
@@ -4934,11 +4830,6 @@ const handleSubmit = async () => {
       } else {
         delete newExtra.openai_responses_flatten_namespaces
       }
-      if (isSparkShadow.value) {
-        delete newExtra.openai_long_context_billing_enabled
-      } else {
-        newExtra.openai_long_context_billing_enabled = openAILongContextBillingEnabled.value
-      }
       if (openAICompactMode.value === 'auto') {
         delete newExtra.openai_compact_mode
       } else {
@@ -5024,12 +4915,6 @@ const handleSubmit = async () => {
       const currentExtra = (updatePayload.extra as Record<string, unknown>) ||
         (props.account.extra as Record<string, unknown>) || {}
       const newExtra: Record<string, unknown> = { ...currentExtra }
-      // 上游倍率自动探测对全部 API-key 平台开放（sub2api 上游即可应答），
-      // Bedrock 凭证无静态 Key 不参与。
-      if (props.account.type === 'apikey') {
-        delete newExtra.upstream_billing_probe_enabled
-        delete newExtra.upstream_billing_rate_sync_enabled
-      }
       // Total quota
       if (editQuotaLimit.value != null && editQuotaLimit.value > 0) {
         newExtra.quota_limit = editQuotaLimit.value

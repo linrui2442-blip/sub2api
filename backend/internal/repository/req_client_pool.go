@@ -2,11 +2,14 @@ package repository
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/providerproxy"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyurl"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
 
@@ -58,6 +61,13 @@ func getSharedReqClient(opts reqClientOptions) (*req.Client, error) {
 	}
 	if trimmed != "" {
 		client.SetProxyURL(trimmed)
+		slog.Info("provider auth proxy resolved", "proxy_source", "account", "proxy_enabled", true)
+	} else {
+		// OAuth account creation happens before an account-specific proxy can
+		// exist. Resolve the standard environment on every request so Personal
+		// runtime changes to HTTP(S)_PROXY/NO_PROXY take effect without creating
+		// another provider-specific transport. ALL_PROXY is the final fallback.
+		client.GetTransport().SetProxy(providerAuthProxy)
 	}
 	client = instrumentReqClient(client)
 
@@ -66,6 +76,52 @@ func getSharedReqClient(opts reqClientOptions) (*req.Client, error) {
 		return c, nil
 	}
 	return client, nil
+}
+
+func providerAuthProxyFromEnvironment(req *http.Request) (*url.URL, error) {
+	return providerproxy.FromEnvironment(req)
+}
+
+type providerProxyDecision struct {
+	URL    *url.URL
+	Source string
+}
+
+var systemProxyResolver = windowsSystemProxy
+
+// providerAuthProxy resolves the Personal authentication egress policy. An
+// explicit account proxy is installed by getSharedReqClient before this
+// function is used. Personal Edition currently has no separate default proxy,
+// so Windows system settings precede the standard environment fallback.
+func providerAuthProxy(req *http.Request) (*url.URL, error) {
+	decision, err := resolveProviderAuthProxy(req)
+	if err == nil {
+		slog.Info("provider auth proxy resolved", "proxy_source", decision.Source, "proxy_enabled", decision.URL != nil)
+	}
+	return decision.URL, err
+}
+
+func resolveProviderAuthProxy(req *http.Request) (providerProxyDecision, error) {
+	if req == nil || req.URL == nil {
+		return providerProxyDecision{Source: "direct"}, nil
+	}
+	if proxy, ok := systemProxyResolver(req.URL); ok {
+		return providerProxyDecision{URL: proxy, Source: "windows_system"}, nil
+	}
+	proxy, err := providerAuthProxyFromEnvironment(req)
+	if err != nil {
+		return providerProxyDecision{}, err
+	}
+	if proxy != nil {
+		return providerProxyDecision{URL: proxy, Source: "environment"}, nil
+	}
+	return providerProxyDecision{Source: "direct"}, nil
+}
+
+type windowsProxyConfig = providerproxy.WindowsProxyConfig
+
+func resolveWindowsProxyConfig(target *url.URL, cfg windowsProxyConfig) (*url.URL, bool) {
+	return providerproxy.ResolveWindowsProxyConfig(target, cfg)
 }
 
 func instrumentReqClient(client *req.Client) *req.Client {

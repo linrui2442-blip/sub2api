@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"database/sql/driver"
 	"regexp"
 	"strings"
 	"testing"
@@ -281,7 +280,7 @@ func TestAccountRepository_ListOAuthRefreshCandidatePage_SQLFilter(t *testing.T)
 	require.Contains(t, normalized, "status = 'active'")
 	// setup-token 的 access_token 同为 8h 短期令牌，必须与 oauth 一起纳入后台刷新候选
 	require.Contains(t, normalized, "type IN ('oauth', 'setup-token')")
-	require.Contains(t, normalized, "platform = ANY($1)")
+	require.Contains(t, normalized, "platform IN (SELECT value FROM json_each($1))")
 	require.NotContains(t, normalized, "platform IN ('anthropic'",
 		"candidate platforms must come from the refresher registry instead of a second hard-coded list")
 	require.Contains(t, normalized, "credentials ? 'refresh_token'")
@@ -299,10 +298,8 @@ func TestAccountRepository_ListOAuthRefreshCandidatePage_SQLFilter(t *testing.T)
 	require.Len(t, capturedArgs, 3)
 	require.Equal(t, int64(100), capturedArgs[1])
 	require.Equal(t, 200, capturedArgs[2])
-	valuer, ok := capturedArgs[0].(interface{ Value() (driver.Value, error) })
+	platforms, ok := capturedArgs[0].(string)
 	require.True(t, ok)
-	platforms, err := valuer.Value()
-	require.NoError(t, err)
 	require.Contains(t, platforms, service.PlatformGrok)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

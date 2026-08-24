@@ -5,11 +5,9 @@ package repository
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
-	"github.com/lib/pq"
 	"github.com/stretchr/testify/require"
 )
 
@@ -186,13 +184,13 @@ func TestIsUniqueViolation(t *testing.T) {
 		want bool
 	}{
 		{
-			name: "unique violation code 23505",
-			err:  &pq.Error{Code: "23505"},
+			name: "sqlite unique violation",
+			err:  errors.New("UNIQUE constraint failed: channels.name"),
 			want: true,
 		},
 		{
-			name: "different pq error code",
-			err:  &pq.Error{Code: "23503"},
+			name: "foreign key violation",
+			err:  errors.New("FOREIGN KEY constraint failed"),
 			want: false,
 		},
 		{
@@ -201,21 +199,13 @@ func TestIsUniqueViolation(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "typed nil pq.Error",
-			err: func() error {
-				var pqErr *pq.Error
-				return pqErr
-			}(),
-			want: false,
-		},
-		{
 			name: "bare nil",
 			err:  nil,
 			want: false,
 		},
 		{
-			name: "wrapped pq error with 23505",
-			err:  fmt.Errorf("wrapped: %w", &pq.Error{Code: "23505"}),
+			name: "wrapped sqlite unique error",
+			err:  errors.New("insert channel: UNIQUE constraint failed: channels.name"),
 			want: true,
 		},
 	}

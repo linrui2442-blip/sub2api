@@ -81,7 +81,7 @@ func (Account) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "jsonb"}),
 
 		// extra: 扩展数据，存储平台特定的额外信息
-		// 如 CRS 账户的 crs_account_id、组织信息等
+		// 如 Provider 账户标识、组织信息及兼容导入元数据等
 		field.JSON("extra", map[string]any{}).
 			Default(func() map[string]any { return map[string]any{} }).
 			SchemaType(map[string]string{dialect.Postgres: "jsonb"}),
@@ -106,12 +106,6 @@ func (Account) Fields() []ent.Field {
 		// 调度器会优先使用高优先级的账户
 		field.Int("priority").
 			Default(50),
-
-		// rate_multiplier: 账号计费倍率（>=0，允许 0 表示该账号计费为 0）
-		// 仅影响账号维度计费口径，不影响用户/API Key 扣费（分组倍率）
-		field.Float("rate_multiplier").
-			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}).
-			Default(1.0),
 
 		// status: 账户状态，如 "active", "error", "disabled"
 		field.String("status").

@@ -27,7 +27,6 @@ import (
 	gocache "github.com/patrickmn/go-cache"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
-	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -57,7 +56,6 @@ IMPORTANT: You must NEVER generate or guess URLs for the user unless you are con
  - Do not use a colon before tool calls. Your tool calls may not be shown directly in the output, so text like "Let me read the file:" followed by a read tool call should just be "Let me read the file." with a period.`
 	maxCacheControlBlocks = 4 // Anthropic API 允许的最大 cache_control 块数量
 
-	defaultUserGroupRateCacheTTL           = 30 * time.Second
 	defaultModelsListCacheTTL              = 15 * time.Second
 	postUsageBillingTimeout                = 15 * time.Second
 	claudeCodeNoopDeltaKeepaliveMinVersion = "2.1.193"
@@ -94,30 +92,9 @@ var (
 	windowCostPrefetchFallbackTotal  atomic.Int64
 	windowCostPrefetchErrorTotal     atomic.Int64
 
-	userGroupRateCacheHitTotal      atomic.Int64
-	userGroupRateCacheMissTotal     atomic.Int64
-	userGroupRateCacheLoadTotal     atomic.Int64
-	userGroupRateCacheSFSharedTotal atomic.Int64
-	userGroupRateCacheFallbackTotal atomic.Int64
-
 	modelsListCacheHitTotal   atomic.Int64
 	modelsListCacheMissTotal  atomic.Int64
 	modelsListCacheStoreTotal atomic.Int64
-
-	// Deprecated: flusher_enabled=true 后不再增长(仅 flag=false 降级直写路径使用);新主路径见 FlusherMetrics。remove after 2026-09。
-	// userPlatformQuotaDBIncrErrorTotal 统计 finalizePostUsageBilling 异步 goroutine
-	// 中 IncrementUsageWithReset 失败次数。Redis 已成功累加 + DB 写失败意味着
-	// Redis cache TTL 过期或被清后该笔 cost 会丢失（与实际消费偏差）。
-	// oncall 通过 GatewayUserPlatformQuotaIncrStats() 暴露给 ops 面板做阈值告警。
-	userPlatformQuotaDBIncrErrorTotal atomic.Int64
-	// Deprecated: flusher_enabled=true 后不再增长(仅 flag=false 降级直写路径使用);新主路径见 FlusherMetrics。remove after 2026-09。
-	// userPlatformQuotaDBIncrLegacyErrorTotal 统计 legacy postUsageBilling
-	// （applyUsageBilling 在 repo==nil 时 fallback）路径下的失败次数；
-	// 与 DB Incr 失败分开计数，便于区分"主路径暂时故障"vs"基础设施长期未配齐"。
-	userPlatformQuotaDBIncrLegacyErrorTotal atomic.Int64
-	// userPlatformQuotaSentinelSetCacheErrorTotal 统计 checkUserPlatformQuotaEligibility
-	// 在 DB 无行时回填 sentinel cache entry 写 Redis 失败的次数（phase A）。
-	userPlatformQuotaSentinelSetCacheErrorTotal atomic.Int64
 )
 
 func GatewayWindowCostPrefetchStats() (cacheHit, cacheMiss, batchSQL, fallback, errCount int64) {
@@ -128,44 +105,8 @@ func GatewayWindowCostPrefetchStats() (cacheHit, cacheMiss, batchSQL, fallback, 
 		windowCostPrefetchErrorTotal.Load()
 }
 
-func GatewayUserGroupRateCacheStats() (cacheHit, cacheMiss, load, singleflightShared, fallback int64) {
-	return userGroupRateCacheHitTotal.Load(),
-		userGroupRateCacheMissTotal.Load(),
-		userGroupRateCacheLoadTotal.Load(),
-		userGroupRateCacheSFSharedTotal.Load(),
-		userGroupRateCacheFallbackTotal.Load()
-}
-
 func GatewayModelsListCacheStats() (cacheHit, cacheMiss, store int64) {
 	return modelsListCacheHitTotal.Load(), modelsListCacheMissTotal.Load(), modelsListCacheStoreTotal.Load()
-}
-
-// GatewayUserPlatformQuotaIncrStats 返回 (mainPathErr, legacyPathErr, sentinelSetErr)。
-// mainPathErr：finalizePostUsageBilling 异步 goroutine 写 DB 失败累计次数；
-// legacyPathErr：postUsageBilling fallback 路径写 DB 失败累计次数；
-// sentinelSetErr：DB 无行时回填 sentinel cache entry 写 Redis 失败累计次数。
-// ops 监控面板可以按"持续上升斜率"做告警阈值。
-func GatewayUserPlatformQuotaIncrStats() (mainPathErr, legacyPathErr, sentinelSetErr int64) {
-	return userPlatformQuotaDBIncrErrorTotal.Load(),
-		userPlatformQuotaDBIncrLegacyErrorTotal.Load(),
-		userPlatformQuotaSentinelSetCacheErrorTotal.Load()
-}
-
-// GatewayUserPlatformQuotaFlusherStats 暴露 flusher 运行指标供 ops/health 面板查询。
-func GatewayUserPlatformQuotaFlusherStats(f *UserPlatformQuotaUsageFlusher) map[string]int64 {
-	if f == nil || f.metrics == nil {
-		return nil
-	}
-	m := f.metrics
-	return map[string]int64{
-		"flush_success":        m.FlushSuccessTotal.Load(),
-		"flush_error":          m.FlushErrorTotal.Load(),
-		"flush_batch_size":     m.FlushBatchSizeTotal.Load(),
-		"flush_latency_ms_max": m.FlushLatencyMsMax.Load(),
-		"dirty_readd":          m.DirtyReaddTotal.Load(),
-		"dirty_lost":           m.DirtyLostTotal.Load(),
-		"flush_fk_violation":   m.FlushFKViolationTotal.Load(),
-	}
 }
 
 func openAIStreamEventIsTerminal(data string) bool {
@@ -480,17 +421,6 @@ type GatewayCache interface {
 	// Delete sticky session binding, used to proactively clean up when account becomes unavailable
 	DeleteSessionAccountID(ctx context.Context, groupID int64, sessionHash string) error
 
-	// Grok async video billing snapshot (create → status success).
-	// SetGrokVideoPendingBilling stores create-time model/duration/resolution for status billing.
-	SetGrokVideoPendingBilling(ctx context.Context, key string, payload []byte, ttl time.Duration) error
-	// GetGrokVideoPendingBilling returns the create-time billing snapshot; miss → nil, nil.
-	GetGrokVideoPendingBilling(ctx context.Context, key string) ([]byte, error)
-	// ClaimGrokVideoBilled atomically marks a video request as billed (SetNX).
-	// Returns true when this caller won the claim; false when already billed or claim unavailable.
-	ClaimGrokVideoBilled(ctx context.Context, key string, ttl time.Duration) (bool, error)
-	// ReleaseGrokVideoBilled clears a claim so a failed RecordUsage can retry billing.
-	ReleaseGrokVideoBilled(ctx context.Context, key string) error
-
 	// Reasoning content cache (Responses→Chat Completions 桥接）。
 	// SetReasoningContent 按 reasoning item id 缓存 reasoning 全文，供后续请求
 	// 在客户端不回传明文 summary 时回注 reasoning_content（DeepSeek thinking
@@ -508,13 +438,6 @@ func derefGroupID(groupID *int64) int64 {
 		return 0
 	}
 	return *groupID
-}
-
-func resolveUserGroupRateCacheTTL(cfg *config.Config) time.Duration {
-	if cfg == nil || cfg.Gateway.UserGroupRateCacheTTLSeconds <= 0 {
-		return defaultUserGroupRateCacheTTL
-	}
-	return time.Duration(cfg.Gateway.UserGroupRateCacheTTLSeconds) * time.Second
 }
 
 func resolveModelsListCacheTTL(cfg *config.Config) time.Duration {
@@ -575,15 +498,6 @@ type AccountSelectionResult struct {
 	Acquired    bool
 	ReleaseFunc func()
 	WaitPlan    *AccountWaitPlan // nil means no wait allowed
-	// profitGate 携带本次选号真实生效的利润门（无门为 nil）。门安装在调度栈的
-	// 局部 ctx 上，handler 必须经 ContextWithSelectionProfitGate 重放后才能在
-	// 调度栈之外做抢槽后终检与准入后粘性绑定。
-	profitGate *openAIProfitControlGate
-}
-
-// ProfitGateActive 报告本次选号是否处于利润门之下。
-func (r *AccountSelectionResult) ProfitGateActive() bool {
-	return r != nil && r.profitGate != nil
 }
 
 // ClaudeUsage 表示Claude API返回的usage信息
@@ -740,43 +654,32 @@ func (s *GatewayService) TempUnscheduleRetryableError(ctx context.Context, accou
 
 // GatewayService handles API gateway operations
 type GatewayService struct {
-	accountRepo           AccountRepository
-	groupRepo             GroupRepository
-	usageLogRepo          UsageLogRepository
-	usageBillingRepo      UsageBillingRepository
-	userRepo              UserRepository
-	userSubRepo           UserSubscriptionRepository
-	userGroupRateRepo     UserGroupRateRepository
-	cache                 GatewayCache
-	digestStore           *DigestSessionStore
-	cfg                   *config.Config
-	schedulerSnapshot     *SchedulerSnapshotService
-	billingService        *BillingService
-	rateLimitService      *RateLimitService
-	billingCacheService   *BillingCacheService
-	identityService       *IdentityService
-	httpUpstream          HTTPUpstream
-	deferredService       *DeferredService
-	concurrencyService    *ConcurrencyService
-	claudeTokenProvider   *ClaudeTokenProvider
-	sessionLimitCache     SessionLimitCache // 会话数量限制缓存（仅 Anthropic OAuth/SetupToken）
-	rpmCache              RPMCache          // RPM 计数缓存（仅 Anthropic OAuth/SetupToken）
-	userGroupRateResolver *userGroupRateResolver
-	userGroupRateCache    *gocache.Cache
-	userGroupRateSF       singleflight.Group
-	modelsListCache       *gocache.Cache
-	modelsListCacheTTL    time.Duration
-	settingService        *SettingService
-	responseHeaderFilter  *responseheaders.CompiledHeaderFilter
-	debugModelRouting     atomic.Bool
-	debugClaudeMimic      atomic.Bool
-	channelService        *ChannelService
-	resolver              *ModelPricingResolver
-	compositeResolver     *CompositeRouteResolver
-	debugGatewayBodyFile  atomic.Pointer[os.File] // non-nil when SUB2API_DEBUG_GATEWAY_BODY is set
-	tlsFPProfileService   *TLSFingerprintProfileService
-	balanceNotifyService  *BalanceNotifyService
-	userPlatformQuotaRepo UserPlatformQuotaRepository
+	accountRepo          AccountRepository
+	groupRepo            GroupRepository
+	usageLogRepo         UsageLogRepository
+	userRepo             UserRepository
+	cache                GatewayCache
+	digestStore          *DigestSessionStore
+	cfg                  *config.Config
+	schedulerSnapshot    *SchedulerSnapshotService
+	rateLimitService     *RateLimitService
+	identityService      *IdentityService
+	httpUpstream         HTTPUpstream
+	deferredService      *DeferredService
+	concurrencyService   *ConcurrencyService
+	claudeTokenProvider  *ClaudeTokenProvider
+	sessionLimitCache    SessionLimitCache // 会话数量限制缓存（仅 Anthropic OAuth/SetupToken）
+	rpmCache             RPMCache          // RPM 计数缓存（仅 Anthropic OAuth/SetupToken）
+	modelsListCache      *gocache.Cache
+	modelsListCacheTTL   time.Duration
+	settingService       *SettingService
+	responseHeaderFilter *responseheaders.CompiledHeaderFilter
+	debugModelRouting    atomic.Bool
+	debugClaudeMimic     atomic.Bool
+	channelService       *ChannelService
+	compositeResolver    *CompositeRouteResolver
+	debugGatewayBodyFile atomic.Pointer[os.File] // non-nil when SUB2API_DEBUG_GATEWAY_BODY is set
+	tlsFPProfileService  *TLSFingerprintProfileService
 }
 
 // NewGatewayService creates a new GatewayService
@@ -784,17 +687,12 @@ func NewGatewayService(
 	accountRepo AccountRepository,
 	groupRepo GroupRepository,
 	usageLogRepo UsageLogRepository,
-	usageBillingRepo UsageBillingRepository,
 	userRepo UserRepository,
-	userSubRepo UserSubscriptionRepository,
-	userGroupRateRepo UserGroupRateRepository,
 	cache GatewayCache,
 	cfg *config.Config,
 	schedulerSnapshot *SchedulerSnapshotService,
 	concurrencyService *ConcurrencyService,
-	billingService *BillingService,
 	rateLimitService *RateLimitService,
-	billingCacheService *BillingCacheService,
 	identityService *IdentityService,
 	httpUpstream HTTPUpstream,
 	deferredService *DeferredService,
@@ -805,55 +703,35 @@ func NewGatewayService(
 	settingService *SettingService,
 	tlsFPProfileService *TLSFingerprintProfileService,
 	channelService *ChannelService,
-	resolver *ModelPricingResolver,
 	compositeResolver *CompositeRouteResolver,
-	balanceNotifyService *BalanceNotifyService,
-	userPlatformQuotaRepo UserPlatformQuotaRepository,
 ) *GatewayService {
-	userGroupRateTTL := resolveUserGroupRateCacheTTL(cfg)
 	modelsListTTL := resolveModelsListCacheTTL(cfg)
 
 	svc := &GatewayService{
-		accountRepo:           accountRepo,
-		groupRepo:             groupRepo,
-		usageLogRepo:          usageLogRepo,
-		usageBillingRepo:      usageBillingRepo,
-		userRepo:              userRepo,
-		userSubRepo:           userSubRepo,
-		userGroupRateRepo:     userGroupRateRepo,
-		cache:                 cache,
-		digestStore:           digestStore,
-		cfg:                   cfg,
-		schedulerSnapshot:     schedulerSnapshot,
-		concurrencyService:    concurrencyService,
-		billingService:        billingService,
-		rateLimitService:      rateLimitService,
-		billingCacheService:   billingCacheService,
-		identityService:       identityService,
-		httpUpstream:          httpUpstream,
-		deferredService:       deferredService,
-		claudeTokenProvider:   claudeTokenProvider,
-		sessionLimitCache:     sessionLimitCache,
-		rpmCache:              rpmCache,
-		userGroupRateCache:    gocache.New(userGroupRateTTL, time.Minute),
-		settingService:        settingService,
-		modelsListCache:       gocache.New(modelsListTTL, time.Minute),
-		modelsListCacheTTL:    modelsListTTL,
-		responseHeaderFilter:  compileResponseHeaderFilter(cfg),
-		tlsFPProfileService:   tlsFPProfileService,
-		channelService:        channelService,
-		resolver:              resolver,
-		compositeResolver:     compositeResolver,
-		balanceNotifyService:  balanceNotifyService,
-		userPlatformQuotaRepo: userPlatformQuotaRepo,
+		accountRepo:          accountRepo,
+		groupRepo:            groupRepo,
+		usageLogRepo:         usageLogRepo,
+		userRepo:             userRepo,
+		cache:                cache,
+		digestStore:          digestStore,
+		cfg:                  cfg,
+		schedulerSnapshot:    schedulerSnapshot,
+		concurrencyService:   concurrencyService,
+		rateLimitService:     rateLimitService,
+		identityService:      identityService,
+		httpUpstream:         httpUpstream,
+		deferredService:      deferredService,
+		claudeTokenProvider:  claudeTokenProvider,
+		sessionLimitCache:    sessionLimitCache,
+		rpmCache:             rpmCache,
+		settingService:       settingService,
+		modelsListCache:      gocache.New(modelsListTTL, time.Minute),
+		modelsListCacheTTL:   modelsListTTL,
+		responseHeaderFilter: compileResponseHeaderFilter(cfg),
+		tlsFPProfileService:  tlsFPProfileService,
+		channelService:       channelService,
+		compositeResolver:    compositeResolver,
 	}
-	svc.userGroupRateResolver = newUserGroupRateResolver(
-		userGroupRateRepo,
-		svc.userGroupRateCache,
-		userGroupRateTTL,
-		&svc.userGroupRateSF,
-		"service.gateway",
-	)
 	svc.debugModelRouting.Store(parseDebugEnvBool(os.Getenv("SUB2API_DEBUG_MODEL_ROUTING")))
 	svc.debugClaudeMimic.Store(parseDebugEnvBool(os.Getenv("SUB2API_DEBUG_CLAUDE_MIMIC")))
 	if path := strings.TrimSpace(os.Getenv(debugGatewayBodyEnv)); path != "" {
@@ -937,39 +815,7 @@ func (s *GatewayService) BindStickySession(ctx context.Context, groupID *int64, 
 	return s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, accountID, stickySessionTTL)
 }
 
-// bindGatewayStickySessionDuringSelection preserves the normal eager sticky
-// behavior unless a profit gate is installed. Profit-controlled requests bind
-// only after the terminal post-slot check, otherwise a rejected candidate could
-// overwrite a healthy pre-existing sticky binding.
 func (s *GatewayService) bindGatewayStickySessionDuringSelection(ctx context.Context, groupID *int64, sessionHash string, accountID int64) error {
-	if gatewayProfitControlGateActive(ctx) {
-		return nil
-	}
-	return s.BindStickySession(ctx, groupID, sessionHash, accountID)
-}
-
-// BindStickySessionAfterProfitAdmission records a terminally admitted
-// account. Without a profit gate it preserves the pre-existing eager binding
-// behavior at the handler bind points. With a gate it never replaces a
-// different binding that already exists: a temporarily ineligible sticky
-// account remains bound and automatically becomes eligible again if its
-// account rate recovers.
-func (s *GatewayService) BindStickySessionAfterProfitAdmission(ctx context.Context, groupID *int64, sessionHash string, accountID int64) error {
-	if sessionHash == "" || accountID <= 0 || s.cache == nil {
-		return nil
-	}
-	if !gatewayProfitControlGateActive(ctx) {
-		return s.BindStickySession(ctx, groupID, sessionHash, accountID)
-	}
-	existingAccountID, err := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
-	if err != nil && !errors.Is(err, ErrStickySessionNotFound) {
-		// 读失败时无法判断既有绑定，保守跳过而不是冒着覆盖健康绑定的风险写入。
-		slog.Warn("profit_control_sticky_binding_read_failed", "group_id", derefGroupID(groupID), "account_id", accountID, "error", err)
-		return nil
-	}
-	if existingAccountID > 0 && existingAccountID != accountID {
-		return nil
-	}
 	return s.BindStickySession(ctx, groupID, sessionHash, accountID)
 }
 

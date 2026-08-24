@@ -48,26 +48,25 @@ type antigravityRetryLoopResult struct {
 
 // resolveAntigravityForwardBaseURL 解析转发用 base URL。
 //
-// 默认使用生产端点 cloudcode-pa.googleapis.com（antigravity.BaseURLs 的首个地址，
-// 与账号 OAuth 登录/测试连接所用的 antigravity.BaseURL 一致）。
-//
-// 历史上这里改用 ForwardBaseURLs()（把 daily/sandbox 排到首位）并默认取首个地址，
-// 导致网关把带生产 OAuth token 的请求发到 daily-cloudcode-pa.sandbox.googleapis.com，
-// 上游拒绝 → 账号被 401「Invalid bearer token」/502 打入临时不可调度且无法恢复
-// （见 #3611 / #2962）。后台「测试连接」用的是生产端点，所以「测试成功但网关 401」。
-//
-// daily/sandbox 端点仅供内部联调，需显式设置
-// GATEWAY_ANTIGRAVITY_FORWARD_BASE_URL=daily（或 sandbox）才启用。
-func resolveAntigravityForwardBaseURL() string {
-	baseURLs := antigravity.BaseURLs
-	if len(baseURLs) == 0 {
-		return ""
-	}
+// 显式环境变量用于诊断并具有最高优先级；未覆盖时，Google AI Pro/Ultra
+// 账号使用 daily，其余账号（含没有 paid_tier 的旧账号）使用 prod。
+func resolveAntigravityForwardBaseURL(account *Account) string {
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv(antigravityForwardBaseURLEnv)))
-	if (mode == "daily" || mode == "sandbox") && len(baseURLs) > 1 {
-		return baseURLs[1]
+	if mode == "daily" || mode == "sandbox" {
+		return "https://daily-cloudcode-pa.googleapis.com"
 	}
-	return baseURLs[0]
+	if mode == "prod" || mode == "production" {
+		return "https://cloudcode-pa.googleapis.com"
+	}
+
+	paidTier := ""
+	if account != nil {
+		paidTier = strings.ToLower(strings.TrimSpace(account.GetCredential("paid_tier")))
+	}
+	if paidTier == "g1-pro-tier" || paidTier == "g1-ultra-tier" {
+		return "https://daily-cloudcode-pa.googleapis.com"
+	}
+	return "https://cloudcode-pa.googleapis.com"
 }
 
 // smartRetryAction 智能重试的处理结果
@@ -488,7 +487,7 @@ func (s *AntigravityGatewayService) antigravityRetryLoop(p antigravityRetryLoopP
 		}
 	}
 
-	baseURL := resolveAntigravityForwardBaseURL()
+	baseURL := resolveAntigravityForwardBaseURL(p.account)
 	if baseURL == "" {
 		return nil, errors.New("no antigravity forward base url configured")
 	}
@@ -496,6 +495,7 @@ func (s *AntigravityGatewayService) antigravityRetryLoop(p antigravityRetryLoopP
 
 	var resp *http.Response
 	var usedBaseURL string
+	authRecoveryAttempted := false
 	logBody := p.settingService != nil && p.settingService.cfg != nil && p.settingService.cfg.Gateway.LogUpstreamErrorBody
 	maxBytes := 2048
 	if p.settingService != nil && p.settingService.cfg != nil && p.settingService.cfg.Gateway.LogUpstreamErrorBodyMaxBytes > 0 {
@@ -561,6 +561,27 @@ urlFallbackLoop:
 			if resp.StatusCode >= 400 {
 				respBody := s.readUpstreamErrorBody(resp)
 				_ = resp.Body.Close()
+
+				// A Google business-endpoint 401 gets one credential recovery and
+				// one replay before any response bytes are committed to the client.
+				// The token provider performs its conditional check under the shared
+				// OAuth lock, preventing concurrent 401s from refreshing repeatedly.
+				if resp.StatusCode == http.StatusUnauthorized && !authRecoveryAttempted &&
+					p.account.Type == AccountTypeOAuth && s.tokenProvider != nil {
+					authRecoveryAttempted = true
+					freshToken, refreshErr := s.tokenProvider.RecoverRejectedAccessToken(p.ctx, p.account, p.accessToken)
+					if refreshErr != nil {
+						logger.LegacyPrintf("service.antigravity_gateway", "%s status=401 credential_recovery_failed account=%d error=%v", p.prefix, p.account.ID, refreshErr)
+						resp = &http.Response{
+							StatusCode: http.StatusUnauthorized,
+							Header:     resp.Header.Clone(),
+							Body:       io.NopCloser(bytes.NewReader(respBody)),
+						}
+						break urlFallbackLoop
+					}
+					p.accessToken = freshToken
+					continue
+				}
 
 				if overagesInjected && shouldMarkCreditsExhausted(resp, respBody, nil) {
 					modelKey := resolveCreditsOveragesModelKey(p.ctx, p.account, "", p.requestedModel)
@@ -762,7 +783,7 @@ func logPrefix(sessionID, accountName string) string {
 
 func (s *AntigravityGatewayService) shouldFailoverUpstreamError(statusCode int) bool {
 	switch statusCode {
-	case 401, 403, 429, 529:
+	case 401, 403, 404, 429, 529:
 		return true
 	default:
 		return statusCode >= 500
@@ -1183,6 +1204,23 @@ func (s *AntigravityGatewayService) handleUpstreamError(
 ) *handleModelRateLimitResult {
 	// 遵守自定义错误码策略：未命中则跳过所有限流处理
 	if !account.ShouldHandleErrorCode(statusCode) {
+		return nil
+	}
+	// A model-not-found response is scoped to this account and final model key.
+	// Handle it before the generic quota parser so it produces exactly one
+	// account+model exclusion and never an account-wide quarantine.
+	if statusCode == http.StatusNotFound {
+		modelKey := resolveFinalAntigravityModelKey(ctx, account, requestedModel)
+		if strings.TrimSpace(modelKey) == "" {
+			modelKey = resolveAntigravityModelKey(requestedModel)
+		}
+		if modelKey != "" {
+			resetAt := time.Now().Add(s.getDefaultRateLimitDuration())
+			if setModelRateLimitByModelName(ctx, s.accountRepo, account.ID, modelKey, prefix, statusCode, resetAt, false) {
+				s.updateAccountModelRateLimitInCache(ctx, account, modelKey, resetAt)
+			}
+			logger.LegacyPrintf("service.antigravity_gateway", "%s status=404 unsupported_model account=%d model=%s scope=account_model", prefix, account.ID, modelKey)
+		}
 		return nil
 	}
 	// 模型级限流处理（优先）

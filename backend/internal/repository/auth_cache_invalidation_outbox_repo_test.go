@@ -2,25 +2,25 @@ package repository
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
+	"database/sql"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
 	sqlmock "github.com/DATA-DOG/go-sqlmock"
-	"github.com/Wei-Shaw/sub2api/migrations"
 	"github.com/stretchr/testify/require"
+	_ "modernc.org/sqlite"
 )
 
-func TestAuthCacheInvalidationOutboxRepository_ClaimUsesLeaseAndSkipLocked(t *testing.T) {
+func TestAuthCacheInvalidationOutboxRepository_ClaimUsesSQLiteLease(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
 	defer func() { _ = db.Close() }()
 
 	created := time.Now().UTC()
-	mock.ExpectQuery("(?s)claimed_at < NOW\\(\\) - .*FOR UPDATE SKIP LOCKED.*RETURNING").
-		WithArgs("worker-a", 100, int64(30)).
+	mock.ExpectQuery("(?s)UPDATE auth_cache_invalidation_outbox.*claimed_at = \\?.*RETURNING").
+		WithArgs(sqlmock.AnyArg(), "worker-a", sqlmock.AnyArg(), sqlmock.AnyArg(), 100, sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "cache_key", "attempts", "delivery_stage", "created_at"}).
 			AddRow(int64(4), strings.Repeat("a", 64), 2, 1, created))
 
@@ -37,13 +37,84 @@ func TestAuthCacheInvalidationOutboxRepository_ClaimIsBoundedByDefault(t *testin
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
 	defer func() { _ = db.Close() }()
-	mock.ExpectQuery("(?s)FROM auth_cache_invalidation_outbox.*LIMIT \\$2.*SKIP LOCKED").
-		WithArgs("worker", 100, int64(30)).
+	mock.ExpectQuery("(?s)UPDATE auth_cache_invalidation_outbox.*LIMIT \\?.*RETURNING").
+		WithArgs(sqlmock.AnyArg(), "worker", sqlmock.AnyArg(), sqlmock.AnyArg(), 100, sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id", "cache_key", "attempts", "delivery_stage", "created_at"}))
 	repo := NewAuthCacheInvalidationOutboxRepository(db)
 	_, err = repo.Claim(context.Background(), "worker", 0, 0)
 	require.NoError(t, err)
 	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+func openAuthInvalidationSQLite(t *testing.T) *sql.DB {
+	t.Helper()
+	db, err := sql.Open("sqlite", fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name()))
+	require.NoError(t, err)
+	db.SetMaxOpenConns(1)
+	_, err = db.Exec(`
+		CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT NOT NULL, deleted_at DATETIME NULL);
+		CREATE TABLE groups (id INTEGER PRIMARY KEY, name TEXT NOT NULL, deleted_at DATETIME NULL);
+	`)
+	require.NoError(t, err)
+	require.NoError(t, ensurePersonalSQLiteInfrastructure(context.Background(), db))
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
+	return db
+}
+
+func TestAuthCacheInvalidationOutboxRepository_SQLiteRuntimeLifecycle(t *testing.T) {
+	ctx := context.Background()
+	db := openAuthInvalidationSQLite(t)
+	repo := NewAuthCacheInvalidationOutboxRepository(db)
+
+	// An empty queue is a normal poll, not an error.
+	events, err := repo.Claim(ctx, "worker-a", 10, 30*time.Second)
+	require.NoError(t, err)
+	require.Empty(t, events)
+
+	now := time.Now().UTC()
+	result, err := db.ExecContext(ctx, `
+		INSERT INTO auth_cache_invalidation_outbox (cache_key, available_at, created_at)
+		VALUES (?, ?, ?)
+	`, strings.Repeat("a", 64), now.Add(-time.Second), now)
+	require.NoError(t, err)
+	id, err := result.LastInsertId()
+	require.NoError(t, err)
+
+	events, err = repo.Claim(ctx, "worker-a", 10, 30*time.Second)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	require.Equal(t, id, events[0].ID)
+
+	// An active lease cannot be stolen by another worker.
+	events, err = repo.Claim(ctx, "worker-b", 10, 30*time.Second)
+	require.NoError(t, err)
+	require.Empty(t, events)
+
+	// Retry clears ownership, increments attempts and honors backoff.
+	retryAt := time.Now().UTC().Add(time.Minute)
+	require.NoError(t, repo.RetryClaimed(ctx, id, "worker-a", retryAt, "temporary failure"))
+	events, err = repo.Claim(ctx, "worker-b", 10, 30*time.Second)
+	require.NoError(t, err)
+	require.Empty(t, events)
+
+	_, err = db.ExecContext(ctx, `UPDATE auth_cache_invalidation_outbox SET available_at = ? WHERE id = ?`, time.Now().UTC().Add(-time.Second), id)
+	require.NoError(t, err)
+	events, err = repo.Claim(ctx, "worker-b", 10, 30*time.Second)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	require.Equal(t, 1, events[0].Attempts)
+
+	// Successful first and second passes retain then remove the event.
+	require.NoError(t, repo.ScheduleSecondPass(ctx, id, "worker-b", time.Now().UTC().Add(-time.Second)))
+	events, err = repo.Claim(ctx, "worker-b", 10, 30*time.Second)
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	require.Equal(t, 1, events[0].Stage)
+	require.NoError(t, repo.DeleteClaimed(ctx, id, "worker-b"))
+
+	events, err = repo.Claim(ctx, "worker-b", 10, 30*time.Second)
+	require.NoError(t, err)
+	require.Empty(t, events)
 }
 
 func TestAuthCacheInvalidationOutboxRepository_ClaimOwnershipTransitions(t *testing.T) {
@@ -97,27 +168,4 @@ func TestAuthCacheInvalidationOutboxRepository_StatsExposeDurableLagAndFailures(
 	require.Equal(t, 7, stats.MaxAttempts)
 	require.Equal(t, "redis down", stats.LastError)
 	require.NotNil(t, stats.OldestCreatedAt)
-}
-
-func TestAuthCacheInvalidationMigration_SecurityCoverageAndNoPlaintextPayload(t *testing.T) {
-	content, err := migrations.FS.ReadFile("184_auth_cache_invalidation_outbox.sql")
-	require.NoError(t, err)
-	sqlText := string(content)
-	for _, required := range []string{
-		"encode(sha256(convert_to(raw_key, 'UTF8')), 'hex')",
-		"OLD.key", "OLD.status", "OLD.deleted_at", "OLD.user_id", "OLD.group_id",
-		"OLD.ip_whitelist", "OLD.ip_blacklist", "OLD.expires_at",
-		"trg_users_auth_cache_invalidation", "trg_groups_auth_cache_invalidation",
-		"trg_user_allowed_groups_auth_cache_invalidation", "FOR EACH ROW",
-		"delivery_stage", "claimed_at", "available_at",
-	} {
-		require.Contains(t, sqlText, required)
-	}
-	require.NotContains(t, sqlText, "quota_used IS DISTINCT")
-	require.NotContains(t, sqlText, "last_used_at IS DISTINCT")
-
-	plaintext := "sk-plaintext-must-not-be-stored"
-	sum := sha256.Sum256([]byte(plaintext))
-	require.Len(t, hex.EncodeToString(sum[:]), 64)
-	require.NotContains(t, sqlText, plaintext)
 }

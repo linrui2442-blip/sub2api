@@ -20,9 +20,6 @@ type stubAdminService struct {
 	openAISchedulerScorePoolCalls       int
 	proxies                             []service.Proxy
 	proxyCounts                         []service.ProxyWithAccountCount
-	redeems                             []service.RedeemCode
-	boundAuthIdentity                   *service.AdminBindAuthIdentityInput
-	boundAuthIdentityFor                int64
 	createdAccounts                     []*service.CreateAccountInput
 	createdProxies                      []*service.CreateProxyInput
 	updatedProxyIDs                     []int64
@@ -65,14 +62,6 @@ type stubAdminService struct {
 	}
 	lastListProxies struct {
 		protocol  string
-		status    string
-		search    string
-		sortBy    string
-		sortOrder string
-		calls     int
-	}
-	lastListRedeemCodes struct {
-		codeType  string
 		status    string
 		search    string
 		sortBy    string
@@ -128,14 +117,6 @@ func newStubAdminService() *stubAdminService {
 		CreatedAt: now,
 		UpdatedAt: now,
 	}
-	redeem := service.RedeemCode{
-		ID:        5,
-		Code:      "R-TEST",
-		Type:      service.RedeemTypeBalance,
-		Value:     10,
-		Status:    service.StatusUnused,
-		CreatedAt: now,
-	}
 	return &stubAdminService{
 		users:       []service.User{user},
 		apiKeys:     []service.APIKey{apiKey},
@@ -143,7 +124,6 @@ func newStubAdminService() *stubAdminService {
 		accounts:    []service.Account{account},
 		proxies:     []service.Proxy{proxy},
 		proxyCounts: []service.ProxyWithAccountCount{{Proxy: proxy, AccountCount: 1}},
-		redeems:     []service.RedeemCode{redeem},
 	}
 }
 
@@ -188,11 +168,6 @@ func (s *stubAdminService) DeleteUser(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *stubAdminService) UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string) (*service.User, error) {
-	user := service.User{ID: userID, Balance: balance, Status: service.StatusActive}
-	return &user, nil
-}
-
 func (s *stubAdminService) BatchUpdateConcurrency(ctx context.Context, userIDs []int64, value int, mode string) (int, error) {
 	return len(userIDs), nil
 }
@@ -218,52 +193,6 @@ func (s *stubAdminService) GetUserRPMStatus(ctx context.Context, userID int64) (
 		UserRPMUsed:  0,
 		UserRPMLimit: user.RPMLimit,
 	}, nil
-}
-
-func (s *stubAdminService) BindUserAuthIdentity(ctx context.Context, userID int64, input service.AdminBindAuthIdentityInput) (*service.AdminBoundAuthIdentity, error) {
-	s.boundAuthIdentityFor = userID
-	copied := input
-	if input.Metadata != nil {
-		copied.Metadata = map[string]any{}
-		for key, value := range input.Metadata {
-			copied.Metadata[key] = value
-		}
-	}
-	if input.Channel != nil {
-		channel := *input.Channel
-		if input.Channel.Metadata != nil {
-			channel.Metadata = map[string]any{}
-			for key, value := range input.Channel.Metadata {
-				channel.Metadata[key] = value
-			}
-		}
-		copied.Channel = &channel
-	}
-	s.boundAuthIdentity = &copied
-
-	now := time.Now().UTC()
-	result := &service.AdminBoundAuthIdentity{
-		UserID:          userID,
-		ProviderType:    input.ProviderType,
-		ProviderKey:     input.ProviderKey,
-		ProviderSubject: input.ProviderSubject,
-		VerifiedAt:      &now,
-		Issuer:          input.Issuer,
-		Metadata:        input.Metadata,
-		CreatedAt:       now,
-		UpdatedAt:       now,
-	}
-	if input.Channel != nil {
-		result.Channel = &service.AdminBoundAuthIdentityChannel{
-			Channel:        input.Channel.Channel,
-			ChannelAppID:   input.Channel.ChannelAppID,
-			ChannelSubject: input.Channel.ChannelSubject,
-			Metadata:       input.Channel.Metadata,
-			CreatedAt:      now,
-			UpdatedAt:      now,
-		}
-	}
-	return result, nil
 }
 
 func (s *stubAdminService) ListGroups(ctx context.Context, page, pageSize int, platform, status, search string, isExclusive *bool, sortBy, sortOrder string) ([]service.Group, int64, error) {
@@ -377,26 +306,6 @@ func (s *stubAdminService) DeleteGroup(ctx context.Context, id int64) error {
 
 func (s *stubAdminService) GetGroupAPIKeys(ctx context.Context, groupID int64, page, pageSize int) ([]service.APIKey, int64, error) {
 	return s.apiKeys, int64(len(s.apiKeys)), nil
-}
-
-func (s *stubAdminService) GetGroupRateMultipliers(_ context.Context, _ int64) ([]service.UserGroupRateEntry, error) {
-	return nil, nil
-}
-
-func (s *stubAdminService) ClearGroupRateMultipliers(_ context.Context, _ int64) error {
-	return nil
-}
-
-func (s *stubAdminService) BatchSetGroupRateMultipliers(_ context.Context, _ int64, _ []service.GroupRateMultiplierInput) error {
-	return nil
-}
-
-func (s *stubAdminService) ClearGroupRPMOverrides(_ context.Context, _ int64) error {
-	return nil
-}
-
-func (s *stubAdminService) BatchSetGroupRPMOverrides(_ context.Context, _ int64, _ []service.GroupRPMOverrideInput) error {
-	return nil
 }
 
 func (s *stubAdminService) ListAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search string, groupID int64, privacyMode string, sortBy, sortOrder string) ([]service.Account, int64, error) {
@@ -680,42 +589,6 @@ func (s *stubAdminService) CheckProxyQuality(ctx context.Context, id int64) (*se
 			{Target: "gemini", Status: "pass", HTTPStatus: 200},
 		},
 	}, nil
-}
-
-func (s *stubAdminService) ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, search string, sortBy, sortOrder string) ([]service.RedeemCode, int64, error) {
-	s.lastListRedeemCodes.codeType = codeType
-	s.lastListRedeemCodes.status = status
-	s.lastListRedeemCodes.search = search
-	s.lastListRedeemCodes.sortBy = sortBy
-	s.lastListRedeemCodes.sortOrder = sortOrder
-	s.lastListRedeemCodes.calls++
-	return s.redeems, int64(len(s.redeems)), nil
-}
-
-func (s *stubAdminService) GetRedeemCode(ctx context.Context, id int64) (*service.RedeemCode, error) {
-	code := service.RedeemCode{ID: id, Code: "R-TEST", Status: service.StatusUnused}
-	return &code, nil
-}
-
-func (s *stubAdminService) GenerateRedeemCodes(ctx context.Context, input *service.GenerateRedeemCodesInput) ([]service.RedeemCode, error) {
-	return s.redeems, nil
-}
-
-func (s *stubAdminService) DeleteRedeemCode(ctx context.Context, id int64) error {
-	return nil
-}
-
-func (s *stubAdminService) BatchDeleteRedeemCodes(ctx context.Context, ids []int64) (int64, error) {
-	return int64(len(ids)), nil
-}
-
-func (s *stubAdminService) ExpireRedeemCode(ctx context.Context, id int64) (*service.RedeemCode, error) {
-	code := service.RedeemCode{ID: id, Code: "R-TEST", Status: service.StatusUsed}
-	return &code, nil
-}
-
-func (s *stubAdminService) GetUserBalanceHistory(ctx context.Context, userID int64, page, pageSize int, codeType string) ([]service.RedeemCode, int64, float64, error) {
-	return s.redeems, int64(len(s.redeems)), 100.0, nil
 }
 
 func (s *stubAdminService) UpdateGroupSortOrders(ctx context.Context, updates []service.GroupSortOrderUpdate) error {

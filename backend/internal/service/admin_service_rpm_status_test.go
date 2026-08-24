@@ -37,15 +37,6 @@ func (s *rpmStatusGroupRepoStub) GetByIDLite(_ context.Context, id int64) (*Grou
 	return s.groups[id], nil
 }
 
-type rpmStatusRateRepoStub struct {
-	UserGroupRateRepository
-	overrides map[int64]*int
-}
-
-func (s *rpmStatusRateRepoStub) GetRPMOverrideByUserAndGroup(_ context.Context, _, groupID int64) (*int, error) {
-	return s.overrides[groupID], nil
-}
-
 type rpmStatusCacheStub struct {
 	UserRPMCache
 	userUsed  int
@@ -71,7 +62,6 @@ func (s *rpmStatusCacheStub) GetUserRPM(context.Context, int64) (int, error) {
 func TestAdminService_GetUserRPMStatus_AggregatesUserAndGroupLimits(t *testing.T) {
 	groupOneID := int64(1)
 	groupTwoID := int64(2)
-	override := 7
 	svc := &adminServiceImpl{
 		userRepo: &rpmStatusUserRepoStub{user: &User{
 			ID:       42,
@@ -86,9 +76,6 @@ func TestAdminService_GetUserRPMStatus_AggregatesUserAndGroupLimits(t *testing.T
 		groupRepo: &rpmStatusGroupRepoStub{groups: map[int64]*Group{
 			groupOneID: {ID: groupOneID, Name: "group-one", RPMLimit: 10},
 			groupTwoID: {ID: groupTwoID, Name: "group-two", RPMLimit: 60},
-		}},
-		userGroupRateRepo: &rpmStatusRateRepoStub{overrides: map[int64]*int{
-			groupTwoID: &override,
 		}},
 		userRPMCache: &rpmStatusCacheStub{
 			userUsed: 5,
@@ -106,7 +93,7 @@ func TestAdminService_GetUserRPMStatus_AggregatesUserAndGroupLimits(t *testing.T
 		UserRPMLimit: 20,
 		PerGroup: []UserGroupRPMStatus{
 			{GroupID: groupOneID, GroupName: "group-one", Used: 3, Limit: 10, Source: "group"},
-			{GroupID: groupTwoID, GroupName: "group-two", Used: 4, Limit: 7, Source: "override"},
+			{GroupID: groupTwoID, GroupName: "group-two", Used: 4, Limit: 60, Source: "group"},
 		},
 	}, status)
 }

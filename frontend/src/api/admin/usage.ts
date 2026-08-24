@@ -17,9 +17,6 @@ export interface AdminUsageStatsResponse {
   total_cache_creation_tokens: number
   total_cache_read_tokens: number
   total_tokens: number
-  total_cost: number
-  total_actual_cost: number
-  total_account_cost: number
   average_duration_ms: number
   endpoints?: EndpointStat[]
   upstream_endpoints?: EndpointStat[]
@@ -48,7 +45,6 @@ export interface UsageCleanupFilters {
   model?: string | null
   request_type?: UsageRequestType | null
   stream?: boolean | null
-  billing_type?: number | null
 }
 
 export interface UsageCleanupTask {
@@ -76,14 +72,12 @@ export interface CreateUsageCleanupTaskRequest {
   model?: string | null
   request_type?: UsageRequestType | null
   stream?: boolean | null
-  billing_type?: number | null
   timezone?: string
 }
 
 export interface AdminUsageQueryParams extends UsageQueryParams {
   user_id?: number
   exact_total?: boolean
-  billing_mode?: string
   upstream_model_mismatch?: boolean
   sort_by?: string
   sort_order?: 'asc' | 'desc'

@@ -13,6 +13,11 @@ import (
 	"time"
 )
 
+// sanitizeEmailHeader removes CR/LF characters to prevent SMTP header injection.
+func sanitizeEmailHeader(value string) string {
+	return strings.NewReplacer("\r", "", "\n", "").Replace(value)
+}
+
 type smtpMessage struct {
 	envelopeFrom string
 	envelopeTo   string

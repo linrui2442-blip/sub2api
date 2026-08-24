@@ -27,12 +27,13 @@ const (
 
 // AntigravityQuotaFetcher 从 Antigravity API 获取额度
 type AntigravityQuotaFetcher struct {
-	proxyRepo ProxyRepository
+	proxyRepo     ProxyRepository
+	tokenProvider *AntigravityTokenProvider
 }
 
 // NewAntigravityQuotaFetcher 创建 AntigravityQuotaFetcher
-func NewAntigravityQuotaFetcher(proxyRepo ProxyRepository) *AntigravityQuotaFetcher {
-	return &AntigravityQuotaFetcher{proxyRepo: proxyRepo}
+func NewAntigravityQuotaFetcher(proxyRepo ProxyRepository, tokenProvider *AntigravityTokenProvider) *AntigravityQuotaFetcher {
+	return &AntigravityQuotaFetcher{proxyRepo: proxyRepo, tokenProvider: tokenProvider}
 }
 
 // CanFetch 检查是否可以获取此账户的额度
@@ -40,13 +41,18 @@ func (f *AntigravityQuotaFetcher) CanFetch(account *Account) bool {
 	if account.Platform != PlatformAntigravity {
 		return false
 	}
-	accessToken := account.GetCredential("access_token")
-	return accessToken != ""
+	return account.Type == AccountTypeUpstream || account.Type == AccountTypeOAuth
 }
 
 // FetchQuota 获取 Antigravity 账户额度信息
 func (f *AntigravityQuotaFetcher) FetchQuota(ctx context.Context, account *Account, proxyURL string) (*QuotaResult, error) {
-	accessToken := account.GetCredential("access_token")
+	if f.tokenProvider == nil {
+		return nil, errors.New("antigravity token provider is not configured")
+	}
+	accessToken, err := f.tokenProvider.GetAccessToken(ctx, account)
+	if err != nil {
+		return nil, fmt.Errorf("get antigravity access token: %w", err)
+	}
 	projectID := account.GetCredential("project_id")
 
 	client, err := antigravity.NewClient(proxyURL)
@@ -56,6 +62,13 @@ func (f *AntigravityQuotaFetcher) FetchQuota(ctx context.Context, account *Accou
 
 	// 调用 API 获取配额
 	modelsResp, modelsRaw, err := client.FetchAvailableModels(ctx, accessToken, projectID)
+	if err != nil && isAntigravityUnauthorized(err) && account.Type == AccountTypeOAuth {
+		accessToken, err = f.tokenProvider.RecoverRejectedAccessToken(ctx, account, accessToken)
+		if err != nil {
+			return nil, fmt.Errorf("refresh antigravity access token after 401: %w", err)
+		}
+		modelsResp, modelsRaw, err = client.FetchAvailableModels(ctx, accessToken, projectID)
+	}
 	if err != nil {
 		// 403 Forbidden: 不报错，返回 is_forbidden 标记
 		var forbiddenErr *antigravity.ForbiddenError
@@ -79,7 +92,7 @@ func (f *AntigravityQuotaFetcher) FetchQuota(ctx context.Context, account *Accou
 	}
 
 	// 调用 LoadCodeAssist 获取订阅等级和 AI Credits 余额（非关键路径，失败不影响主流程）
-	tierRaw, tierNormalized, loadResp := f.fetchSubscriptionTier(ctx, client, accessToken)
+	tierRaw, tierNormalized, loadResp := f.fetchSubscriptionTier(ctx, client, account, accessToken)
 
 	// 转换为 UsageInfo
 	usageInfo := f.buildUsageInfo(modelsResp, tierRaw, tierNormalized, loadResp)
@@ -90,10 +103,26 @@ func (f *AntigravityQuotaFetcher) FetchQuota(ctx context.Context, account *Accou
 	}, nil
 }
 
+func isAntigravityUnauthorized(err error) bool {
+	if err == nil {
+		return false
+	}
+	lower := strings.ToLower(err.Error())
+	return strings.Contains(lower, "http 401") || strings.Contains(lower, "unauthenticated")
+}
+
 // fetchSubscriptionTier 获取账号订阅等级，失败返回空字符串。
 // 同时返回 LoadCodeAssistResponse，以便提取 AI Credits 余额。
-func (f *AntigravityQuotaFetcher) fetchSubscriptionTier(ctx context.Context, client *antigravity.Client, accessToken string) (raw, normalized string, loadResp *antigravity.LoadCodeAssistResponse) {
+func (f *AntigravityQuotaFetcher) fetchSubscriptionTier(ctx context.Context, client *antigravity.Client, account *Account, accessToken string) (raw, normalized string, loadResp *antigravity.LoadCodeAssistResponse) {
 	loadResp, _, err := client.LoadCodeAssist(ctx, accessToken)
+	if err != nil && isAntigravityUnauthorized(err) && account != nil && account.Type == AccountTypeOAuth {
+		freshToken, refreshErr := f.tokenProvider.RecoverRejectedAccessToken(ctx, account, accessToken)
+		if refreshErr != nil {
+			slog.Warn("failed to refresh token for subscription tier", "error", refreshErr)
+			return "", "", nil
+		}
+		loadResp, _, err = client.LoadCodeAssist(ctx, freshToken)
+	}
 	if err != nil {
 		slog.Warn("failed to fetch subscription tier", "error", err)
 		return "", "", nil

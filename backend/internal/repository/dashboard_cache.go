@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/redis/go-redis/v9"
 )
@@ -18,6 +19,9 @@ type dashboardCache struct {
 }
 
 func NewDashboardCache(rdb *redis.Client, cfg *config.Config) service.DashboardStatsCache {
+	if personal.Enabled() {
+		return newPersonalDashboardCache()
+	}
 	prefix := "sub2api:"
 	if cfg != nil {
 		prefix = strings.TrimSpace(cfg.Dashboard.KeyPrefix)

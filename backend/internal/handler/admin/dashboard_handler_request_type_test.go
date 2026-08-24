@@ -95,10 +95,9 @@ func (s *dashboardUsageRepoCapture) GetUserSpendingRanking(
 ) (*usagestats.UserSpendingRankingResponse, error) {
 	s.rankingLimit = limit
 	return &usagestats.UserSpendingRankingResponse{
-		Ranking:         s.ranking,
-		TotalActualCost: s.rankingTotal,
-		TotalRequests:   44,
-		TotalTokens:     1234,
+		Ranking:       s.ranking,
+		TotalRequests: 44,
+		TotalTokens:   1234,
 	}, nil
 }
 
@@ -252,7 +251,7 @@ func TestDashboardUsersRankingLimitAndCache(t *testing.T) {
 	dashboardUsersRankingCache = newSnapshotCache(5 * time.Minute)
 	repo := &dashboardUsageRepoCapture{
 		ranking: []usagestats.UserSpendingRankingItem{
-			{UserID: 7, Email: "rank@example.com", ActualCost: 10.5, Requests: 3, Tokens: 300},
+			{UserID: 7, Email: "rank@example.com", Requests: 3, Tokens: 300},
 		},
 		rankingTotal: 88.8,
 	}
@@ -264,7 +263,7 @@ func TestDashboardUsersRankingLimitAndCache(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Equal(t, 50, repo.rankingLimit)
-	require.Contains(t, rec.Body.String(), "\"total_actual_cost\":88.8")
+	require.NotContains(t, rec.Body.String(), "total_actual_cost")
 	require.Contains(t, rec.Body.String(), "\"total_requests\":44")
 	require.Contains(t, rec.Body.String(), "\"total_tokens\":1234")
 	require.Equal(t, "miss", rec.Header().Get("X-Snapshot-Cache"))

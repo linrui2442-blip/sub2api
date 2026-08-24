@@ -9,21 +9,10 @@ const here = dirname(fileURLToPath(import.meta.url))
 const read = (path: string) => readFileSync(resolve(here, path), 'utf8')
 
 describe('Prompt Audit integration surface', () => {
-  it('registers an admin and risk-control guarded route', () => {
-    const router = read('../../../router/index.ts')
-    expect(router).toContain("path: '/admin/prompt-audit'")
-    const route = router.slice(router.indexOf("path: '/admin/prompt-audit'"), router.indexOf("path: '/admin/usage'"))
-    expect(route).toContain('requiresAuth: true')
-    expect(route).toContain('requiresAdmin: true')
-    expect(route).toContain('requiresRiskControl: true')
-  })
-
-  it('keeps the legacy content moderation route and adds both pages under an expand-only security group', () => {
-    const sidebar = read('../../../components/layout/AppSidebar.vue')
-    const group = sidebar.slice(sidebar.indexOf("path: '/admin/security-audit'"), sidebar.indexOf("path: '/admin/redeem'"))
-    expect(group).toContain('expandOnly: true')
-    expect(group).toContain("path: '/admin/risk-control'")
-    expect(group).toContain("path: '/admin/prompt-audit'")
+  it('does not expose the upstream risk-control console in Personal routes', () => {
+    const router = read('../../../router/personal.ts')
+    expect(router).not.toContain("path: '/admin/prompt-audit'")
+    expect(router).not.toContain("path: '/admin/risk-control'")
   })
 
   it('keeps Prompt Audit locale trees symmetric and all operational controls named', () => {

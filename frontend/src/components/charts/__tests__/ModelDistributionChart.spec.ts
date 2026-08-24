@@ -57,8 +57,6 @@ describe('ModelDistributionChart', () => {
       cache_creation_tokens: 0,
       cache_read_tokens: 0,
       total_tokens: 1000,
-      cost: 1.5,
-      actual_cost: 0.2,
     },
     {
       model: 'model-b',
@@ -68,8 +66,6 @@ describe('ModelDistributionChart', () => {
       cache_creation_tokens: 0,
       cache_read_tokens: 0,
       total_tokens: 500,
-      cost: 0.5,
-      actual_cost: 1.4,
     },
   ]
 
@@ -102,11 +98,11 @@ describe('ModelDistributionChart', () => {
     expect(label).toBe('model-a: 1.00K (66.7%)')
   })
 
-  it('uses actual_cost and reorders rows in actual cost mode', () => {
+  it('uses requests and reorders rows in request mode', () => {
     const wrapper = mount(ModelDistributionChart, {
       props: {
         modelStats,
-        metric: 'actual_cost',
+        metric: 'requests',
       },
       global: {
         stubs: {
@@ -116,20 +112,20 @@ describe('ModelDistributionChart', () => {
     })
 
     const chartData = JSON.parse(wrapper.find('.chart-data').text())
-    expect(chartData.labels).toEqual(['model-b', 'model-a'])
-    expect(chartData.datasets[0].data).toEqual([1.4, 0.2])
+    expect(chartData.labels).toEqual(['model-a', 'model-b'])
+    expect(chartData.datasets[0].data).toEqual([8, 3])
 
     const rows = wrapper.findAll('tbody tr')
-    expect(rows[0].text()).toContain('model-b')
-    expect(rows[1].text()).toContain('model-a')
+    expect(rows[0].text()).toContain('model-a')
+    expect(rows[1].text()).toContain('model-b')
 
     const options = (wrapper.vm as any).$?.setupState.doughnutOptions
     const label = options.plugins.tooltip.callbacks.label({
-      label: 'model-b',
-      raw: 1.4,
-      dataset: { data: [1.4, 0.2] },
+      label: 'model-a',
+      raw: 8,
+      dataset: { data: [8, 3] },
     })
-    expect(label).toBe('model-b: $1.40 (87.5%)')
+    expect(label).toBe('model-a: 8 (72.7%)')
   })
 
   it('can hide account cost for user usage stats without account_cost', () => {
@@ -146,8 +142,8 @@ describe('ModelDistributionChart', () => {
     })
 
     expect(wrapper.text()).not.toContain('Account Cost')
-    expect(wrapper.findAll('thead th')).toHaveLength(5)
-    expect(wrapper.findAll('tbody tr')[0].findAll('td')).toHaveLength(5)
+    expect(wrapper.findAll('thead th')).toHaveLength(3)
+    expect(wrapper.findAll('tbody tr')[0].findAll('td')).toHaveLength(3)
   })
 
   it('uses the dashboard user label policy and renders Others with a dedicated chart color', async () => {
@@ -156,11 +152,10 @@ describe('ModelDistributionChart', () => {
         modelStats: [],
         enableRankingView: true,
         rankingItems: [
-          { user_id: 1, email: 'alpha@example.com', username: 'alpha', actual_cost: 12, requests: 10, tokens: 1000 },
-          { user_id: 2, email: 'beta@example.com', username: '   ', actual_cost: 8, requests: 6, tokens: 600 },
-          { user_id: 3, email: '   ', username: '', actual_cost: 0, requests: 0, tokens: 0 },
+          { user_id: 1, email: 'alpha@example.com', username: 'alpha', requests: 10, tokens: 1000 },
+          { user_id: 2, email: 'beta@example.com', username: '   ', requests: 6, tokens: 600 },
+          { user_id: 3, email: '   ', username: '', requests: 0, tokens: 0 },
         ],
-        rankingTotalActualCost: 30,
         rankingTotalRequests: 20,
         rankingTotalTokens: 2000,
       },
@@ -182,7 +177,7 @@ describe('ModelDistributionChart', () => {
       '#3 User #3',
       'Others',
     ])
-    expect(chartData.datasets[0].data).toEqual([12, 8, 0, 10])
+    expect(chartData.datasets[0].data).toEqual([1000, 600, 0, 400])
     expect(chartData.datasets[0].backgroundColor[0]).toBe('#3b82f6')
     expect(chartData.datasets[0].backgroundColor[3]).toBe('#94a3b8')
     expect(chartData.datasets[0].backgroundColor[3]).not.toBe(chartData.datasets[0].backgroundColor[0])
@@ -196,6 +191,5 @@ describe('ModelDistributionChart', () => {
     expect(rows[3].text()).toContain('Others')
     expect(rows[3].text()).toContain('4')
     expect(rows[3].text()).toContain('400')
-    expect(rows[3].text()).toContain('$10.00')
   })
 })

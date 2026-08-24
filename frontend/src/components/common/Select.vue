@@ -199,7 +199,7 @@ const placeholderText = computed(() => props.placeholder ?? t('common.selectOpti
 const searchPlaceholderText = computed(() => props.searchPlaceholder ?? t('common.searchPlaceholder'))
 const emptyTextDisplay = computed(() => props.emptyText ?? t('common.noOptionsFound'))
 
-// 远程搜索的防抖间隔（对齐 OpenAIFastPolicyUserSelector 的 300ms 惯例）。
+// 远程搜索的防抖间隔。
 const REMOTE_SEARCH_DEBOUNCE_MS = 300
 let remoteSearchTimer: ReturnType<typeof setTimeout> | null = null
 

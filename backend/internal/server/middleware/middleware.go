@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
@@ -35,13 +36,17 @@ const (
 // 同时设置 request.Context（供 Service 使用）和 gin.Context（供 Handler 快速检查）
 func ForcePlatform(platform string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 设置到 request.Context，使用 ctxkey.ForcePlatform 供 Service 层读取
-		ctx := context.WithValue(c.Request.Context(), ctxkey.ForcePlatform, platform)
-		c.Request = c.Request.WithContext(ctx)
-		// 同时设置到 gin.Context，供 Handler 快速检查
-		c.Set(string(ContextKeyForcePlatform), platform)
+		SetForcePlatform(c, platform)
 		c.Next()
 	}
+}
+
+// SetForcePlatform applies the same request and Gin context state as the
+// ForcePlatform middleware when a provider is resolved dynamically.
+func SetForcePlatform(c *gin.Context, platform string) {
+	ctx := context.WithValue(c.Request.Context(), ctxkey.ForcePlatform, platform)
+	c.Request = c.Request.WithContext(ctx)
+	c.Set(string(ContextKeyForcePlatform), platform)
 }
 
 // HasForcePlatform 检查是否有强制平台（用于 Handler 跳过分组检查）
@@ -125,6 +130,13 @@ func RequireGroupAssignment(settingService *service.SettingService, writeError G
 	return func(c *gin.Context) {
 		apiKey, ok := GetAPIKeyFromContext(c)
 		if !ok || apiKey.GroupID != nil {
+			c.Next()
+			return
+		}
+		// An ungrouped Personal key is valid once the Personal Router has
+		// resolved an explicit provider. It still uses the existing scheduler
+		// and account pool; no synthetic group is introduced.
+		if forcePlatform, ok := GetForcePlatformFromContext(c); ok && strings.TrimSpace(forcePlatform) != "" {
 			c.Next()
 			return
 		}

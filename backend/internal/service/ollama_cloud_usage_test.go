@@ -70,8 +70,8 @@ func (r *ollamaUsageTestRepo) ListOllamaCloudUsageGroupAccounts(_ context.Contex
 // cloneOllamaUsageTestAccount 深拷贝共享 map，模拟真实仓储每次查询返回全新行：
 // 组写在 r.mu 下改成员 map，浅拷贝会让 RunDue 过滤循环无锁读到同一 map 而竞争。
 func cloneOllamaUsageTestAccount(account Account) Account {
-	account.Credentials = mergeMap(nil, account.Credentials)
-	account.Extra = mergeMap(nil, account.Extra)
+	account.Credentials = cloneTestMap(account.Credentials)
+	account.Extra = cloneTestMap(account.Extra)
 	return account
 }
 
@@ -605,7 +605,7 @@ func TestParseOllamaCloudUsageHTMLPlanAndBalanceFallbacks(t *testing.T) {
 	require.Equal(t, "Pro", data.Plan)
 }
 
-func TestOllamaCloudUsageManagedExtraCannotBeImported(t *testing.T) {
+func TestOllamaCloudUsageManagedExtraCannotBeCreated(t *testing.T) {
 	remoteExtra := map[string]any{
 		OllamaCloudUsageSessionExtraKey:     "remote-ciphertext",
 		OllamaCloudUsageAutoRefreshExtraKey: true,
@@ -615,30 +615,11 @@ func TestOllamaCloudUsageManagedExtraCannotBeImported(t *testing.T) {
 		Name: "ollama", Platform: PlatformOpenAI, Type: AccountTypeAPIKey,
 		Credentials: map[string]any{"base_url": "https://ollama.com", "api_key": "key"},
 		Concurrency: 1,
-	}, mergeMap(nil, remoteExtra))
+	}, cloneTestMap(remoteExtra))
 	require.NoError(t, err)
 	require.NotContains(t, created.Extra, OllamaCloudUsageSessionExtraKey)
 	require.NotContains(t, created.Extra, OllamaCloudUsageAutoRefreshExtraKey)
 	require.NotContains(t, created.Extra, OllamaCloudUsageSnapshotExtraKey)
-
-	existing := ollamaUsageAccount(6)
-	existing.Extra = map[string]any{
-		OllamaCloudUsageSessionExtraKey:     "local-ciphertext",
-		OllamaCloudUsageAutoRefreshExtraKey: false,
-		OllamaCloudUsageSnapshotExtraKey:    map[string]any{"status": OllamaCloudUsageStatusOK},
-	}
-	targetExtra := mergeMap(existing.Extra, remoteExtra)
-	reconcileCRSUpstreamBillingProbeExtra(existing, existing.Platform, existing.Type, mergeMap(existing.Credentials, nil), targetExtra)
-	require.Equal(t, "local-ciphertext", targetExtra[OllamaCloudUsageSessionExtraKey])
-	require.Equal(t, false, targetExtra[OllamaCloudUsageAutoRefreshExtraKey])
-	require.Equal(t, map[string]any{"status": OllamaCloudUsageStatusOK}, targetExtra[OllamaCloudUsageSnapshotExtraKey])
-
-	changedCredentials := mergeMap(existing.Credentials, map[string]any{"api_key": "rotated"})
-	targetExtra = mergeMap(existing.Extra, remoteExtra)
-	reconcileCRSUpstreamBillingProbeExtra(existing, existing.Platform, existing.Type, changedCredentials, targetExtra)
-	require.NotContains(t, targetExtra, OllamaCloudUsageSessionExtraKey)
-	require.NotContains(t, targetExtra, OllamaCloudUsageAutoRefreshExtraKey)
-	require.NotContains(t, targetExtra, OllamaCloudUsageSnapshotExtraKey)
 }
 
 func TestAccountServiceUpdateStripsOllamaManagedExtra(t *testing.T) {
@@ -1014,8 +995,8 @@ func TestOllamaCloudUsageRunnerIdentityChangePreservesOldGroupAndDoesNotLoop(t *
 	sibling.Extra[OllamaCloudUsageSessionExtraKey] = "cipher:wos-session=secret"
 	sibling.Extra[OllamaCloudUsageAutoRefreshExtraKey] = true
 	dueAnchor := *anchor
-	dueAnchor.Credentials = mergeMap(nil, anchor.Credentials)
-	dueAnchor.Extra = mergeMap(nil, anchor.Extra)
+	dueAnchor.Credentials = cloneTestMap(anchor.Credentials)
+	dueAnchor.Extra = cloneTestMap(anchor.Extra)
 	repo := &ollamaUsageTestRepo{
 		upstreamBillingProbeAccountRepo: &upstreamBillingProbeAccountRepo{accounts: map[int64]*Account{
 			anchor.ID: anchor, sibling.ID: sibling,

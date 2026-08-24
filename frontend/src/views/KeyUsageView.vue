@@ -1,6 +1,6 @@
 <template>
   <div class="relative flex min-h-screen flex-col bg-gray-50 dark:bg-dark-950">
-    <!-- Header (same pattern as HomeView) -->
+    <!-- Public key-usage header -->
     <header class="relative z-20 px-6 py-4">
       <nav class="mx-auto flex max-w-6xl items-center justify-between">
         <router-link to="/home" class="flex items-center gap-3">
@@ -320,7 +320,6 @@
                     <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.outputTokens') }}</th>
                     <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.cacheReadTokens') }}</th>
                     <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.cacheWriteTokens') }}</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.cost') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -335,7 +334,6 @@
                     <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(row.output_tokens) }}</td>
                     <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(row.cache_read_tokens) }}</td>
                     <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(row.cache_write_tokens) }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right font-medium text-gray-900 dark:text-white">{{ usd(row.actual_cost != null ? row.actual_cost : row.cost) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -364,7 +362,6 @@
                     <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.cacheCreationTokens') }}</th>
                     <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.cacheReadTokens') }}</th>
                     <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.totalTokens') }}</th>
-                    <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-dark-400">{{ t('keyUsage.cost') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -380,7 +377,6 @@
                     <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(m.cache_creation_tokens) }}</td>
                     <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(m.cache_read_tokens) }}</td>
                     <td class="px-4 py-3 text-sm tabular-nums text-right text-gray-700 dark:text-dark-200">{{ fmtNum(m.total_tokens) }}</td>
-                    <td class="px-4 py-3 text-sm tabular-nums text-right font-medium text-gray-900 dark:text-white">{{ usd(m.actual_cost != null ? m.actual_cost : m.cost) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -390,7 +386,7 @@
       </div>
     </main>
 
-    <!-- Footer (same pattern as HomeView) -->
+    <!-- Public key-usage footer -->
     <footer class="relative z-10 border-t border-gray-200/50 px-6 py-8 dark:border-dark-800/50">
       <div class="mx-auto flex max-w-6xl flex-col items-center justify-center gap-4 text-center sm:flex-row sm:text-left">
         <p class="text-sm text-gray-500 dark:text-dark-400">
@@ -429,14 +425,14 @@ import { sanitizeUrl } from '@/utils/url'
 const { t, locale } = useI18n()
 const appStore = useAppStore()
 
-// ==================== Site Settings (same as HomeView) ====================
+// ==================== Site Settings ====================
 
 const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
 const siteLogo = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '', { allowRelative: true, allowDataUrl: true }))
 const docUrl = computed(() => sanitizeUrl(appStore.cachedPublicSettings?.doc_url || appStore.docUrl || ''))
 const githubUrl = 'https://github.com/Wei-Shaw/sub2api'
 
-// ==================== Theme (same as HomeView) ====================
+// ==================== Theme ====================
 
 const isDark = ref(document.documentElement.classList.contains('dark'))
 
@@ -601,7 +597,7 @@ const statusInfo = computed(() => {
   }
 
   return {
-    label: data.planName || t('keyUsage.walletBalance'),
+    label: data.planName || t('keyUsage.personalEdition'),
     statusText: 'Active',
     isActive: true,
   }
@@ -631,24 +627,6 @@ const ringItems = computed<RingItem[]>(() => {
           resetAt: rl.reset_at,
         })
       }
-    }
-  } else {
-    if (data.subscription) {
-      const sub = data.subscription
-      const limits = [
-        { label: t('keyUsage.limitDaily'), usage: sub.daily_usage_usd, limit: sub.daily_limit_usd },
-        { label: t('keyUsage.limitWeekly'), usage: sub.weekly_usage_usd, limit: sub.weekly_limit_usd },
-        { label: t('keyUsage.limitMonthly'), usage: sub.monthly_usage_usd, limit: sub.monthly_limit_usd },
-      ]
-      for (const l of limits) {
-        if (l.limit != null && l.limit > 0) {
-          const pct = Math.min(Math.round((l.usage / l.limit) * 100), 100)
-          items.push({ title: l.label, pct, amount: `${usd(l.usage)} / ${usd(l.limit)}`, iconType: 'calendar' })
-        }
-      }
-    }
-    if (!data.subscription && data.balance != null) {
-      items.push({ title: t('keyUsage.walletBalance'), pct: 0, amount: usd(data.balance), isBalance: true, iconType: 'dollar' })
     }
   }
 
@@ -728,47 +706,14 @@ const detailRows = computed<DetailRow[]>(() => {
   } else {
     rows.push({
       iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', iconSvg: ICON_CHECK,
-      label: t('keyUsage.subscriptionType'), value: data.planName || t('keyUsage.walletBalance'), valueClass: '',
+      label: t('keyUsage.accessMode'), value: data.planName || t('keyUsage.personalEdition'), valueClass: '',
     })
-
-    if (data.subscription) {
-      const sub = data.subscription
-      if (sub.daily_limit_usd > 0) {
-        const pct = (sub.daily_usage_usd / sub.daily_limit_usd) * 100
-        rows.push({
-          iconBg: 'bg-primary-500/10', iconColor: 'text-primary-500', iconSvg: ICON_DOLLAR,
-          label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '日' : 'D'})`, value: `${usd(sub.daily_usage_usd)} / ${usd(sub.daily_limit_usd)}`, valueClass: getUsageColor(pct),
-        })
-      }
-      if (sub.weekly_limit_usd > 0) {
-        const pct = (sub.weekly_usage_usd / sub.weekly_limit_usd) * 100
-        rows.push({
-          iconBg: 'bg-indigo-500/10', iconColor: 'text-indigo-500', iconSvg: ICON_DOLLAR,
-          label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '周' : 'W'})`, value: `${usd(sub.weekly_usage_usd)} / ${usd(sub.weekly_limit_usd)}`, valueClass: getUsageColor(pct),
-        })
-      }
-      if (sub.monthly_limit_usd > 0) {
-        const pct = (sub.monthly_usage_usd / sub.monthly_limit_usd) * 100
-        rows.push({
-          iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', iconSvg: ICON_DOLLAR,
-          label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '月' : 'M'})`, value: `${usd(sub.monthly_usage_usd)} / ${usd(sub.monthly_limit_usd)}`, valueClass: getUsageColor(pct),
-        })
-      }
-      if (sub.expires_at) {
-        rows.push({
-          iconBg: 'bg-amber-500/10', iconColor: 'text-amber-500', iconSvg: ICON_CALENDAR,
-          label: t('keyUsage.subscriptionExpires'), value: formatDate(sub.expires_at), valueClass: '',
-        })
-      }
+    if (data.group) {
+      rows.push({
+        iconBg: 'bg-primary-500/10', iconColor: 'text-primary-500', iconSvg: ICON_SHIELD,
+        label: t('keyUsage.group'), value: data.group, valueClass: '',
+      })
     }
-
-    const remainColor = data.remaining != null
-      ? (data.remaining <= 0 ? 'text-rose-500' : data.remaining < 10 ? 'text-amber-500' : 'text-emerald-500')
-      : ''
-    rows.push({
-      iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', iconSvg: ICON_SHIELD,
-      label: t('keyUsage.remainingQuota'), value: data.remaining != null ? usd(data.remaining) : '-', valueClass: remainColor,
-    })
   }
 
   return rows
@@ -793,7 +738,6 @@ const usageStatCells = computed<StatCell[]>(() => {
     { label: t('keyUsage.todayTokens'), value: fmtNum(today.total_tokens) },
     { label: t('keyUsage.todayCacheCreation'), value: fmtNum(today.cache_creation_tokens) },
     { label: t('keyUsage.todayCacheRead'), value: fmtNum(today.cache_read_tokens) },
-    { label: t('keyUsage.todayCost'), value: usd(today.actual_cost) },
     { label: t('keyUsage.rpmTpm'), value: `${usage.rpm || 0} / ${usage.tpm || 0}` },
     { label: t('keyUsage.totalRequests'), value: fmtNum(total.requests) },
     { label: t('keyUsage.totalInputTokens'), value: fmtNum(total.input_tokens) },
@@ -801,7 +745,6 @@ const usageStatCells = computed<StatCell[]>(() => {
     { label: t('keyUsage.totalTokensLabel'), value: fmtNum(total.total_tokens) },
     { label: t('keyUsage.totalCacheCreation'), value: fmtNum(total.cache_creation_tokens) },
     { label: t('keyUsage.totalCacheRead'), value: fmtNum(total.cache_read_tokens) },
-    { label: t('keyUsage.totalCost'), value: usd(total.actual_cost) },
     { label: t('keyUsage.avgDuration'), value: usage.average_duration_ms ? `${Math.round(usage.average_duration_ms)} ms` : '-' },
   ]
 })
@@ -816,8 +759,6 @@ interface DailyUsageRow {
   output_tokens: number
   cache_read_tokens: number
   cache_write_tokens: number
-  cost: number
-  actual_cost?: number
 }
 
 const dailyUsageRows = computed<DailyUsageRow[]>(() => {
@@ -829,6 +770,7 @@ const showDailyUsage = computed(() => Boolean(resultData.value && Array.isArray(
 
 // ==================== Utility Functions ====================
 
+// API-key quota values are access-control limits, not UsageLog billing fields.
 function usd(value: number | null | undefined): string {
   if (value == null || value < 0) return '-'
   return '$' + Number(value).toFixed(2)

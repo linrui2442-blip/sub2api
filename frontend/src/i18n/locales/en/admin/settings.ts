@@ -14,27 +14,6 @@ export default {
         payment: 'Payment',
       },
       features: {
-        channelMonitor: {
-          title: 'Channel Monitor',
-          description: 'Choose either V1 active probes or V2 passive usage monitoring. When disabled, both background jobs stop and the user entry is hidden.',
-          configureLink: 'Configure monitors in Channel Management > Channel Monitor',
-          enabled: 'Enable Channel Monitor',
-          enabledHint: 'Disabling stops both the V1 scheduler and V2 aggregation; existing config and history are kept.',
-          mode: 'Monitor mode',
-          modeHint: 'Default is V1 (active probes). Switch to V2 only when you want passive aggregation; only one implementation can be active at a time.',
-          modeV2: 'V2 passive monitoring',
-          modeV1: 'V1 active probes',
-          modeV2Hint: 'Opt-in: aggregates health metrics from real gateway traffic without upstream probe traffic. V1 probes stop while V2 is active.',
-          modeV1Hint: 'Default: runs scheduled upstream health checks for configured channel monitors (probe traffic).',
-          defaultInterval: 'Default check interval (seconds)',
-          defaultIntervalHint: 'V1 only: default interval for new monitors (overridable per monitor). Range 15 – 3600 seconds.',
-          hideThroughput: 'Hide throughput rates from users (RPM / TPM)',
-          hideThroughputHint:
-            'When on, the user Channel Monitor page and user APIs omit RPM and TPM so fleet volume cannot be reverse-estimated from rates × window. Admins still see full metrics. Error rates, latency, and cache rates remain visible.',
-          showQuota: 'Show channel usage/balance to users',
-          showQuotaHint:
-            'When on, quota-mode channel monitors expose the linked account usage windows/balance on the user Channel Status page. Disabled by default; admins always see it.',
-        },
         availableChannels: {
           title: 'Available Channels',
           description: 'Show logged-in users an aggregate view of the channels, models and pricing they can access. Disabled by default.',
@@ -186,70 +165,6 @@ export default {
         saved: 'Panel rate limit settings saved',
         saveFailed: 'Failed to save panel rate limit settings'
       },
-      turnstile: {
-        title: 'Cloudflare Turnstile',
-        description: 'Bot protection for login and registration',
-        enableTurnstile: 'Enable Turnstile',
-        enableTurnstileHint: 'Require Cloudflare Turnstile verification',
-        siteKey: 'Site Key',
-        secretKey: 'Secret Key',
-        siteKeyHint: 'Get this from your Cloudflare Dashboard',
-        cloudflareDashboard: 'Cloudflare Dashboard',
-        secretKeyHint: 'Server-side verification key (keep this secret)',
-        secretKeyConfiguredHint: 'Secret key configured. Leave empty to keep the current value.'
-      },
-      captcha: {
-        title: 'CAPTCHA',
-        description: 'Bot protection for login and registration',
-        enable: 'Enable CAPTCHA',
-        enableHint: 'Require human verification on login, registration and related flows',
-        provider: 'Provider',
-        providerTurnstile: 'Cloudflare Turnstile',
-        providerTencent: 'Tencent Captcha',
-        providerAliyun: 'Aliyun Captcha 2.0'
-      },
-      tencentCaptcha: {
-        title: 'Tencent Captcha',
-        description: 'Slider captcha protection for login, registration, and third-party account creation',
-        enable: 'Enable Tencent Captcha',
-        enableHint: 'Use Tencent slider captcha in every existing Turnstile flow',
-        keepExisting: 'Leave empty to keep current value',
-        configured: 'Configured. Leave empty to keep it.',
-        required: 'Required before enabling.',
-        mutualExclusion: 'Tencent Captcha, Cloudflare Turnstile and Aliyun Captcha are mutually exclusive. Enabling one disables the others.',
-        region: 'Service site',
-        regionCn: 'Chinese mainland',
-        regionIntl: 'International',
-        regionHint: 'Selects the SDK script and the server-side verification endpoint. It must match the site that issued your CaptchaAppId; international apps are created in the tencentcloud.com console.',
-        appCredentialsTitle: 'Captcha application credentials',
-        appCredentialsHint: 'Get CaptchaAppId and AppSecretKey from Verification Management in the Captcha console.',
-        cloudCredentialsTitle: 'Cloud API credentials',
-        cloudCredentialsHint: 'SecretId and SecretKey authorize server-side DescribeCaptchaResult requests.',
-        appId: 'CaptchaAppId',
-        appSecretKey: 'AppSecretKey',
-        cloudSecretId: 'Tencent Cloud SecretId',
-        cloudSecretKey: 'Tencent Cloud SecretKey',
-        camPermissionHint: 'Create a CAM sub-user with QcloudCaptchaFullAccess instead of using permanent root-account credentials.',
-        aidEncryptedHint: 'aidEncrypted is not supported yet. Keep CaptchaAppId mandatory verification disabled in the Captcha console.',
-        openCaptchaConsole: 'Open Captcha console',
-        createCloudKeys: 'Create SecretId / SecretKey',
-        openWebDocs: 'View Web integration guide'
-      },
-      aliyunCaptcha: {
-        accessKeyId: 'AccessKey ID',
-        accessKeyIdHint: 'Alibaba Cloud AccessKey ID used for server-side verification; a captcha-only RAM user is recommended',
-        accessKeySecret: 'AccessKey Secret',
-        accessKeySecretHint: 'Server-side verification secret (keep this secret)',
-        accessKeySecretConfiguredHint: 'Secret configured. Leave empty to keep the current value.',
-        sceneId: 'Scene ID',
-        sceneIdHint: 'Create a verification scene in the Alibaba Cloud Captcha console; the captcha type (invisible/slider/puzzle) is configured per scene there',
-        prefix: 'Prefix',
-        prefixHint: 'Found in the instance information on the console overview page',
-        region: 'Region',
-        regionCn: 'Mainland China',
-        regionSgp: 'Singapore',
-        regionHint: 'Determines the frontend script region and the server endpoint; must match your captcha instance region'
-      },
       apiKeyAcl: {
         title: 'API Key IP Access Control',
         description:
@@ -397,16 +312,6 @@ export default {
           'Duplicate subscription group: {groupId}. Each group can only appear once.',
         subscriptionGroup: 'Subscription Group',
         subscriptionValidityDays: 'Validity (days)',
-        defaultPlatformQuotas: 'Default Platform Quotas (on signup)',
-        defaultPlatformQuotasHint: 'Automatically assigned to new users on signup; existing users are not affected. Leave blank = unlimited.',
-        platformQuotaNotice: 'Monthly quota uses a 30-day rolling window, not a calendar month.',
-      },
-      platformQuota: {
-        platform:    'Platform',
-        daily:       'Daily (USD)',
-        weekly:      'Weekly (USD)',
-        monthly:     'Monthly (USD, 30d rolling)',
-        placeholder: 'Unlimited',
       },
       claudeCode: {
         title: 'Claude Code Settings',
@@ -430,16 +335,6 @@ export default {
         accountSchedulingThresholdsGlobalHint: 'System-wide default for every account on that platform. Individual accounts can still override this in the account editor.',
         accountSchedulingThresholdsDisabledHint: '100 disables platform auto-pause. Values 1–99 pause scheduling once utilization reaches that percent.',
         accountSchedulingThresholdsRangeHint: 'Integer 1–100 (percent). OpenAI/Anthropic/Grok only.'
-      },
-      upstreamBillingProbe: {
-        title: 'Upstream Rate Auto Detection',
-        description: 'Periodically retrieve rates declared by upstream Sub2API sites. Account rates change only when the separate sync switch is enabled.',
-        enabled: 'Enable global auto detection',
-        enabledHint: 'When enabled, scheduled detection runs only for accounts that also enable automatic detection. Disabling stops all scheduled detection; manual detection remains available.',
-        intervalMinutes: 'Detection interval (minutes)',
-        intervalHint: 'Range: 5–1440 minutes. A successful result remains valid for two detection intervals.',
-        saved: 'Upstream rate auto detection settings saved',
-        saveFailed: 'Failed to save upstream rate auto detection settings'
       },
       ollamaCloudUsage: {
         title: 'Ollama Cloud Usage Refresh',
@@ -1172,8 +1067,6 @@ export default {
         defaultSubscriptionsLabel: 'Default subscriptions',
         defaultSubscriptionsHint: 'Applies only to this auth source. Leave empty to skip source-specific subscriptions.',
         noSourceSubscriptions: 'No source-specific default subscriptions configured.',
-        platformQuotasOverride: 'Platform Quota Overrides',
-        platformQuotasOverrideHint: 'Blank fields inherit the system default. Set to 0 to fully block that window for this auth source.',
       },
       paymentVisibleMethods: {
         methodLabel: '{title} visible method',

@@ -100,8 +100,9 @@ type windowStatsCache struct {
 
 // antigravityUsageCache 缓存 Antigravity 额度数据
 type antigravityUsageCache struct {
-	usageInfo *UsageInfo
-	timestamp time.Time
+	usageInfo    *UsageInfo
+	timestamp    time.Time
+	tokenVersion int64
 }
 
 const (
@@ -132,16 +133,9 @@ func NewUsageCache() *UsageCache {
 }
 
 // WindowStats 窗口期统计
-//
-// cost: 账号口径费用（total_cost * account_rate_multiplier）
-// standard_cost: 标准费用（total_cost，不含倍率）
-// user_cost: 用户/API Key 口径费用（actual_cost，受分组倍率影响）
 type WindowStats struct {
-	Requests     int64   `json:"requests"`
-	Tokens       int64   `json:"tokens"`
-	Cost         float64 `json:"cost"`
-	StandardCost float64 `json:"standard_cost"`
-	UserCost     float64 `json:"user_cost"`
+	Requests int64 `json:"requests"`
+	Tokens   int64 `json:"tokens"`
 }
 
 // UsageProgress 使用量进度
@@ -638,11 +632,8 @@ func applySyntheticWindowStats(info *UsageInfo, extra map[string]any) {
 		return
 	}
 	info.FiveHour.WindowStats = &WindowStats{
-		Requests:     int64(parseExtraInt(raw["requests"])),
-		Tokens:       int64(parseExtraInt(raw["tokens"])),
-		Cost:         parseExtraFloat64(raw["cost"]),
-		StandardCost: parseExtraFloat64(raw["standard_cost"]),
-		UserCost:     parseExtraFloat64(raw["user_cost"]),
+		Requests: int64(parseExtraInt(raw["requests"])),
+		Tokens:   int64(parseExtraInt(raw["tokens"])),
 	}
 }
 
@@ -993,11 +984,10 @@ func (s *AccountUsageService) getGeminiUsage(ctx context.Context, account *Accou
 	if quota.SharedRPD > 0 {
 		totalReq := dayTotals.ProRequests + dayTotals.FlashRequests
 		totalTokens := dayTotals.ProTokens + dayTotals.FlashTokens
-		totalCost := dayTotals.ProCost + dayTotals.FlashCost
-		usage.GeminiSharedDaily = buildGeminiUsageProgress(totalReq, quota.SharedRPD, dailyResetAt, totalTokens, totalCost, now)
+		usage.GeminiSharedDaily = buildGeminiUsageProgress(totalReq, quota.SharedRPD, dailyResetAt, totalTokens, now)
 	} else {
-		usage.GeminiProDaily = buildGeminiUsageProgress(dayTotals.ProRequests, quota.ProRPD, dailyResetAt, dayTotals.ProTokens, dayTotals.ProCost, now)
-		usage.GeminiFlashDaily = buildGeminiUsageProgress(dayTotals.FlashRequests, quota.FlashRPD, dailyResetAt, dayTotals.FlashTokens, dayTotals.FlashCost, now)
+		usage.GeminiProDaily = buildGeminiUsageProgress(dayTotals.ProRequests, quota.ProRPD, dailyResetAt, dayTotals.ProTokens, now)
+		usage.GeminiFlashDaily = buildGeminiUsageProgress(dayTotals.FlashRequests, quota.FlashRPD, dailyResetAt, dayTotals.FlashTokens, now)
 	}
 
 	// Minute window (RPM) - fixed-window approximation: current minute [truncate(now), truncate(now)+1m)
@@ -1012,11 +1002,10 @@ func (s *AccountUsageService) getGeminiUsage(ctx context.Context, account *Accou
 	if quota.SharedRPM > 0 {
 		totalReq := minuteTotals.ProRequests + minuteTotals.FlashRequests
 		totalTokens := minuteTotals.ProTokens + minuteTotals.FlashTokens
-		totalCost := minuteTotals.ProCost + minuteTotals.FlashCost
-		usage.GeminiSharedMinute = buildGeminiUsageProgress(totalReq, quota.SharedRPM, minuteResetAt, totalTokens, totalCost, now)
+		usage.GeminiSharedMinute = buildGeminiUsageProgress(totalReq, quota.SharedRPM, minuteResetAt, totalTokens, now)
 	} else {
-		usage.GeminiProMinute = buildGeminiUsageProgress(minuteTotals.ProRequests, quota.ProRPM, minuteResetAt, minuteTotals.ProTokens, minuteTotals.ProCost, now)
-		usage.GeminiFlashMinute = buildGeminiUsageProgress(minuteTotals.FlashRequests, quota.FlashRPM, minuteResetAt, minuteTotals.FlashTokens, minuteTotals.FlashCost, now)
+		usage.GeminiProMinute = buildGeminiUsageProgress(minuteTotals.ProRequests, quota.ProRPM, minuteResetAt, minuteTotals.ProTokens, now)
+		usage.GeminiFlashMinute = buildGeminiUsageProgress(minuteTotals.FlashRequests, quota.FlashRPM, minuteResetAt, minuteTotals.FlashTokens, now)
 	}
 
 	return usage, nil
@@ -1028,12 +1017,21 @@ func (s *AccountUsageService) getAntigravityUsage(ctx context.Context, account *
 		now := time.Now()
 		return &UsageInfo{UpdatedAt: &now}, nil
 	}
+	if latestAccount, isStale := CheckTokenVersion(ctx, account, s.accountRepo); isStale && latestAccount != nil {
+		slog.Debug("antigravity_usage_cache_version_mismatch",
+			"account_id", account.ID,
+			"snapshot_version", account.GetCredentialAsInt64("_token_version"),
+			"durable_version", latestAccount.GetCredentialAsInt64("_token_version"),
+		)
+		account = latestAccount
+	}
+	tokenVersion := account.GetCredentialAsInt64("_token_version")
 
 	// 1. 检查缓存
 	if cached, ok := s.cache.antigravityCache.Load(account.ID); ok {
 		if cache, ok := cached.(*antigravityUsageCache); ok {
 			ttl := antigravityCacheTTL(cache.usageInfo)
-			if time.Since(cache.timestamp) < ttl {
+			if cache.tokenVersion == tokenVersion && time.Since(cache.timestamp) < ttl {
 				usage := cache.usageInfo
 				if usage.FiveHour != nil && usage.FiveHour.ResetsAt != nil {
 					usage.FiveHour.RemainingSeconds = int(time.Until(*usage.FiveHour.ResetsAt).Seconds())
@@ -1050,7 +1048,7 @@ func (s *AccountUsageService) getAntigravityUsage(ctx context.Context, account *
 		if cached, ok := s.cache.antigravityCache.Load(account.ID); ok {
 			if cache, ok := cached.(*antigravityUsageCache); ok {
 				ttl := antigravityCacheTTL(cache.usageInfo)
-				if time.Since(cache.timestamp) < ttl {
+				if cache.tokenVersion == tokenVersion && time.Since(cache.timestamp) < ttl {
 					usage := cache.usageInfo
 					// 重新计算 RemainingSeconds，避免返回过时的剩余秒数
 					recalcAntigravityRemainingSeconds(usage)
@@ -1069,16 +1067,18 @@ func (s *AccountUsageService) getAntigravityUsage(ctx context.Context, account *
 			degraded := buildAntigravityDegradedUsage(err)
 			enrichUsageWithAccountError(degraded, account)
 			s.cache.antigravityCache.Store(account.ID, &antigravityUsageCache{
-				usageInfo: degraded,
-				timestamp: time.Now(),
+				usageInfo:    degraded,
+				timestamp:    time.Now(),
+				tokenVersion: tokenVersion,
 			})
 			return degraded, nil
 		}
 
 		enrichUsageWithAccountError(fetchResult.UsageInfo, account)
 		s.cache.antigravityCache.Store(account.ID, &antigravityUsageCache{
-			usageInfo: fetchResult.UsageInfo,
-			timestamp: time.Now(),
+			usageInfo:    fetchResult.UsageInfo,
+			timestamp:    time.Now(),
+			tokenVersion: tokenVersion,
 		})
 		return fetchResult.UsageInfo, nil
 	})
@@ -1092,6 +1092,15 @@ func (s *AccountUsageService) getAntigravityUsage(ctx context.Context, account *
 		return &UsageInfo{UpdatedAt: &now}, nil
 	}
 	return usage, nil
+}
+
+// InvalidateAntigravityUsageCache removes a degraded quota result after a
+// successful OAuth refresh so the next UI read performs a fresh probe.
+func (s *AccountUsageService) InvalidateAntigravityUsageCache(accountID int64) {
+	if s == nil || s.cache == nil {
+		return
+	}
+	s.cache.antigravityCache.Delete(accountID)
 }
 
 func (s *AccountUsageService) getGrokUsage(ctx context.Context, account *Account, force bool) (*UsageInfo, error) {
@@ -1296,11 +1305,11 @@ func buildAntigravityDegradedUsage(err error) *UsageInfo {
 	// 错误格式来自 antigravity/client.go: "fetchAvailableModels 失败 (HTTP %d): ..."
 	errStr := err.Error()
 	switch {
-	case strings.Contains(errStr, "HTTP 401") ||
-		strings.Contains(errStr, "UNAUTHENTICATED") ||
-		strings.Contains(errStr, "invalid_grant"):
+	case isAntigravityRefreshCredentialInvalid(err):
 		info.ErrorCode = errorCodeUnauthenticated
 		info.NeedsReauth = true
+	case strings.Contains(errStr, "HTTP 401") || strings.Contains(errStr, "UNAUTHENTICATED"):
+		info.ErrorCode = errorCodeUnauthenticated
 	case strings.Contains(errStr, "HTTP 429"):
 		info.ErrorCode = errorCodeRateLimited
 	default:
@@ -1308,6 +1317,11 @@ func buildAntigravityDegradedUsage(err error) *UsageInfo {
 	}
 
 	return info
+}
+
+func isAntigravityRefreshCredentialInvalid(err error) bool {
+	class, ok := antigravityFailureClass(err)
+	return ok && class == antigravityAuthFailureReauthRequired
 }
 
 // enrichUsageWithAccountError 结合账号错误状态修正 UsageInfo
@@ -1367,11 +1381,8 @@ func (s *AccountUsageService) addWindowStats(ctx context.Context, account *Accou
 		}
 
 		windowStats = &WindowStats{
-			Requests:     stats.Requests,
-			Tokens:       stats.Tokens,
-			Cost:         stats.Cost,
-			StandardCost: stats.StandardCost,
-			UserCost:     stats.UserCost,
+			Requests: stats.Requests,
+			Tokens:   stats.Tokens,
 		}
 
 		// 缓存窗口统计（1 分钟）
@@ -1395,11 +1406,8 @@ func (s *AccountUsageService) GetTodayStats(ctx context.Context, accountID int64
 	}
 
 	return &WindowStats{
-		Requests:     stats.Requests,
-		Tokens:       stats.Tokens,
-		Cost:         stats.Cost,
-		StandardCost: stats.StandardCost,
-		UserCost:     stats.UserCost,
+		Requests: stats.Requests,
+		Tokens:   stats.Tokens,
 	}, nil
 }
 
@@ -1467,11 +1475,8 @@ func windowStatsFromAccountStats(stats *usagestats.AccountStats) *WindowStats {
 		return &WindowStats{}
 	}
 	return &WindowStats{
-		Requests:     stats.Requests,
-		Tokens:       stats.Tokens,
-		Cost:         stats.Cost,
-		StandardCost: stats.StandardCost,
-		UserCost:     stats.UserCost,
+		Requests: stats.Requests,
+		Tokens:   stats.Tokens,
 	}
 }
 
@@ -1761,7 +1766,7 @@ func (s *AccountUsageService) estimateSetupTokenUsage(account *Account) *UsageIn
 	return info
 }
 
-func buildGeminiUsageProgress(used, limit int64, resetAt time.Time, tokens int64, cost float64, now time.Time) *UsageProgress {
+func buildGeminiUsageProgress(used, limit int64, resetAt time.Time, tokens int64, now time.Time) *UsageProgress {
 	// limit <= 0 means "no local quota window" (unknown or unlimited).
 	if limit <= 0 {
 		return nil
@@ -1778,11 +1783,7 @@ func buildGeminiUsageProgress(used, limit int64, resetAt time.Time, tokens int64
 		RemainingSeconds: remainingSeconds,
 		UsedRequests:     used,
 		LimitRequests:    limit,
-		WindowStats: &WindowStats{
-			Requests: used,
-			Tokens:   tokens,
-			Cost:     cost,
-		},
+		WindowStats:      &WindowStats{Requests: used, Tokens: tokens},
 	}
 }
 

@@ -298,9 +298,12 @@ func TestNewClient_无代理(t *testing.T) {
 	if client.httpClient.Timeout != clientTimeout {
 		t.Errorf("Timeout 不匹配: got %v, want %v", client.httpClient.Timeout, clientTimeout)
 	}
-	// 无代理时 Transport 应为 nil（使用默认）
-	if client.httpClient.Transport != nil {
-		t.Error("无代理时 Transport 应为 nil")
+	transport, ok := client.httpClient.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("无账号代理时应使用带统一代理解析器的 HTTP Transport")
+	}
+	if transport.Proxy == nil {
+		t.Fatal("无账号代理时必须保留 Windows 系统/环境代理解析器")
 	}
 }
 
@@ -326,8 +329,9 @@ func TestNewClient_空格代理(t *testing.T) {
 		t.Fatal("NewClient 返回 nil")
 	}
 	// 空格代理应等同于无代理
-	if client.httpClient.Transport != nil {
-		t.Error("空格代理 Transport 应为 nil")
+	transport, ok := client.httpClient.Transport.(*http.Transport)
+	if !ok || transport.Proxy == nil {
+		t.Error("空格代理应使用统一 Windows 系统/环境代理解析器")
 	}
 }
 

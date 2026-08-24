@@ -32,7 +32,7 @@ const (
 
 // DefaultCSPPolicy is the default Content-Security-Policy with nonce support
 // __CSP_NONCE__ will be replaced with actual nonce at request time by the SecurityHeaders middleware
-const DefaultCSPPolicy = "default-src 'self'; worker-src 'self' blob:; script-src 'self' __CSP_NONCE__ https://challenges.cloudflare.com https://*.alicdn.com https://static.cloudflareinsights.com https://turing.captcha.qcloud.com https://turing.captcha.gtimg.com https://ca.turing.captcha.qcloud.com https://global.turing.captcha.gtimg.com https://www.tycaptcha.com https://cloudcache.tencentcs.com https://*.stripe.com https://static.airwallex.com https://checkout.airwallex.com https://static-demo.airwallex.com https://checkout-demo.airwallex.com; style-src 'self' 'unsafe-inline' https://*.captcha.gtimg.com https://fonts.googleapis.com https://*.alicdn.com https://static.airwallex.com https://checkout.airwallex.com https://static-demo.airwallex.com https://checkout-demo.airwallex.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://turing.captcha.qcloud.com https://www.tycaptcha.com https://rce.tencentrio.com https:; frame-src https://challenges.cloudflare.com https://turing.captcha.qcloud.com https://ca.turing.captcha.qcloud.com https://www.tycaptcha.com https://*.stripe.com https://checkout.airwallex.com https://checkout-demo.airwallex.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+const DefaultCSPPolicy = "default-src 'self'; worker-src 'self' blob:; script-src 'self' __CSP_NONCE__ https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 
 // UMQ（用户消息队列）模式常量
 const (
@@ -62,43 +62,30 @@ const (
 const DefaultUpstreamResponseReadMaxBytes int64 = 128 * 1024 * 1024
 
 type Config struct {
-	Server                  ServerConfig                  `mapstructure:"server"`
-	Log                     LogConfig                     `mapstructure:"log"`
-	CORS                    CORSConfig                    `mapstructure:"cors"`
-	Security                SecurityConfig                `mapstructure:"security"`
-	Billing                 BillingConfig                 `mapstructure:"billing"`
-	Turnstile               TurnstileConfig               `mapstructure:"turnstile"`
-	Database                DatabaseConfig                `mapstructure:"database"`
-	Redis                   RedisConfig                   `mapstructure:"redis"`
-	Ops                     OpsConfig                     `mapstructure:"ops"`
-	JWT                     JWTConfig                     `mapstructure:"jwt"`
-	Totp                    TotpConfig                    `mapstructure:"totp"`
-	WebAuthn                WebAuthnConfig                `mapstructure:"webauthn"`
-	LinuxDo                 LinuxDoConnectConfig          `mapstructure:"linuxdo_connect"`
-	WeChat                  WeChatConnectConfig           `mapstructure:"wechat_connect"`
-	OIDC                    OIDCConnectConfig             `mapstructure:"oidc_connect"`
-	DingTalk                DingTalkConnectConfig         `mapstructure:"dingtalk_connect"`
-	GitHubOAuth             EmailOAuthProviderConfig      `mapstructure:"github_oauth"`
-	GoogleOAuth             EmailOAuthProviderConfig      `mapstructure:"google_oauth"`
-	Default                 DefaultConfig                 `mapstructure:"default"`
-	RateLimit               RateLimitConfig               `mapstructure:"rate_limit"`
-	Pricing                 PricingConfig                 `mapstructure:"pricing"`
-	Gateway                 GatewayConfig                 `mapstructure:"gateway"`
-	APIKeyAuth              APIKeyAuthCacheConfig         `mapstructure:"api_key_auth_cache"`
-	SubscriptionCache       SubscriptionCacheConfig       `mapstructure:"subscription_cache"`
-	SubscriptionMaintenance SubscriptionMaintenanceConfig `mapstructure:"subscription_maintenance"`
-	Dashboard               DashboardCacheConfig          `mapstructure:"dashboard_cache"`
-	DashboardAgg            DashboardAggregationConfig    `mapstructure:"dashboard_aggregation"`
-	UsageCleanup            UsageCleanupConfig            `mapstructure:"usage_cleanup"`
-	Concurrency             ConcurrencyConfig             `mapstructure:"concurrency"`
-	TokenRefresh            TokenRefreshConfig            `mapstructure:"token_refresh"`
-	RunMode                 string                        `mapstructure:"run_mode" yaml:"run_mode"`
-	Timezone                string                        `mapstructure:"timezone"` // e.g. "Asia/Shanghai", "UTC"
-	Gemini                  GeminiConfig                  `mapstructure:"gemini"`
-	Update                  UpdateConfig                  `mapstructure:"update"`
-	Idempotency             IdempotencyConfig             `mapstructure:"idempotency"`
-	BatchImage              BatchImageConfig              `mapstructure:"batch_image"`
-	ImageStorage            ImageStorageConfig            `mapstructure:"image_storage"`
+	Server       ServerConfig               `mapstructure:"server"`
+	Log          LogConfig                  `mapstructure:"log"`
+	CORS         CORSConfig                 `mapstructure:"cors"`
+	Security     SecurityConfig             `mapstructure:"security"`
+	Database     DatabaseConfig             `mapstructure:"database"`
+	Redis        RedisConfig                `mapstructure:"redis"`
+	Ops          OpsConfig                  `mapstructure:"ops"`
+	JWT          JWTConfig                  `mapstructure:"jwt"`
+	Totp         TotpConfig                 `mapstructure:"totp"`
+	WebAuthn     WebAuthnConfig             `mapstructure:"webauthn"`
+	Default      DefaultConfig              `mapstructure:"default"`
+	RateLimit    RateLimitConfig            `mapstructure:"rate_limit"`
+	Gateway      GatewayConfig              `mapstructure:"gateway"`
+	APIKeyAuth   APIKeyAuthCacheConfig      `mapstructure:"api_key_auth_cache"`
+	Dashboard    DashboardCacheConfig       `mapstructure:"dashboard_cache"`
+	DashboardAgg DashboardAggregationConfig `mapstructure:"dashboard_aggregation"`
+	UsageCleanup UsageCleanupConfig         `mapstructure:"usage_cleanup"`
+	Concurrency  ConcurrencyConfig          `mapstructure:"concurrency"`
+	TokenRefresh TokenRefreshConfig         `mapstructure:"token_refresh"`
+	RunMode      string                     `mapstructure:"run_mode" yaml:"run_mode"`
+	Timezone     string                     `mapstructure:"timezone"` // e.g. "Asia/Shanghai", "UTC"
+	Gemini       GeminiConfig               `mapstructure:"gemini"`
+	Update       UpdateConfig               `mapstructure:"update"`
+	Idempotency  IdempotencyConfig          `mapstructure:"idempotency"`
 }
 
 type LogConfig struct {
@@ -181,441 +168,6 @@ type IdempotencyConfig struct {
 	CleanupBatchSize int `mapstructure:"cleanup_batch_size"`
 }
 
-type BatchImageConfig struct {
-	Enabled                           bool   `mapstructure:"enabled"`
-	MaxItemsPerJobDefault             int    `mapstructure:"max_items_per_job_default"`
-	MaxItemsPerJobTrial               int    `mapstructure:"max_items_per_job_trial"`
-	MaxOutputImagesPerJob             int    `mapstructure:"max_output_images_per_job"`
-	MaxOutputImagesPerItem            int    `mapstructure:"max_output_images_per_item"`
-	MaxPromptCharsPerItem             int    `mapstructure:"max_prompt_chars_per_item"`
-	MaxReferenceImagesPerJob          int    `mapstructure:"max_reference_images_per_job"`
-	MaxReferenceInlineBytesPerJob     int    `mapstructure:"max_reference_inline_bytes_per_job"`
-	DefaultResponseMimeType           string `mapstructure:"default_response_mime_type"`
-	DefaultImageSize                  string `mapstructure:"default_image_size"`
-	MaxDownloadItemsZip               int    `mapstructure:"max_download_items_zip"`
-	MaxDownloadBytesPerRequest        int64  `mapstructure:"max_download_bytes_per_request"`
-	MaxDownloadDurationSeconds        int    `mapstructure:"max_download_duration_seconds"`
-	MaxDownloadConcurrencyPerUser     int    `mapstructure:"max_download_concurrency_per_user"`
-	InputRetentionAfterTerminalHours  int    `mapstructure:"input_retention_after_terminal_hours"`
-	OutputRetentionAfterTerminalHours int    `mapstructure:"output_retention_after_terminal_hours"`
-	OutputRetentionMaxDays            int    `mapstructure:"output_retention_max_days"`
-	CleanupIntervalMinutes            int    `mapstructure:"cleanup_interval_minutes"`
-	CleanupBatchSize                  int    `mapstructure:"cleanup_batch_size"`
-	QueueEnabled                      bool   `mapstructure:"queue_enabled"`
-	QueueReadyKey                     string `mapstructure:"queue_ready_key"`
-	QueueDelayedKey                   string `mapstructure:"queue_delayed_key"`
-	QueueActiveKey                    string `mapstructure:"queue_active_key"`
-	InflightKeyPrefix                 string `mapstructure:"inflight_key_prefix"`
-	LockKeyPrefix                     string `mapstructure:"lock_key_prefix"`
-	IdempotencyKeyPrefix              string `mapstructure:"idempotency_key_prefix"`
-	InflightTTLSeconds                int    `mapstructure:"inflight_ttl_seconds"`
-	JobLockTTLSeconds                 int    `mapstructure:"job_lock_ttl_seconds"`
-	DefaultRequeueDelaySeconds        int    `mapstructure:"default_requeue_delay_seconds"`
-	ErrorRetryDelaySeconds            int    `mapstructure:"error_retry_delay_seconds"`
-	LockConflictDelaySeconds          int    `mapstructure:"lock_conflict_delay_seconds"`
-	StaleActiveAfterSeconds           int    `mapstructure:"stale_active_after_seconds"`
-	DelayedMoverIntervalSeconds       int    `mapstructure:"delayed_mover_interval_seconds"`
-	RecoveryIntervalSeconds           int    `mapstructure:"recovery_interval_seconds"`
-	DelayedMoveLimit                  int    `mapstructure:"delayed_move_limit"`
-	RecoverLimit                      int    `mapstructure:"recover_limit"`
-	VertexEnabled                     bool   `mapstructure:"vertex_enabled"`
-	VertexProjectID                   string `mapstructure:"vertex_project_id"`
-	VertexLocation                    string `mapstructure:"vertex_location"`
-	// VertexManagedGCSBucket is a server-owned bucket for batch JSONL input/output.
-	// Disable Cloud Storage soft delete on this bucket to avoid retaining deleted batch objects.
-	VertexManagedGCSBucket       string `mapstructure:"vertex_managed_gcs_bucket"`
-	VertexManagedGCSPrefix       string `mapstructure:"vertex_managed_gcs_prefix"`
-	VertexInputRetentionHours    int    `mapstructure:"vertex_input_retention_hours"`
-	VertexOutputRetentionHours   int    `mapstructure:"vertex_output_retention_hours"`
-	VertexBatchPredictionBaseURL string `mapstructure:"vertex_batch_prediction_base_url"`
-	VertexGCSBaseURL             string `mapstructure:"vertex_gcs_base_url"`
-}
-
-// ImageStorageConfig 配置异步图片任务结果上传的 S3 兼容对象存储。
-// Enabled 同时作为异步图片任务功能的总开关：未启用或未配置完整凭证时，
-// 异步生图接口整体禁用，避免把上游返回的大 base64 结果塞进 Redis。
-type ImageStorageConfig struct {
-	Enabled         bool   `mapstructure:"enabled"`
-	Endpoint        string `mapstructure:"endpoint"` // e.g. https://<account_id>.r2.cloudflarestorage.com
-	Region          string `mapstructure:"region"`   // R2 用 "auto"
-	Bucket          string `mapstructure:"bucket"`
-	AccessKeyID     string `mapstructure:"access_key_id"`
-	SecretAccessKey string `mapstructure:"secret_access_key"`
-	Prefix          string `mapstructure:"prefix"`               // S3 key 前缀，如 "images/"
-	ForcePathStyle  bool   `mapstructure:"force_path_style"`     // MinIO/路径风格桶
-	PublicBaseURL   string `mapstructure:"public_base_url"`      // 配了则返回 public_base_url/key 直链；否则 presigned
-	PresignExpiry   int    `mapstructure:"presign_expiry_hours"` // public_base_url 为空时的 presigned 过期时长(小时)
-	MaxDownloadByte int64  `mapstructure:"max_download_bytes"`   // 下载上游 url 图片的字节上限
-}
-
-// IsConfigured 检查对象存储必要字段是否已配置
-func (c *ImageStorageConfig) IsConfigured() bool {
-	return c.Bucket != "" && c.AccessKeyID != "" && c.SecretAccessKey != ""
-}
-
-// Active 返回异步图片任务是否可用：开关打开且凭证齐全
-func (c *ImageStorageConfig) Active() bool {
-	return c.Enabled && c.IsConfigured()
-}
-
-// MissingCredentialKeys 返回 IsConfigured 所缺的配置键名。
-// 用于启动日志：只说"凭证不完整"会让运维以为自己漏填了，而实际可能是值填了却没被读到。
-func (c *ImageStorageConfig) MissingCredentialKeys() []string {
-	var missing []string
-	if c.Bucket == "" {
-		missing = append(missing, "image_storage.bucket")
-	}
-	if c.AccessKeyID == "" {
-		missing = append(missing, "image_storage.access_key_id")
-	}
-	if c.SecretAccessKey == "" {
-		missing = append(missing, "image_storage.secret_access_key")
-	}
-	return missing
-}
-
-type LinuxDoConnectConfig struct {
-	Enabled             bool   `mapstructure:"enabled"`
-	ClientID            string `mapstructure:"client_id"`
-	ClientSecret        string `mapstructure:"client_secret"`
-	AuthorizeURL        string `mapstructure:"authorize_url"`
-	TokenURL            string `mapstructure:"token_url"`
-	UserInfoURL         string `mapstructure:"userinfo_url"`
-	Scopes              string `mapstructure:"scopes"`
-	RedirectURL         string `mapstructure:"redirect_url"`          // 后端回调地址（需在提供方后台登记）
-	FrontendRedirectURL string `mapstructure:"frontend_redirect_url"` // 前端接收 token 的路由（默认：/auth/linuxdo/callback）
-	TokenAuthMethod     string `mapstructure:"token_auth_method"`     // client_secret_post / client_secret_basic / none
-	UsePKCE             bool   `mapstructure:"use_pkce"`
-
-	// 可选：用于从 userinfo JSON 中提取字段的 gjson 路径。
-	// 为空时，服务端会尝试一组常见字段名。
-	UserInfoEmailPath    string `mapstructure:"userinfo_email_path"`
-	UserInfoIDPath       string `mapstructure:"userinfo_id_path"`
-	UserInfoUsernamePath string `mapstructure:"userinfo_username_path"`
-}
-
-type WeChatConnectConfig struct {
-	Enabled             bool   `mapstructure:"enabled"`
-	AppID               string `mapstructure:"app_id"`
-	AppSecret           string `mapstructure:"app_secret"`
-	OpenAppID           string `mapstructure:"open_app_id"`
-	OpenAppSecret       string `mapstructure:"open_app_secret"`
-	MPAppID             string `mapstructure:"mp_app_id"`
-	MPAppSecret         string `mapstructure:"mp_app_secret"`
-	MobileAppID         string `mapstructure:"mobile_app_id"`
-	MobileAppSecret     string `mapstructure:"mobile_app_secret"`
-	OpenEnabled         bool   `mapstructure:"open_enabled"`
-	MPEnabled           bool   `mapstructure:"mp_enabled"`
-	MobileEnabled       bool   `mapstructure:"mobile_enabled"`
-	Mode                string `mapstructure:"mode"`
-	Scopes              string `mapstructure:"scopes"`
-	RedirectURL         string `mapstructure:"redirect_url"`
-	FrontendRedirectURL string `mapstructure:"frontend_redirect_url"`
-}
-
-type OIDCConnectConfig struct {
-	Enabled                 bool   `mapstructure:"enabled"`
-	ProviderName            string `mapstructure:"provider_name"` // 显示名: "Keycloak" 等
-	ClientID                string `mapstructure:"client_id"`
-	ClientSecret            string `mapstructure:"client_secret"`
-	IssuerURL               string `mapstructure:"issuer_url"`
-	DiscoveryURL            string `mapstructure:"discovery_url"`
-	AuthorizeURL            string `mapstructure:"authorize_url"`
-	TokenURL                string `mapstructure:"token_url"`
-	UserInfoURL             string `mapstructure:"userinfo_url"`
-	JWKSURL                 string `mapstructure:"jwks_url"`
-	Scopes                  string `mapstructure:"scopes"`                // 默认 "openid email profile"
-	RedirectURL             string `mapstructure:"redirect_url"`          // 后端回调地址（需在提供方后台登记）
-	FrontendRedirectURL     string `mapstructure:"frontend_redirect_url"` // 前端接收 token 的路由（默认：/auth/oidc/callback）
-	TokenAuthMethod         string `mapstructure:"token_auth_method"`     // client_secret_post / client_secret_basic / none
-	UsePKCE                 bool   `mapstructure:"use_pkce"`
-	ValidateIDToken         bool   `mapstructure:"validate_id_token"`
-	UsePKCEExplicit         bool   `mapstructure:"-" yaml:"-"`
-	ValidateIDTokenExplicit bool   `mapstructure:"-" yaml:"-"`
-	AllowedSigningAlgs      string `mapstructure:"allowed_signing_algs"`   // 默认 "RS256,ES256,PS256"
-	ClockSkewSeconds        int    `mapstructure:"clock_skew_seconds"`     // 默认 120
-	RequireEmailVerified    bool   `mapstructure:"require_email_verified"` // 默认 false
-
-	// 可选：用于从 userinfo JSON 中提取字段的 gjson 路径。
-	// 为空时，服务端会尝试一组常见字段名。
-	UserInfoEmailPath    string `mapstructure:"userinfo_email_path"`
-	UserInfoIDPath       string `mapstructure:"userinfo_id_path"`
-	UserInfoUsernamePath string `mapstructure:"userinfo_username_path"`
-}
-
-type DingTalkConnectConfig struct {
-	Enabled             bool   `mapstructure:"enabled"`
-	ClientID            string `mapstructure:"client_id"`
-	ClientSecret        string `mapstructure:"client_secret"`
-	AuthorizeURL        string `mapstructure:"authorize_url"`
-	TokenURL            string `mapstructure:"token_url"`
-	UserInfoURL         string `mapstructure:"userinfo_url"`
-	Scopes              string `mapstructure:"scopes"`
-	RedirectURL         string `mapstructure:"redirect_url"`
-	FrontendRedirectURL string `mapstructure:"frontend_redirect_url"`
-
-	// 平台底座 + 业务行为
-	DingTalkAppKind string `mapstructure:"dingtalk_app_kind"` // 仅 "internal_app"（V4 fail-closed）
-	AppType         string `mapstructure:"app_type"`          // "public" (default) | "internal"
-
-	// Corp 限定（none | internal_only）
-	CorpRestrictionPolicy   string `mapstructure:"corp_restriction_policy"`
-	InternalCorpID          string `mapstructure:"internal_corp_id"`
-	BypassRegistration      bool   `mapstructure:"bypass_registration"`
-	SyncCorpEmail           bool   `mapstructure:"sync_corp_email"`
-	SyncDisplayName         bool   `mapstructure:"sync_display_name"`
-	SyncDept                bool   `mapstructure:"sync_dept"`
-	SyncCorpEmailAttrKey    string `mapstructure:"sync_corp_email_attr_key"`
-	SyncDisplayNameAttrKey  string `mapstructure:"sync_display_name_attr_key"`
-	SyncDeptAttrKey         string `mapstructure:"sync_dept_attr_key"`
-	SyncCorpEmailAttrName   string `mapstructure:"sync_corp_email_attr_name"`
-	SyncDisplayNameAttrName string `mapstructure:"sync_display_name_attr_name"`
-	SyncDeptAttrName        string `mapstructure:"sync_dept_attr_name"`
-
-	// 邮箱 + Username
-	RequireEmail            bool   `mapstructure:"require_email"`
-	UsernameOverwritePolicy string `mapstructure:"username_overwrite_policy"`
-
-	// Attribute（私有版扩展点；开源版仅声明）
-	UsernameAttributeKey         string   `mapstructure:"username_attribute_key"`
-	EnableAttributeMatching      bool     `mapstructure:"enable_attribute_matching"`
-	EnableAttributeSync          bool     `mapstructure:"enable_attribute_sync"`
-	AttributeSyncFields          []string `mapstructure:"attribute_sync_fields"`
-	AttributeSyncOverwritePolicy string   `mapstructure:"attribute_sync_overwrite_policy"`
-}
-
-type EmailOAuthProviderConfig struct {
-	Enabled             bool   `mapstructure:"enabled"`
-	ClientID            string `mapstructure:"client_id"`
-	ClientSecret        string `mapstructure:"client_secret"`
-	AuthorizeURL        string `mapstructure:"authorize_url"`
-	TokenURL            string `mapstructure:"token_url"`
-	UserInfoURL         string `mapstructure:"userinfo_url"`
-	EmailsURL           string `mapstructure:"emails_url"`
-	Scopes              string `mapstructure:"scopes"`
-	RedirectURL         string `mapstructure:"redirect_url"`
-	FrontendRedirectURL string `mapstructure:"frontend_redirect_url"`
-}
-
-const (
-	defaultWeChatConnectMode             = "open"
-	defaultWeChatConnectScopes           = "snsapi_login"
-	defaultWeChatConnectFrontendRedirect = "/auth/wechat/callback"
-)
-
-func firstNonEmptyString(values ...string) string {
-	for _, value := range values {
-		if trimmed := strings.TrimSpace(value); trimmed != "" {
-			return trimmed
-		}
-	}
-	return ""
-}
-
-func normalizeWeChatConnectMode(raw string) string {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "mp":
-		return "mp"
-	case "mobile":
-		return "mobile"
-	default:
-		return defaultWeChatConnectMode
-	}
-}
-
-func normalizeWeChatConnectStoredMode(openEnabled, mpEnabled, mobileEnabled bool, mode string) string {
-	mode = normalizeWeChatConnectMode(mode)
-	switch mode {
-	case "open":
-		if openEnabled {
-			return "open"
-		}
-	case "mp":
-		if mpEnabled {
-			return "mp"
-		}
-	case "mobile":
-		if mobileEnabled {
-			return "mobile"
-		}
-	}
-	switch {
-	case openEnabled:
-		return "open"
-	case mpEnabled:
-		return "mp"
-	case mobileEnabled:
-		return "mobile"
-	default:
-		return mode
-	}
-}
-
-func defaultWeChatConnectScopesForMode(mode string) string {
-	switch normalizeWeChatConnectMode(mode) {
-	case "mp":
-		return "snsapi_userinfo"
-	case "mobile":
-		return ""
-	default:
-		return defaultWeChatConnectScopes
-	}
-}
-
-func normalizeWeChatConnectScopes(raw, mode string) string {
-	switch normalizeWeChatConnectMode(mode) {
-	case "mp":
-		switch strings.TrimSpace(raw) {
-		case "snsapi_base":
-			return "snsapi_base"
-		case "snsapi_userinfo":
-			return "snsapi_userinfo"
-		default:
-			return defaultWeChatConnectScopesForMode(mode)
-		}
-	case "mobile":
-		return ""
-	default:
-		return defaultWeChatConnectScopes
-	}
-}
-
-func shouldApplyLegacyWeChatEnv(configKey, envKey string) bool {
-	if viper.InConfig(configKey) {
-		return false
-	}
-	_, hasNewEnv := os.LookupEnv(envKey)
-	return !hasNewEnv
-}
-
-func hasExplicitConfigOrEnv(configKey, envKey string) bool {
-	if viper.InConfig(configKey) {
-		return true
-	}
-	_, ok := os.LookupEnv(envKey)
-	return ok
-}
-
-func applyLegacyWeChatConnectEnvCompatibility(cfg *WeChatConnectConfig) {
-	if cfg == nil {
-		return
-	}
-
-	legacyOpenAppID := ""
-	if shouldApplyLegacyWeChatEnv("wechat_connect.open_app_id", "WECHAT_CONNECT_OPEN_APP_ID") &&
-		shouldApplyLegacyWeChatEnv("wechat_connect.app_id", "WECHAT_CONNECT_APP_ID") {
-		legacyOpenAppID = strings.TrimSpace(os.Getenv("WECHAT_OAUTH_OPEN_APP_ID"))
-		if legacyOpenAppID != "" {
-			cfg.OpenAppID = legacyOpenAppID
-		}
-	}
-
-	legacyOpenAppSecret := ""
-	if shouldApplyLegacyWeChatEnv("wechat_connect.open_app_secret", "WECHAT_CONNECT_OPEN_APP_SECRET") &&
-		shouldApplyLegacyWeChatEnv("wechat_connect.app_secret", "WECHAT_CONNECT_APP_SECRET") {
-		legacyOpenAppSecret = strings.TrimSpace(os.Getenv("WECHAT_OAUTH_OPEN_APP_SECRET"))
-		if legacyOpenAppSecret != "" {
-			cfg.OpenAppSecret = legacyOpenAppSecret
-		}
-	}
-
-	legacyMPAppID := ""
-	if shouldApplyLegacyWeChatEnv("wechat_connect.mp_app_id", "WECHAT_CONNECT_MP_APP_ID") &&
-		shouldApplyLegacyWeChatEnv("wechat_connect.app_id", "WECHAT_CONNECT_APP_ID") {
-		legacyMPAppID = strings.TrimSpace(os.Getenv("WECHAT_OAUTH_MP_APP_ID"))
-		if legacyMPAppID != "" {
-			cfg.MPAppID = legacyMPAppID
-		}
-	}
-
-	legacyMPAppSecret := ""
-	if shouldApplyLegacyWeChatEnv("wechat_connect.mp_app_secret", "WECHAT_CONNECT_MP_APP_SECRET") &&
-		shouldApplyLegacyWeChatEnv("wechat_connect.app_secret", "WECHAT_CONNECT_APP_SECRET") {
-		legacyMPAppSecret = strings.TrimSpace(os.Getenv("WECHAT_OAUTH_MP_APP_SECRET"))
-		if legacyMPAppSecret != "" {
-			cfg.MPAppSecret = legacyMPAppSecret
-		}
-	}
-
-	if shouldApplyLegacyWeChatEnv("wechat_connect.frontend_redirect_url", "WECHAT_CONNECT_FRONTEND_REDIRECT_URL") {
-		if legacyFrontend := strings.TrimSpace(os.Getenv("WECHAT_OAUTH_FRONTEND_REDIRECT_URL")); legacyFrontend != "" {
-			cfg.FrontendRedirectURL = legacyFrontend
-		}
-	}
-
-	hasLegacyOpen := legacyOpenAppID != "" && legacyOpenAppSecret != ""
-	hasLegacyMP := legacyMPAppID != "" && legacyMPAppSecret != ""
-
-	if shouldApplyLegacyWeChatEnv("wechat_connect.enabled", "WECHAT_CONNECT_ENABLED") && (hasLegacyOpen || hasLegacyMP) {
-		cfg.Enabled = true
-	}
-	if shouldApplyLegacyWeChatEnv("wechat_connect.open_enabled", "WECHAT_CONNECT_OPEN_ENABLED") && hasLegacyOpen {
-		cfg.OpenEnabled = true
-	}
-	if shouldApplyLegacyWeChatEnv("wechat_connect.mp_enabled", "WECHAT_CONNECT_MP_ENABLED") && hasLegacyMP {
-		cfg.MPEnabled = true
-	}
-	if shouldApplyLegacyWeChatEnv("wechat_connect.mode", "WECHAT_CONNECT_MODE") {
-		switch {
-		case hasLegacyMP && !hasLegacyOpen:
-			cfg.Mode = "mp"
-		case hasLegacyOpen:
-			cfg.Mode = "open"
-		}
-	}
-	if shouldApplyLegacyWeChatEnv("wechat_connect.scopes", "WECHAT_CONNECT_SCOPES") {
-		switch {
-		case hasLegacyMP && !hasLegacyOpen:
-			cfg.Scopes = defaultWeChatConnectScopesForMode("mp")
-		case hasLegacyOpen:
-			cfg.Scopes = defaultWeChatConnectScopesForMode("open")
-		}
-	}
-}
-
-func normalizeWeChatConnectConfig(cfg *WeChatConnectConfig) {
-	if cfg == nil {
-		return
-	}
-
-	cfg.AppID = strings.TrimSpace(cfg.AppID)
-	cfg.AppSecret = strings.TrimSpace(cfg.AppSecret)
-	cfg.OpenAppID = strings.TrimSpace(cfg.OpenAppID)
-	cfg.OpenAppSecret = strings.TrimSpace(cfg.OpenAppSecret)
-	cfg.MPAppID = strings.TrimSpace(cfg.MPAppID)
-	cfg.MPAppSecret = strings.TrimSpace(cfg.MPAppSecret)
-	cfg.MobileAppID = strings.TrimSpace(cfg.MobileAppID)
-	cfg.MobileAppSecret = strings.TrimSpace(cfg.MobileAppSecret)
-	cfg.Mode = normalizeWeChatConnectMode(cfg.Mode)
-	cfg.RedirectURL = strings.TrimSpace(cfg.RedirectURL)
-	cfg.FrontendRedirectURL = strings.TrimSpace(cfg.FrontendRedirectURL)
-
-	cfg.AppID = firstNonEmptyString(cfg.AppID, cfg.OpenAppID, cfg.MPAppID, cfg.MobileAppID)
-	cfg.AppSecret = firstNonEmptyString(cfg.AppSecret, cfg.OpenAppSecret, cfg.MPAppSecret, cfg.MobileAppSecret)
-	cfg.OpenAppID = firstNonEmptyString(cfg.OpenAppID, cfg.AppID)
-	cfg.OpenAppSecret = firstNonEmptyString(cfg.OpenAppSecret, cfg.AppSecret)
-	cfg.MPAppID = firstNonEmptyString(cfg.MPAppID, cfg.AppID)
-	cfg.MPAppSecret = firstNonEmptyString(cfg.MPAppSecret, cfg.AppSecret)
-	cfg.MobileAppID = firstNonEmptyString(cfg.MobileAppID, cfg.AppID)
-	cfg.MobileAppSecret = firstNonEmptyString(cfg.MobileAppSecret, cfg.AppSecret)
-
-	if !cfg.OpenEnabled && !cfg.MPEnabled && !cfg.MobileEnabled && cfg.Enabled {
-		switch cfg.Mode {
-		case "mp":
-			cfg.MPEnabled = true
-		case "mobile":
-			cfg.MobileEnabled = true
-		default:
-			cfg.OpenEnabled = true
-		}
-	}
-	cfg.Mode = normalizeWeChatConnectStoredMode(cfg.OpenEnabled, cfg.MPEnabled, cfg.MobileEnabled, cfg.Mode)
-	cfg.Scopes = normalizeWeChatConnectScopes(cfg.Scopes, cfg.Mode)
-	if cfg.FrontendRedirectURL == "" {
-		cfg.FrontendRedirectURL = defaultWeChatConnectFrontendRedirect
-	}
-}
-
 // TokenRefreshConfig OAuth token自动刷新配置
 type TokenRefreshConfig struct {
 	// 是否启用自动刷新
@@ -640,21 +192,6 @@ type TokenRefreshConfig struct {
 	AttemptTimeoutSeconds int `mapstructure:"attempt_timeout_seconds"`
 	// 单个后台刷新周期的总超时（秒）
 	CycleTimeoutSeconds int `mapstructure:"cycle_timeout_seconds"`
-}
-
-type PricingConfig struct {
-	// 价格数据远程URL（默认使用LiteLLM镜像）
-	RemoteURL string `mapstructure:"remote_url"`
-	// 哈希校验文件URL
-	HashURL string `mapstructure:"hash_url"`
-	// 本地数据目录
-	DataDir string `mapstructure:"data_dir"`
-	// 回退文件路径
-	FallbackFile string `mapstructure:"fallback_file"`
-	// 更新间隔（小时）
-	UpdateIntervalHours int `mapstructure:"update_interval_hours"`
-	// 哈希校验间隔（分钟）
-	HashCheckIntervalMinutes int `mapstructure:"hash_check_interval_minutes"`
 }
 
 type ServerConfig struct {
@@ -799,8 +336,6 @@ func (c *Config) SetTrustForwardedIPForAPIKeyACL(enabled bool) {
 type URLAllowlistConfig struct {
 	Enabled           bool     `mapstructure:"enabled"`
 	UpstreamHosts     []string `mapstructure:"upstream_hosts"`
-	PricingHosts      []string `mapstructure:"pricing_hosts"`
-	CRSHosts          []string `mapstructure:"crs_hosts"`
 	AllowPrivateHosts bool     `mapstructure:"allow_private_hosts"`
 	// 关闭 URL 白名单校验时，是否允许 http URL（默认只允许 https）
 	AllowInsecureHTTP bool `mapstructure:"allow_insecure_http"`
@@ -821,7 +356,6 @@ type ProxyFallbackConfig struct {
 	// AllowDirectOnError 当辅助服务的代理初始化失败时是否允许回退直连。
 	// 仅影响以下非 AI 账号连接的辅助服务：
 	//   - GitHub Release 更新检查
-	//   - 定价数据拉取
 	// 不影响 AI 账号网关连接（Claude/OpenAI/Gemini/Antigravity），
 	// 这些关键路径的代理失败始终返回错误，不会回退直连。
 	// 默认 false：避免因代理配置错误导致服务器真实 IP 泄露。
@@ -830,30 +364,6 @@ type ProxyFallbackConfig struct {
 
 type ProxyProbeConfig struct {
 	InsecureSkipVerify bool `mapstructure:"insecure_skip_verify"` // 已禁用：禁止跳过 TLS 证书验证
-}
-
-type BillingConfig struct {
-	CircuitBreaker CircuitBreakerConfig `mapstructure:"circuit_breaker"`
-	// MinimumBalanceReserve is the conservative preflight floor for balance billing.
-	// Requests in balance mode are rejected when the cached balance is below this
-	// amount, even if it is still positive. Set to 0 to keep the legacy balance > 0 gate.
-	MinimumBalanceReserve float64 `mapstructure:"minimum_balance_reserve"`
-	// UserPlatformQuotaCacheTTLSeconds 用户 × 平台 quota 缓存 TTL（秒），默认 86400=1天，覆盖典型 daily 窗口。
-	// 消费点：
-	//   - billing_cache_service.cacheWriteWorker 异步累加
-	//   - billing_cache_service.checkUserPlatformQuotaEligibility 首次缓存装载
-	// 读写两端必须共用同一 TTL，避免缓存生命周期不一致导致 quota 计数漂移。
-	UserPlatformQuotaCacheTTLSeconds int `mapstructure:"user_platform_quota_cache_ttl_seconds"`
-	// UserPlatformQuotaSentinelTTLSeconds sentinel(无 limit 占位)entry 的 TTL,
-	// 显著短于 quota cache 默认 86400s 以控 Redis 内存;默认 3600=1h。
-	UserPlatformQuotaSentinelTTLSeconds int `mapstructure:"user_platform_quota_sentinel_ttl_seconds"`
-}
-
-type CircuitBreakerConfig struct {
-	Enabled             bool `mapstructure:"enabled"`
-	FailureThreshold    int  `mapstructure:"failure_threshold"`
-	ResetTimeoutSeconds int  `mapstructure:"reset_timeout_seconds"`
-	HalfOpenRequests    int  `mapstructure:"half_open_requests"`
 }
 
 type ConcurrencyConfig struct {
@@ -1014,8 +524,6 @@ type GatewayConfig struct {
 	// UsageRecord: 使用量记录异步队列配置（有界队列 + 固定 worker）
 	UsageRecord GatewayUsageRecordConfig `mapstructure:"usage_record"`
 
-	// UserGroupRateCacheTTLSeconds: 用户分组倍率热路径缓存 TTL（秒）
-	UserGroupRateCacheTTLSeconds int `mapstructure:"user_group_rate_cache_ttl_seconds"`
 	// ModelsListCacheTTLSeconds: /v1/models 模型列表短缓存 TTL（秒）
 	ModelsListCacheTTLSeconds int `mapstructure:"models_list_cache_ttl_seconds"`
 
@@ -1451,13 +959,6 @@ type DatabaseConfig struct {
 	ConnMaxLifetimeMinutes int `mapstructure:"conn_max_lifetime_minutes"`
 	// ConnMaxIdleTimeMinutes: 空闲连接最大存活时间，及时释放不活跃连接
 	ConnMaxIdleTimeMinutes int `mapstructure:"conn_max_idle_time_minutes"`
-	// UserPlatformQuotaFlusherEnabled: 是否启用 user×platform 配额写聚合 flusher
-	UserPlatformQuotaFlusherEnabled bool `mapstructure:"user_platform_quota_flusher_enabled"`
-	// UserPlatformQuotaFlushIntervalMs: flusher 刷写间隔（毫秒）
-	UserPlatformQuotaFlushIntervalMs int `mapstructure:"user_platform_quota_flush_interval_ms"`
-	// UserPlatformQuotaFlushBatchSize: flusher 单批最大条数
-	// 建议 ≤ 6000（单条 UPSERT 原子上限）
-	UserPlatformQuotaFlushBatchSize int `mapstructure:"user_platform_quota_flush_batch_size"`
 }
 
 func (d *DatabaseConfig) DSN() string {
@@ -1583,15 +1084,10 @@ type TotpConfig struct {
 	EncryptionKeyConfigured bool `mapstructure:"-"`
 }
 
-type TurnstileConfig struct {
-	Required bool `mapstructure:"required"`
-}
-
 type DefaultConfig struct {
 	AdminEmail      string  `mapstructure:"admin_email"`
 	AdminPassword   string  `mapstructure:"admin_password"`
 	UserConcurrency int     `mapstructure:"user_concurrency"`
-	UserBalance     float64 `mapstructure:"user_balance"`
 	APIKeyPrefix    string  `mapstructure:"api_key_prefix"`
 	RateMultiplier  float64 `mapstructure:"rate_multiplier"`
 }
@@ -1619,20 +1115,6 @@ type InvalidAuthAbuseConfig struct {
 	WindowSeconds int  `mapstructure:"window_seconds"`
 	BlockSeconds  int  `mapstructure:"block_seconds"`
 	Capacity      int  `mapstructure:"capacity"`
-}
-
-// SubscriptionCacheConfig 订阅认证 L1 缓存配置
-type SubscriptionCacheConfig struct {
-	L1Size        int `mapstructure:"l1_size"`
-	L1TTLSeconds  int `mapstructure:"l1_ttl_seconds"`
-	JitterPercent int `mapstructure:"jitter_percent"`
-}
-
-// SubscriptionMaintenanceConfig 订阅窗口维护后台任务配置。
-// 用于将“请求路径触发的维护动作”有界化，避免高并发下 goroutine 膨胀。
-type SubscriptionMaintenanceConfig struct {
-	WorkerCount int `mapstructure:"worker_count"`
-	QueueSize   int `mapstructure:"queue_size"`
 }
 
 // DashboardCacheConfig 仪表盘统计缓存配置
@@ -1772,39 +1254,6 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	}
 	cfg.Server.FrontendURL = strings.TrimSpace(cfg.Server.FrontendURL)
 	cfg.JWT.Secret = strings.TrimSpace(cfg.JWT.Secret)
-	cfg.LinuxDo.ClientID = strings.TrimSpace(cfg.LinuxDo.ClientID)
-	cfg.LinuxDo.ClientSecret = strings.TrimSpace(cfg.LinuxDo.ClientSecret)
-	cfg.LinuxDo.AuthorizeURL = strings.TrimSpace(cfg.LinuxDo.AuthorizeURL)
-	cfg.LinuxDo.TokenURL = strings.TrimSpace(cfg.LinuxDo.TokenURL)
-	cfg.LinuxDo.UserInfoURL = strings.TrimSpace(cfg.LinuxDo.UserInfoURL)
-	cfg.LinuxDo.Scopes = strings.TrimSpace(cfg.LinuxDo.Scopes)
-	cfg.LinuxDo.RedirectURL = strings.TrimSpace(cfg.LinuxDo.RedirectURL)
-	cfg.LinuxDo.FrontendRedirectURL = strings.TrimSpace(cfg.LinuxDo.FrontendRedirectURL)
-	cfg.LinuxDo.TokenAuthMethod = strings.ToLower(strings.TrimSpace(cfg.LinuxDo.TokenAuthMethod))
-	cfg.LinuxDo.UserInfoEmailPath = strings.TrimSpace(cfg.LinuxDo.UserInfoEmailPath)
-	cfg.LinuxDo.UserInfoIDPath = strings.TrimSpace(cfg.LinuxDo.UserInfoIDPath)
-	cfg.LinuxDo.UserInfoUsernamePath = strings.TrimSpace(cfg.LinuxDo.UserInfoUsernamePath)
-	applyLegacyWeChatConnectEnvCompatibility(&cfg.WeChat)
-	normalizeWeChatConnectConfig(&cfg.WeChat)
-	cfg.OIDC.ProviderName = strings.TrimSpace(cfg.OIDC.ProviderName)
-	cfg.OIDC.ClientID = strings.TrimSpace(cfg.OIDC.ClientID)
-	cfg.OIDC.ClientSecret = strings.TrimSpace(cfg.OIDC.ClientSecret)
-	cfg.OIDC.IssuerURL = strings.TrimSpace(cfg.OIDC.IssuerURL)
-	cfg.OIDC.DiscoveryURL = strings.TrimSpace(cfg.OIDC.DiscoveryURL)
-	cfg.OIDC.AuthorizeURL = strings.TrimSpace(cfg.OIDC.AuthorizeURL)
-	cfg.OIDC.TokenURL = strings.TrimSpace(cfg.OIDC.TokenURL)
-	cfg.OIDC.UserInfoURL = strings.TrimSpace(cfg.OIDC.UserInfoURL)
-	cfg.OIDC.JWKSURL = strings.TrimSpace(cfg.OIDC.JWKSURL)
-	cfg.OIDC.Scopes = strings.TrimSpace(cfg.OIDC.Scopes)
-	cfg.OIDC.RedirectURL = strings.TrimSpace(cfg.OIDC.RedirectURL)
-	cfg.OIDC.FrontendRedirectURL = strings.TrimSpace(cfg.OIDC.FrontendRedirectURL)
-	cfg.OIDC.TokenAuthMethod = strings.ToLower(strings.TrimSpace(cfg.OIDC.TokenAuthMethod))
-	cfg.OIDC.AllowedSigningAlgs = strings.TrimSpace(cfg.OIDC.AllowedSigningAlgs)
-	cfg.OIDC.UserInfoEmailPath = strings.TrimSpace(cfg.OIDC.UserInfoEmailPath)
-	cfg.OIDC.UserInfoIDPath = strings.TrimSpace(cfg.OIDC.UserInfoIDPath)
-	cfg.OIDC.UserInfoUsernamePath = strings.TrimSpace(cfg.OIDC.UserInfoUsernamePath)
-	cfg.OIDC.UsePKCEExplicit = hasExplicitConfigOrEnv("oidc_connect.use_pkce", "OIDC_CONNECT_USE_PKCE")
-	cfg.OIDC.ValidateIDTokenExplicit = hasExplicitConfigOrEnv("oidc_connect.validate_id_token", "OIDC_CONNECT_VALIDATE_ID_TOKEN")
 	cfg.Dashboard.KeyPrefix = strings.TrimSpace(cfg.Dashboard.KeyPrefix)
 	cfg.CORS.AllowedOrigins = normalizeStringSlice(cfg.CORS.AllowedOrigins)
 	cfg.Security.ResponseHeaders.AdditionalAllowed = normalizeStringSlice(cfg.Security.ResponseHeaders.AdditionalAllowed)
@@ -1984,7 +1433,6 @@ func setDefaults() {
 	viper.SetDefault("security.url_allowlist.pricing_hosts", []string{
 		"raw.githubusercontent.com",
 	})
-	viper.SetDefault("security.url_allowlist.crs_hosts", []string{})
 	viper.SetDefault("security.url_allowlist.allow_private_hosts", true)
 	viper.SetDefault("security.url_allowlist.allow_insecure_http", true)
 	viper.SetDefault("security.response_headers.enabled", true)
@@ -1997,89 +1445,6 @@ func setDefaults() {
 
 	// Security - disable direct fallback on proxy error
 	viper.SetDefault("security.proxy_fallback.allow_direct_on_error", false)
-
-	// Billing
-	viper.SetDefault("billing.circuit_breaker.enabled", true)
-	viper.SetDefault("billing.circuit_breaker.failure_threshold", 5)
-	viper.SetDefault("billing.circuit_breaker.reset_timeout_seconds", 30)
-	viper.SetDefault("billing.circuit_breaker.half_open_requests", 3)
-	viper.SetDefault("billing.minimum_balance_reserve", 0.000001)
-	viper.SetDefault("billing.user_platform_quota_cache_ttl_seconds", 86400)
-	viper.SetDefault("billing.user_platform_quota_sentinel_ttl_seconds", 3600)
-
-	// Turnstile
-	viper.SetDefault("turnstile.required", false)
-
-	// LinuxDo Connect OAuth 登录
-	viper.SetDefault("linuxdo_connect.enabled", false)
-	viper.SetDefault("linuxdo_connect.client_id", "")
-	viper.SetDefault("linuxdo_connect.client_secret", "")
-	viper.SetDefault("linuxdo_connect.authorize_url", "https://connect.linux.do/oauth2/authorize")
-	viper.SetDefault("linuxdo_connect.token_url", "https://connect.linux.do/oauth2/token")
-	viper.SetDefault("linuxdo_connect.userinfo_url", "https://connect.linux.do/api/user")
-	viper.SetDefault("linuxdo_connect.scopes", "user")
-	viper.SetDefault("linuxdo_connect.redirect_url", "")
-	viper.SetDefault("linuxdo_connect.frontend_redirect_url", "/auth/linuxdo/callback")
-	viper.SetDefault("linuxdo_connect.token_auth_method", "client_secret_post")
-	viper.SetDefault("linuxdo_connect.use_pkce", false)
-	viper.SetDefault("linuxdo_connect.userinfo_email_path", "")
-	viper.SetDefault("linuxdo_connect.userinfo_id_path", "")
-	viper.SetDefault("linuxdo_connect.userinfo_username_path", "")
-
-	// WeChat Connect OAuth 登录
-	viper.SetDefault("wechat_connect.enabled", false)
-	viper.SetDefault("wechat_connect.app_id", "")
-	viper.SetDefault("wechat_connect.app_secret", "")
-	viper.SetDefault("wechat_connect.open_app_id", "")
-	viper.SetDefault("wechat_connect.open_app_secret", "")
-	viper.SetDefault("wechat_connect.mp_app_id", "")
-	viper.SetDefault("wechat_connect.mp_app_secret", "")
-	viper.SetDefault("wechat_connect.mobile_app_id", "")
-	viper.SetDefault("wechat_connect.mobile_app_secret", "")
-	viper.SetDefault("wechat_connect.open_enabled", false)
-	viper.SetDefault("wechat_connect.mp_enabled", false)
-	viper.SetDefault("wechat_connect.mobile_enabled", false)
-	viper.SetDefault("wechat_connect.mode", defaultWeChatConnectMode)
-	viper.SetDefault("wechat_connect.scopes", defaultWeChatConnectScopes)
-	viper.SetDefault("wechat_connect.redirect_url", "")
-	viper.SetDefault("wechat_connect.frontend_redirect_url", defaultWeChatConnectFrontendRedirect)
-
-	// Generic OIDC OAuth 登录
-	viper.SetDefault("oidc_connect.enabled", false)
-	viper.SetDefault("oidc_connect.provider_name", "OIDC")
-	viper.SetDefault("oidc_connect.client_id", "")
-	viper.SetDefault("oidc_connect.client_secret", "")
-	viper.SetDefault("oidc_connect.issuer_url", "")
-	viper.SetDefault("oidc_connect.discovery_url", "")
-	viper.SetDefault("oidc_connect.authorize_url", "")
-	viper.SetDefault("oidc_connect.token_url", "")
-	viper.SetDefault("oidc_connect.userinfo_url", "")
-	viper.SetDefault("oidc_connect.jwks_url", "")
-	viper.SetDefault("oidc_connect.scopes", "openid email profile")
-	viper.SetDefault("oidc_connect.redirect_url", "")
-	viper.SetDefault("oidc_connect.frontend_redirect_url", "/auth/oidc/callback")
-	viper.SetDefault("oidc_connect.token_auth_method", "client_secret_post")
-	viper.SetDefault("oidc_connect.use_pkce", true)
-	viper.SetDefault("oidc_connect.validate_id_token", true)
-	viper.SetDefault("oidc_connect.allowed_signing_algs", "RS256,ES256,PS256")
-	viper.SetDefault("oidc_connect.clock_skew_seconds", 120)
-	viper.SetDefault("oidc_connect.require_email_verified", false)
-	viper.SetDefault("oidc_connect.userinfo_email_path", "")
-	viper.SetDefault("oidc_connect.userinfo_id_path", "")
-	viper.SetDefault("oidc_connect.userinfo_username_path", "")
-
-	// DingTalk Connect OAuth 登录
-	viper.SetDefault("dingtalk_connect.enabled", false)
-	viper.SetDefault("dingtalk_connect.authorize_url", "https://login.dingtalk.com/oauth2/auth")
-	viper.SetDefault("dingtalk_connect.token_url", "https://api.dingtalk.com/v1.0/oauth2/userAccessToken")
-	viper.SetDefault("dingtalk_connect.userinfo_url", "https://api.dingtalk.com/v1.0/contact/users/me")
-	viper.SetDefault("dingtalk_connect.scopes", "openid")
-	viper.SetDefault("dingtalk_connect.frontend_redirect_url", "/auth/dingtalk/callback")
-	viper.SetDefault("dingtalk_connect.dingtalk_app_kind", "internal_app")
-	viper.SetDefault("dingtalk_connect.app_type", "public")
-	viper.SetDefault("dingtalk_connect.corp_restriction_policy", "none")
-	viper.SetDefault("dingtalk_connect.require_email", true)
-	viper.SetDefault("dingtalk_connect.username_overwrite_policy", "if_empty")
 
 	// Database
 	viper.SetDefault("database.host", "localhost")
@@ -2108,70 +1473,6 @@ func setDefaults() {
 	viper.SetDefault("redis.pool_size", 1024)
 	viper.SetDefault("redis.min_idle_conns", 128)
 	viper.SetDefault("redis.enable_tls", false)
-
-	// Batch Image queue
-	viper.SetDefault("batch_image.enabled", false)
-	viper.SetDefault("batch_image.max_items_per_job_default", 200)
-	viper.SetDefault("batch_image.max_items_per_job_trial", 50)
-	viper.SetDefault("batch_image.max_output_images_per_job", 200)
-	viper.SetDefault("batch_image.max_output_images_per_item", 4)
-	viper.SetDefault("batch_image.max_prompt_chars_per_item", 8000)
-	viper.SetDefault("batch_image.max_reference_images_per_job", 1000)
-	viper.SetDefault("batch_image.max_reference_inline_bytes_per_job", 134217728)
-	viper.SetDefault("batch_image.default_response_mime_type", "image/png")
-	viper.SetDefault("batch_image.default_image_size", "1K")
-	viper.SetDefault("batch_image.max_download_items_zip", 200)
-	viper.SetDefault("batch_image.max_download_bytes_per_request", 536870912)
-	viper.SetDefault("batch_image.max_download_duration_seconds", 600)
-	viper.SetDefault("batch_image.max_download_concurrency_per_user", 1)
-	viper.SetDefault("batch_image.input_retention_after_terminal_hours", 24)
-	viper.SetDefault("batch_image.output_retention_after_terminal_hours", 72)
-	viper.SetDefault("batch_image.output_retention_max_days", 7)
-	viper.SetDefault("batch_image.cleanup_interval_minutes", 30)
-	viper.SetDefault("batch_image.cleanup_batch_size", 100)
-	viper.SetDefault("batch_image.queue_enabled", false)
-	viper.SetDefault("batch_image.queue_ready_key", "batch_image:queue:ready")
-	viper.SetDefault("batch_image.queue_delayed_key", "batch_image:queue:delayed")
-	viper.SetDefault("batch_image.queue_active_key", "batch_image:queue:active")
-	viper.SetDefault("batch_image.inflight_key_prefix", "batch_image:queue:inflight:")
-	viper.SetDefault("batch_image.lock_key_prefix", "batch_image:queue:lock:")
-	viper.SetDefault("batch_image.idempotency_key_prefix", "batch_image:queue:idem:")
-	viper.SetDefault("batch_image.inflight_ttl_seconds", 604800)
-	viper.SetDefault("batch_image.job_lock_ttl_seconds", 300)
-	viper.SetDefault("batch_image.default_requeue_delay_seconds", 30)
-	viper.SetDefault("batch_image.error_retry_delay_seconds", 60)
-	viper.SetDefault("batch_image.lock_conflict_delay_seconds", 5)
-	viper.SetDefault("batch_image.stale_active_after_seconds", 600)
-	viper.SetDefault("batch_image.delayed_mover_interval_seconds", 5)
-	viper.SetDefault("batch_image.recovery_interval_seconds", 300)
-	viper.SetDefault("batch_image.delayed_move_limit", 100)
-	viper.SetDefault("batch_image.recover_limit", 100)
-	viper.SetDefault("batch_image.vertex_enabled", false)
-	viper.SetDefault("batch_image.vertex_project_id", "")
-	viper.SetDefault("batch_image.vertex_location", "global")
-	viper.SetDefault("batch_image.vertex_managed_gcs_bucket", "")
-	viper.SetDefault("batch_image.vertex_managed_gcs_prefix", "batch-image/{env}/{batch_id}")
-	viper.SetDefault("batch_image.vertex_input_retention_hours", 24)
-	viper.SetDefault("batch_image.vertex_output_retention_hours", 72)
-	viper.SetDefault("batch_image.vertex_batch_prediction_base_url", "")
-	viper.SetDefault("batch_image.vertex_gcs_base_url", "")
-
-	// Image storage (async image task result offload to S3-compatible object storage)
-	viper.SetDefault("image_storage.enabled", false)
-	viper.SetDefault("image_storage.region", "auto")
-	viper.SetDefault("image_storage.prefix", "images/")
-	viper.SetDefault("image_storage.force_path_style", false)
-	viper.SetDefault("image_storage.presign_expiry_hours", 24)
-	viper.SetDefault("image_storage.max_download_bytes", 33554432)
-	// Registered with empty defaults so AutomaticEnv can reach them: viper only
-	// decodes keys present in AllKeys(), so a credential that is supplied purely
-	// via IMAGE_STORAGE_* and never appears in config.yaml would be dropped and
-	// silently disable the whole async image feature.
-	viper.SetDefault("image_storage.endpoint", "")
-	viper.SetDefault("image_storage.bucket", "")
-	viper.SetDefault("image_storage.access_key_id", "")
-	viper.SetDefault("image_storage.secret_access_key", "")
-	viper.SetDefault("image_storage.public_base_url", "")
 
 	// Ops (vNext)
 	viper.SetDefault("ops.enabled", true)
@@ -2203,21 +1504,12 @@ func setDefaults() {
 	viper.SetDefault("default.admin_email", "")
 	viper.SetDefault("default.admin_password", "")
 	viper.SetDefault("default.user_concurrency", 5)
-	viper.SetDefault("default.user_balance", 0)
 	viper.SetDefault("default.api_key_prefix", "sk-")
 	viper.SetDefault("default.rate_multiplier", 1.0)
 
 	// RateLimit
 	viper.SetDefault("rate_limit.overload_cooldown_minutes", 10)
 	viper.SetDefault("rate_limit.oauth_401_cooldown_minutes", 10)
-
-	// Pricing - 从 model-price-repo 同步模型定价和上下文窗口数据（固定到 commit，避免分支漂移）
-	viper.SetDefault("pricing.remote_url", "https://raw.githubusercontent.com/Wei-Shaw/model-price-repo/main/model_prices_and_context_window.json")
-	viper.SetDefault("pricing.hash_url", "https://raw.githubusercontent.com/Wei-Shaw/model-price-repo/main/model_prices_and_context_window.sha256")
-	viper.SetDefault("pricing.data_dir", "./data")
-	viper.SetDefault("pricing.fallback_file", "./resources/model-pricing/model_prices_and_context_window.json")
-	viper.SetDefault("pricing.update_interval_hours", 24)
-	viper.SetDefault("pricing.hash_check_interval_minutes", 10)
 
 	// Timezone (default to Asia/Shanghai for Chinese users)
 	viper.SetDefault("timezone", "Asia/Shanghai")
@@ -2235,11 +1527,6 @@ func setDefaults() {
 	viper.SetDefault("api_key_auth_cache.invalid_abuse.window_seconds", 60)
 	viper.SetDefault("api_key_auth_cache.invalid_abuse.block_seconds", 60)
 	viper.SetDefault("api_key_auth_cache.invalid_abuse.capacity", 16384)
-
-	// Subscription auth L1 cache
-	viper.SetDefault("subscription_cache.l1_size", 16384)
-	viper.SetDefault("subscription_cache.l1_ttl_seconds", 10)
-	viper.SetDefault("subscription_cache.jitter_percent", 10)
 
 	// Dashboard cache
 	viper.SetDefault("dashboard_cache.enabled", true)
@@ -2439,7 +1726,6 @@ func setDefaults() {
 	viper.SetDefault("gateway.usage_record.auto_scale_down_step", 16)
 	viper.SetDefault("gateway.usage_record.auto_scale_check_interval_seconds", 3)
 	viper.SetDefault("gateway.usage_record.auto_scale_cooldown_seconds", 10)
-	viper.SetDefault("gateway.user_group_rate_cache_ttl_seconds", 30)
 	viper.SetDefault("gateway.models_list_cache_ttl_seconds", 15)
 	// TLS指纹伪装配置（默认关闭，需要账号级别单独启用）
 	// 用户消息串行队列默认值
@@ -2474,15 +1760,11 @@ func setDefaults() {
 	viper.SetDefault("gemini.oauth.scopes", "")
 	viper.SetDefault("gemini.quota.policy", "")
 
-	// Subscription Maintenance (bounded queue + worker pool)
-	viper.SetDefault("subscription_maintenance.worker_count", 2)
-	viper.SetDefault("subscription_maintenance.queue_size", 1024)
-
 	setEnvReachableDefaults()
 }
 
-// setEnvReachableDefaults registers zero-valued defaults for keys that are
-// documented in deploy/config.example.yaml but had no default of their own.
+// setEnvReachableDefaults registers zero-valued defaults for optional runtime
+// keys that had no default of their own.
 //
 // viper.Unmarshal only decodes the keys returned by AllKeys(), which unions
 // SetDefault keys, config-file keys and explicitly bound BindEnv keys.
@@ -2490,8 +1772,7 @@ func setDefaults() {
 // and the viper_bind_struct escape hatch is compiled out (we build with
 // -tags embed). So a key that lives only in the example file was unreachable by
 // environment variable: the value was read from the process environment and
-// then silently dropped. Deployments driven purely by env — which is what
-// deploy/docker-compose.yml does — got the zero value with no warning.
+// then silently dropped.
 //
 // The values below are deliberately zero rather than the documented example
 // values: an absent key already unmarshalled to the zero value, so registering
@@ -2525,41 +1806,6 @@ func setEnvReachableDefaults() {
 	_ = viper.BindEnv("server.trusted_proxies", "SERVER_TRUSTED_PROXIES")
 	_ = viper.BindEnv("security.forwarded_client_ip_headers", "SECURITY_FORWARDED_CLIENT_IP_HEADERS")
 
-	// Third-party login providers. These carry client secrets and are exactly
-	// the settings an operator expects to inject via the environment, but every
-	// key here was previously unreachable that way.
-	for _, provider := range []string{"github_oauth", "google_oauth"} {
-		viper.SetDefault(provider+".enabled", false)
-		viper.SetDefault(provider+".client_id", "")
-		viper.SetDefault(provider+".client_secret", "")
-		viper.SetDefault(provider+".authorize_url", "")
-		viper.SetDefault(provider+".token_url", "")
-		viper.SetDefault(provider+".userinfo_url", "")
-		viper.SetDefault(provider+".emails_url", "")
-		viper.SetDefault(provider+".scopes", "")
-		viper.SetDefault(provider+".redirect_url", "")
-		viper.SetDefault(provider+".frontend_redirect_url", "")
-	}
-
-	viper.SetDefault("dingtalk_connect.client_id", "")
-	viper.SetDefault("dingtalk_connect.client_secret", "")
-	viper.SetDefault("dingtalk_connect.internal_corp_id", "")
-	viper.SetDefault("dingtalk_connect.redirect_url", "")
-	viper.SetDefault("dingtalk_connect.bypass_registration", false)
-	viper.SetDefault("dingtalk_connect.username_attribute_key", "")
-	viper.SetDefault("dingtalk_connect.enable_attribute_matching", false)
-	viper.SetDefault("dingtalk_connect.enable_attribute_sync", false)
-	viper.SetDefault("dingtalk_connect.attribute_sync_fields", []string{})
-	viper.SetDefault("dingtalk_connect.attribute_sync_overwrite_policy", "")
-	viper.SetDefault("dingtalk_connect.sync_display_name", false)
-	viper.SetDefault("dingtalk_connect.sync_display_name_attr_key", "")
-	viper.SetDefault("dingtalk_connect.sync_display_name_attr_name", "")
-	viper.SetDefault("dingtalk_connect.sync_dept", false)
-	viper.SetDefault("dingtalk_connect.sync_dept_attr_key", "")
-	viper.SetDefault("dingtalk_connect.sync_dept_attr_name", "")
-	viper.SetDefault("dingtalk_connect.sync_corp_email", false)
-	viper.SetDefault("dingtalk_connect.sync_corp_email_attr_key", "")
-	viper.SetDefault("dingtalk_connect.sync_corp_email_attr_name", "")
 }
 
 func (c *Config) Validate() error {
@@ -2670,13 +1916,6 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.SubscriptionMaintenance.WorkerCount < 0 {
-		return fmt.Errorf("subscription_maintenance.worker_count must be non-negative")
-	}
-	if c.SubscriptionMaintenance.QueueSize < 0 {
-		return fmt.Errorf("subscription_maintenance.queue_size must be non-negative")
-	}
-
 	// Gemini OAuth 配置校验：client_id 与 client_secret 必须同时设置或同时留空。
 	// 留空时表示使用内置的 Gemini CLI OAuth 客户端（其 client_secret 通过环境变量注入）。
 	geminiClientID := strings.TrimSpace(c.Gemini.OAuth.ClientID)
@@ -2766,189 +2005,6 @@ func (c *Config) Validate() error {
 	if c.Security.CSP.Enabled && strings.TrimSpace(c.Security.CSP.Policy) == "" {
 		return fmt.Errorf("security.csp.policy is required when CSP is enabled")
 	}
-	if c.LinuxDo.Enabled {
-		if strings.TrimSpace(c.LinuxDo.ClientID) == "" {
-			return fmt.Errorf("linuxdo_connect.client_id is required when linuxdo_connect.enabled=true")
-		}
-		if strings.TrimSpace(c.LinuxDo.AuthorizeURL) == "" {
-			return fmt.Errorf("linuxdo_connect.authorize_url is required when linuxdo_connect.enabled=true")
-		}
-		if strings.TrimSpace(c.LinuxDo.TokenURL) == "" {
-			return fmt.Errorf("linuxdo_connect.token_url is required when linuxdo_connect.enabled=true")
-		}
-		if strings.TrimSpace(c.LinuxDo.UserInfoURL) == "" {
-			return fmt.Errorf("linuxdo_connect.userinfo_url is required when linuxdo_connect.enabled=true")
-		}
-		if strings.TrimSpace(c.LinuxDo.RedirectURL) == "" {
-			return fmt.Errorf("linuxdo_connect.redirect_url is required when linuxdo_connect.enabled=true")
-		}
-		method := strings.ToLower(strings.TrimSpace(c.LinuxDo.TokenAuthMethod))
-		switch method {
-		case "", "client_secret_post", "client_secret_basic", "none":
-		default:
-			return fmt.Errorf("linuxdo_connect.token_auth_method must be one of: client_secret_post/client_secret_basic/none")
-		}
-		if (method == "" || method == "client_secret_post" || method == "client_secret_basic") &&
-			strings.TrimSpace(c.LinuxDo.ClientSecret) == "" {
-			return fmt.Errorf("linuxdo_connect.client_secret is required when linuxdo_connect.enabled=true and token_auth_method is client_secret_post/client_secret_basic")
-		}
-		if strings.TrimSpace(c.LinuxDo.FrontendRedirectURL) == "" {
-			return fmt.Errorf("linuxdo_connect.frontend_redirect_url is required when linuxdo_connect.enabled=true")
-		}
-
-		if err := ValidateAbsoluteHTTPURL(c.LinuxDo.AuthorizeURL); err != nil {
-			return fmt.Errorf("linuxdo_connect.authorize_url invalid: %w", err)
-		}
-		if err := ValidateAbsoluteHTTPURL(c.LinuxDo.TokenURL); err != nil {
-			return fmt.Errorf("linuxdo_connect.token_url invalid: %w", err)
-		}
-		if err := ValidateAbsoluteHTTPURL(c.LinuxDo.UserInfoURL); err != nil {
-			return fmt.Errorf("linuxdo_connect.userinfo_url invalid: %w", err)
-		}
-		if err := ValidateAbsoluteHTTPURL(c.LinuxDo.RedirectURL); err != nil {
-			return fmt.Errorf("linuxdo_connect.redirect_url invalid: %w", err)
-		}
-		if err := ValidateFrontendRedirectURL(c.LinuxDo.FrontendRedirectURL); err != nil {
-			return fmt.Errorf("linuxdo_connect.frontend_redirect_url invalid: %w", err)
-		}
-
-		warnIfInsecureURL("linuxdo_connect.authorize_url", c.LinuxDo.AuthorizeURL)
-		warnIfInsecureURL("linuxdo_connect.token_url", c.LinuxDo.TokenURL)
-		warnIfInsecureURL("linuxdo_connect.userinfo_url", c.LinuxDo.UserInfoURL)
-		warnIfInsecureURL("linuxdo_connect.redirect_url", c.LinuxDo.RedirectURL)
-		warnIfInsecureURL("linuxdo_connect.frontend_redirect_url", c.LinuxDo.FrontendRedirectURL)
-	}
-	if c.WeChat.Enabled {
-		weChat := c.WeChat
-		normalizeWeChatConnectConfig(&weChat)
-
-		if weChat.OpenEnabled {
-			if strings.TrimSpace(weChat.OpenAppID) == "" {
-				return fmt.Errorf("wechat_connect.open_app_id is required when wechat_connect.open_enabled=true")
-			}
-			if strings.TrimSpace(weChat.OpenAppSecret) == "" {
-				return fmt.Errorf("wechat_connect.open_app_secret is required when wechat_connect.open_enabled=true")
-			}
-		}
-		if weChat.MPEnabled {
-			if strings.TrimSpace(weChat.MPAppID) == "" {
-				return fmt.Errorf("wechat_connect.mp_app_id is required when wechat_connect.mp_enabled=true")
-			}
-			if strings.TrimSpace(weChat.MPAppSecret) == "" {
-				return fmt.Errorf("wechat_connect.mp_app_secret is required when wechat_connect.mp_enabled=true")
-			}
-		}
-		if weChat.MobileEnabled {
-			if strings.TrimSpace(weChat.MobileAppID) == "" {
-				return fmt.Errorf("wechat_connect.mobile_app_id is required when wechat_connect.mobile_enabled=true")
-			}
-			if strings.TrimSpace(weChat.MobileAppSecret) == "" {
-				return fmt.Errorf("wechat_connect.mobile_app_secret is required when wechat_connect.mobile_enabled=true")
-			}
-		}
-		if v := strings.TrimSpace(weChat.RedirectURL); v != "" {
-			if err := ValidateAbsoluteHTTPURL(v); err != nil {
-				return fmt.Errorf("wechat_connect.redirect_url invalid: %w", err)
-			}
-			warnIfInsecureURL("wechat_connect.redirect_url", v)
-		}
-		if err := ValidateFrontendRedirectURL(weChat.FrontendRedirectURL); err != nil {
-			return fmt.Errorf("wechat_connect.frontend_redirect_url invalid: %w", err)
-		}
-		warnIfInsecureURL("wechat_connect.frontend_redirect_url", weChat.FrontendRedirectURL)
-	}
-	if c.OIDC.Enabled {
-		if strings.TrimSpace(c.OIDC.ClientID) == "" {
-			return fmt.Errorf("oidc_connect.client_id is required when oidc_connect.enabled=true")
-		}
-		if strings.TrimSpace(c.OIDC.IssuerURL) == "" {
-			return fmt.Errorf("oidc_connect.issuer_url is required when oidc_connect.enabled=true")
-		}
-		if strings.TrimSpace(c.OIDC.RedirectURL) == "" {
-			return fmt.Errorf("oidc_connect.redirect_url is required when oidc_connect.enabled=true")
-		}
-		if strings.TrimSpace(c.OIDC.FrontendRedirectURL) == "" {
-			return fmt.Errorf("oidc_connect.frontend_redirect_url is required when oidc_connect.enabled=true")
-		}
-		if !scopeContainsOpenID(c.OIDC.Scopes) {
-			return fmt.Errorf("oidc_connect.scopes must contain openid")
-		}
-
-		method := strings.ToLower(strings.TrimSpace(c.OIDC.TokenAuthMethod))
-		switch method {
-		case "", "client_secret_post", "client_secret_basic", "none":
-		default:
-			return fmt.Errorf("oidc_connect.token_auth_method must be one of: client_secret_post/client_secret_basic/none")
-		}
-		if (method == "" || method == "client_secret_post" || method == "client_secret_basic") &&
-			strings.TrimSpace(c.OIDC.ClientSecret) == "" {
-			return fmt.Errorf("oidc_connect.client_secret is required when oidc_connect.enabled=true and token_auth_method is client_secret_post/client_secret_basic")
-		}
-		if c.OIDC.ClockSkewSeconds < 0 || c.OIDC.ClockSkewSeconds > 600 {
-			return fmt.Errorf("oidc_connect.clock_skew_seconds must be between 0 and 600")
-		}
-		if c.OIDC.ValidateIDToken && strings.TrimSpace(c.OIDC.AllowedSigningAlgs) == "" {
-			return fmt.Errorf("oidc_connect.allowed_signing_algs is required when oidc_connect.validate_id_token=true")
-		}
-
-		if err := ValidateAbsoluteHTTPURL(c.OIDC.IssuerURL); err != nil {
-			return fmt.Errorf("oidc_connect.issuer_url invalid: %w", err)
-		}
-		if v := strings.TrimSpace(c.OIDC.DiscoveryURL); v != "" {
-			if err := ValidateAbsoluteHTTPURL(v); err != nil {
-				return fmt.Errorf("oidc_connect.discovery_url invalid: %w", err)
-			}
-		}
-		if v := strings.TrimSpace(c.OIDC.AuthorizeURL); v != "" {
-			if err := ValidateAbsoluteHTTPURL(v); err != nil {
-				return fmt.Errorf("oidc_connect.authorize_url invalid: %w", err)
-			}
-		}
-		if v := strings.TrimSpace(c.OIDC.TokenURL); v != "" {
-			if err := ValidateAbsoluteHTTPURL(v); err != nil {
-				return fmt.Errorf("oidc_connect.token_url invalid: %w", err)
-			}
-		}
-		if v := strings.TrimSpace(c.OIDC.UserInfoURL); v != "" {
-			if err := ValidateAbsoluteHTTPURL(v); err != nil {
-				return fmt.Errorf("oidc_connect.userinfo_url invalid: %w", err)
-			}
-		}
-		if v := strings.TrimSpace(c.OIDC.JWKSURL); v != "" {
-			if err := ValidateAbsoluteHTTPURL(v); err != nil {
-				return fmt.Errorf("oidc_connect.jwks_url invalid: %w", err)
-			}
-		}
-		if err := ValidateAbsoluteHTTPURL(c.OIDC.RedirectURL); err != nil {
-			return fmt.Errorf("oidc_connect.redirect_url invalid: %w", err)
-		}
-		if err := ValidateFrontendRedirectURL(c.OIDC.FrontendRedirectURL); err != nil {
-			return fmt.Errorf("oidc_connect.frontend_redirect_url invalid: %w", err)
-		}
-
-		warnIfInsecureURL("oidc_connect.issuer_url", c.OIDC.IssuerURL)
-		warnIfInsecureURL("oidc_connect.discovery_url", c.OIDC.DiscoveryURL)
-		warnIfInsecureURL("oidc_connect.authorize_url", c.OIDC.AuthorizeURL)
-		warnIfInsecureURL("oidc_connect.token_url", c.OIDC.TokenURL)
-		warnIfInsecureURL("oidc_connect.userinfo_url", c.OIDC.UserInfoURL)
-		warnIfInsecureURL("oidc_connect.jwks_url", c.OIDC.JWKSURL)
-		warnIfInsecureURL("oidc_connect.redirect_url", c.OIDC.RedirectURL)
-		warnIfInsecureURL("oidc_connect.frontend_redirect_url", c.OIDC.FrontendRedirectURL)
-	}
-	if c.Billing.CircuitBreaker.Enabled {
-		if c.Billing.CircuitBreaker.FailureThreshold <= 0 {
-			return fmt.Errorf("billing.circuit_breaker.failure_threshold must be positive")
-		}
-		if c.Billing.CircuitBreaker.ResetTimeoutSeconds <= 0 {
-			return fmt.Errorf("billing.circuit_breaker.reset_timeout_seconds must be positive")
-		}
-		if c.Billing.CircuitBreaker.HalfOpenRequests <= 0 {
-			return fmt.Errorf("billing.circuit_breaker.half_open_requests must be positive")
-		}
-	}
-	if c.Billing.MinimumBalanceReserve < 0 {
-		return fmt.Errorf("billing.minimum_balance_reserve must be non-negative")
-	}
 	if c.Database.MaxOpenConns <= 0 {
 		return fmt.Errorf("database.max_open_conns must be positive")
 	}
@@ -2981,61 +2037,6 @@ func (c *Config) Validate() error {
 	}
 	if c.Redis.MinIdleConns > c.Redis.PoolSize {
 		return fmt.Errorf("redis.min_idle_conns cannot exceed redis.pool_size")
-	}
-	if c.BatchImage.QueueEnabled {
-		if strings.TrimSpace(c.BatchImage.QueueReadyKey) == "" {
-			return fmt.Errorf("batch_image.queue_ready_key must not be empty")
-		}
-		if strings.TrimSpace(c.BatchImage.QueueDelayedKey) == "" {
-			return fmt.Errorf("batch_image.queue_delayed_key must not be empty")
-		}
-		if strings.TrimSpace(c.BatchImage.QueueActiveKey) == "" {
-			return fmt.Errorf("batch_image.queue_active_key must not be empty")
-		}
-		if strings.TrimSpace(c.BatchImage.InflightKeyPrefix) == "" {
-			return fmt.Errorf("batch_image.inflight_key_prefix must not be empty")
-		}
-		if strings.TrimSpace(c.BatchImage.LockKeyPrefix) == "" {
-			return fmt.Errorf("batch_image.lock_key_prefix must not be empty")
-		}
-		if c.BatchImage.InflightTTLSeconds <= 0 {
-			return fmt.Errorf("batch_image.inflight_ttl_seconds must be positive")
-		}
-		if c.BatchImage.JobLockTTLSeconds <= 0 {
-			return fmt.Errorf("batch_image.job_lock_ttl_seconds must be positive")
-		}
-		if c.BatchImage.StaleActiveAfterSeconds <= 0 {
-			return fmt.Errorf("batch_image.stale_active_after_seconds must be positive")
-		}
-		if c.BatchImage.DelayedMoveLimit <= 0 {
-			return fmt.Errorf("batch_image.delayed_move_limit must be positive")
-		}
-		if c.BatchImage.RecoverLimit <= 0 {
-			return fmt.Errorf("batch_image.recover_limit must be positive")
-		}
-	}
-	if c.BatchImage.VertexEnabled {
-		if strings.TrimSpace(c.BatchImage.VertexManagedGCSBucket) == "" {
-			return fmt.Errorf("batch_image.vertex_managed_gcs_bucket must not be empty when vertex is enabled")
-		}
-		if strings.Contains(c.BatchImage.VertexManagedGCSBucket, "://") {
-			return fmt.Errorf("batch_image.vertex_managed_gcs_bucket must be a bucket name, not a URI")
-		}
-		if strings.TrimSpace(c.BatchImage.VertexLocation) == "" {
-			return fmt.Errorf("batch_image.vertex_location must not be empty when vertex is enabled")
-		}
-		if strings.TrimSpace(c.BatchImage.VertexManagedGCSPrefix) == "" {
-			return fmt.Errorf("batch_image.vertex_managed_gcs_prefix must not be empty when vertex is enabled")
-		}
-		if !strings.Contains(c.BatchImage.VertexManagedGCSPrefix, "{batch_id}") {
-			return fmt.Errorf("batch_image.vertex_managed_gcs_prefix must contain {batch_id}")
-		}
-		if c.BatchImage.VertexInputRetentionHours <= 0 {
-			return fmt.Errorf("batch_image.vertex_input_retention_hours must be positive")
-		}
-		if c.BatchImage.VertexOutputRetentionHours <= 0 {
-			return fmt.Errorf("batch_image.vertex_output_retention_hours must be positive")
-		}
 	}
 	if c.Dashboard.Enabled {
 		if c.Dashboard.StatsFreshTTLSeconds <= 0 {
@@ -3507,9 +2508,6 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("gateway.usage_record.auto_scale_cooldown_seconds must be non-negative")
 		}
 	}
-	if c.Gateway.UserGroupRateCacheTTLSeconds <= 0 {
-		return fmt.Errorf("gateway.user_group_rate_cache_ttl_seconds must be positive")
-	}
 	if c.Gateway.ModelsListCacheTTLSeconds < 10 || c.Gateway.ModelsListCacheTTLSeconds > 30 {
 		return fmt.Errorf("gateway.models_list_cache_ttl_seconds must be between 10-30")
 	}
@@ -3597,9 +2595,6 @@ func (c *Config) Validate() error {
 	}
 	if c.Gateway.Grok.FreeQuotaStatsCacheSeconds < 0 {
 		return fmt.Errorf("gateway.grok.free_quota_stats_cache_seconds must be non-negative")
-	}
-	if err := ValidateDingTalkConfig(c.DingTalk); err != nil {
-		return fmt.Errorf("dingtalk_connect: %w", err)
 	}
 	return nil
 }
@@ -3730,15 +2725,6 @@ func ValidateFrontendRedirectURL(raw string) error {
 		return fmt.Errorf("must not include fragment")
 	}
 	return nil
-}
-
-func scopeContainsOpenID(scopes string) bool {
-	for _, scope := range strings.Fields(strings.ToLower(strings.TrimSpace(scopes))) {
-		if scope == "openid" {
-			return true
-		}
-	}
-	return false
 }
 
 // isHTTPScheme 检查是否为 HTTP 或 HTTPS 协议

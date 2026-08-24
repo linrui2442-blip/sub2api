@@ -16,24 +16,7 @@ const setupClient = axios.create({
 export interface SetupStatus {
   needs_setup: boolean
   step: string
-}
-
-export interface DatabaseConfig {
-  host: string
-  port: number
-  user: string
-  password: string
-  dbname: string
-  sslmode: string
-}
-
-export interface RedisConfig {
-  host: string
-  port: number
-  username: string
-  password: string
-  db: number
-  enable_tls: boolean
+  personal?: boolean
 }
 
 export interface AdminConfig {
@@ -41,17 +24,8 @@ export interface AdminConfig {
   password: string
 }
 
-export interface ServerConfig {
-  host: string
-  port: number
-  mode: string
-}
-
-export interface InstallRequest {
-  database: DatabaseConfig
-  redis: RedisConfig
+export interface PersonalInstallRequest {
   admin: AdminConfig
-  server: ServerConfig
 }
 
 export interface InstallResponse {
@@ -68,23 +42,10 @@ export async function getSetupStatus(): Promise<SetupStatus> {
 }
 
 /**
- * Test database connection
+ * Initialize Personal Edition. SQLite and the in-process cache/scheduler are
+ * automatic; only the local owner account is provided by the user.
  */
-export async function testDatabase(config: DatabaseConfig): Promise<void> {
-  await setupClient.post('/setup/test-db', config)
-}
-
-/**
- * Test Redis connection
- */
-export async function testRedis(config: RedisConfig): Promise<void> {
-  await setupClient.post('/setup/test-redis', config)
-}
-
-/**
- * Perform installation
- */
-export async function install(config: InstallRequest): Promise<InstallResponse> {
-  const response = await setupClient.post('/setup/install', config)
+export async function installPersonal(config: PersonalInstallRequest): Promise<InstallResponse> {
+  const response = await setupClient.post('/setup/personal/install', config)
   return response.data.data
 }

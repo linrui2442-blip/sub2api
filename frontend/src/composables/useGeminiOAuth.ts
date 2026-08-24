@@ -102,7 +102,8 @@ export function useGeminiOAuth() {
       return tokenInfo as GeminiTokenInfo
     } catch (err: any) {
       // Check for specific missing project_id error
-      const errorMessage = err.message || err.response?.data?.message || ''
+      const errorMessage =
+        err.response?.data?.detail || err.response?.data?.message || err.message || ''
       if (errorMessage.includes('missing project_id')) {
         error.value = t('admin.accounts.oauth.gemini.missingProjectId')
       } else {

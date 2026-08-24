@@ -18,6 +18,7 @@ func TestNormalizeAntigravitySubscription_PaidTierWithIneligible(t *testing.T) {
 	result := NormalizeAntigravitySubscription(resp)
 
 	assert.Equal(t, "Pro", result.PlanType, "paid tier should preserve Pro even with ineligible tiers")
+	assert.Equal(t, "g1-pro-tier", result.PaidTierID)
 	assert.Equal(t, "abnormal", result.SubscriptionStatus)
 	assert.Equal(t, "location validation required", result.SubscriptionError)
 }
@@ -33,6 +34,7 @@ func TestNormalizeAntigravitySubscription_FreeTierWithIneligible(t *testing.T) {
 	result := NormalizeAntigravitySubscription(resp)
 
 	assert.Equal(t, "Abnormal", result.PlanType, "free tier with ineligible should be Abnormal")
+	assert.Equal(t, "free-tier", result.PaidTierID)
 	assert.Equal(t, "abnormal", result.SubscriptionStatus)
 }
 
@@ -44,6 +46,7 @@ func TestNormalizeAntigravitySubscription_NoIneligible(t *testing.T) {
 	result := NormalizeAntigravitySubscription(resp)
 
 	assert.Equal(t, "Ultra", result.PlanType)
+	assert.Equal(t, "g1-ultra-tier", result.PaidTierID)
 	assert.Empty(t, result.SubscriptionStatus)
 }
 

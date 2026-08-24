@@ -72,55 +72,6 @@
               />
             </div>
 
-            <!-- Dynamic Attribute Filters -->
-            <template v-for="(value, attrId) in activeAttributeFilters" :key="attrId">
-              <div
-                v-if="visibleFilters.has(`attr_${attrId}`)"
-                class="relative w-full sm:w-36"
-              >
-                <!-- Text/Email/URL/Textarea/Date type: styled input -->
-                <input
-                  v-if="['text', 'textarea', 'email', 'url', 'date'].includes(getAttributeDefinition(Number(attrId))?.type || 'text')"
-                  :value="value"
-                  @input="(e) => updateAttributeFilter(Number(attrId), (e.target as HTMLInputElement).value)"
-                  @keyup.enter="applyFilter"
-                  :placeholder="getAttributeDefinitionName(Number(attrId))"
-                  class="input w-full"
-                />
-                <!-- Number type: number input -->
-                <input
-                  v-else-if="getAttributeDefinition(Number(attrId))?.type === 'number'"
-                  :value="value"
-                  type="number"
-                  @input="(e) => updateAttributeFilter(Number(attrId), (e.target as HTMLInputElement).value)"
-                  @keyup.enter="applyFilter"
-                  :placeholder="getAttributeDefinitionName(Number(attrId))"
-                  class="input w-full"
-                />
-                <!-- Select/Multi-select type -->
-                <template v-else-if="['select', 'multi_select'].includes(getAttributeDefinition(Number(attrId))?.type || '')">
-                  <div class="w-full">
-                    <Select
-                      :model-value="value"
-                      :options="[
-                        { value: '', label: getAttributeDefinitionName(Number(attrId)) },
-                        ...(getAttributeDefinition(Number(attrId))?.options || [])
-                      ]"
-                      @update:model-value="(val) => { updateAttributeFilter(Number(attrId), String(val ?? '')); applyFilter() }"
-                    />
-                  </div>
-                </template>
-                <!-- Fallback -->
-                <input
-                  v-else
-                  :value="value"
-                  @input="(e) => updateAttributeFilter(Number(attrId), (e.target as HTMLInputElement).value)"
-                  @keyup.enter="applyFilter"
-                  :placeholder="getAttributeDefinitionName(Number(attrId))"
-                  class="input w-full"
-                />
-              </div>
-            </template>
           </div>
 
           <!-- Right: Actions and Settings -->
@@ -161,27 +112,6 @@
                     <span>{{ filter.name }}</span>
                     <Icon
                       v-if="visibleFilters.has(filter.key)"
-                      name="check"
-                      size="sm"
-                      class="text-primary-500"
-                      :stroke-width="2"
-                    />
-                  </button>
-                  <!-- Divider if custom attributes exist -->
-                  <div
-                    v-if="filterableAttributes.length > 0"
-                    class="my-1 border-t border-gray-100 dark:border-dark-700"
-                  ></div>
-                  <!-- Custom attribute filters -->
-                  <button
-                    v-for="attr in filterableAttributes"
-                    :key="attr.id"
-                    @click="toggleAttributeFilter(attr)"
-                    class="flex w-full items-center justify-between px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
-                  >
-                    <span>{{ attr.name }}</span>
-                    <Icon
-                      v-if="visibleFilters.has(`attr_${attr.id}`)"
                       name="check"
                       size="sm"
                       class="text-primary-500"
@@ -231,15 +161,6 @@
                   </button>
                 </div>
               </div>
-              <!-- Attributes Config Button -->
-              <button
-                @click="showAttributesModal = true"
-                class="btn btn-secondary px-2 md:px-3"
-                :title="t('admin.users.attributes.configButton')"
-              >
-                <Icon name="cog" size="sm" class="md:mr-1.5" />
-                <span class="hidden md:inline">{{ t('admin.users.attributes.configButton') }}</span>
-              </button>
             </div>
 
             <button
@@ -309,21 +230,6 @@
             </div>
           </template>
 
-          <!-- Dynamic attribute columns -->
-          <template
-            v-for="def in attributeDefinitions.filter(d => d.enabled)"
-            :key="def.id"
-            #[`cell-attr_${def.id}`]="{ row }"
-          >
-            <div class="max-w-xs">
-              <span
-                class="block truncate text-sm text-gray-700 dark:text-gray-300"
-                :title="getAttributeValue(row.id, def.id)"
-              >
-                {{ getAttributeValue(row.id, def.id) }}
-              </span>
-            </div>
-          </template>
 
           <template #cell-role="{ value }">
             <span :class="['badge', value === 'admin' ? 'badge-purple' : 'badge-gray']">
@@ -396,66 +302,6 @@
             <span v-else class="text-xs text-gray-400 dark:text-dark-500">-</span>
           </template>
 
-          <template #cell-subscriptions="{ row }">
-            <div
-              v-if="row.subscriptions && row.subscriptions.length > 0"
-              class="flex flex-wrap gap-1.5"
-            >
-              <GroupBadge
-                v-for="sub in row.subscriptions"
-                :key="sub.id"
-                :name="sub.group?.name || ''"
-                :platform="sub.group?.platform"
-                :subscription-type="sub.group?.subscription_type"
-                :rate-multiplier="sub.group?.rate_multiplier"
-                :days-remaining="sub.expires_at ? getDaysRemaining(sub.expires_at) : null"
-                :title="sub.expires_at ? formatDateTime(sub.expires_at) : ''"
-              />
-            </div>
-            <span
-              v-else
-              class="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1 text-xs text-gray-400 dark:bg-dark-700/50 dark:text-dark-500"
-            >
-              <Icon name="ban" size="xs" class="h-3.5 w-3.5" />
-              <span>{{ t('admin.users.noSubscription') }}</span>
-            </span>
-          </template>
-
-          <template #cell-balance="{ value, row }">
-            <div class="flex items-center gap-2">
-              <div class="group relative">
-                <button
-                  class="font-medium text-gray-900 underline decoration-dashed decoration-gray-300 underline-offset-4 transition-colors hover:text-primary-600 dark:text-white dark:decoration-dark-500 dark:hover:text-primary-400"
-                  @click="handleBalanceHistory(row)"
-                >
-                  ${{ value.toFixed(2) }}
-                </button>
-                <!-- Instant tooltip -->
-                <div class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition-opacity duration-75 group-hover:opacity-100 dark:bg-dark-600">
-                  {{ t('admin.users.balanceHistoryTip') }}
-                  <div class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-dark-600"></div>
-                </div>
-              </div>
-              <button
-                @click.stop="handleDeposit(row)"
-                class="rounded px-2 py-0.5 text-xs font-medium text-emerald-600 transition-colors hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
-                :title="t('admin.users.deposit')"
-              >
-                {{ t('admin.users.deposit') }}
-              </button>
-            </div>
-          </template>
-
-          <template #cell-balance_platform_quota="{ row }">
-            <button
-              type="button"
-              class="block text-left underline decoration-dashed decoration-gray-300 underline-offset-4 transition-colors hover:decoration-primary-400 dark:decoration-dark-500"
-              :title="t('admin.users.platformQuota.cellColumnTooltip')"
-              @click="handlePlatformQuota(row)"
-            >
-              <UserPlatformQuotaCell :quotas="platformQuotaStats[row.id]" />
-            </button>
-          </template>
 
           <!-- 用量列自定义表头：列名 + 单个排序图标按钮，点击展开"今日/近30天"菜单。
                column.sortable=false，DataTable 内置点击逻辑不会触发；
@@ -540,8 +386,8 @@
 
           <template #cell-usage="{ row }">
             <PlatformUsageBreakdown
-              :today="usageStats[row.id]?.today_actual_cost ?? 0"
-              :total="usageStats[row.id]?.total_actual_cost ?? 0"
+              :today="usageStats[row.id]?.today_requests ?? 0"
+              :total="usageStats[row.id]?.total_requests ?? 0"
               :by-platform="usageStats[row.id]?.by_platform"
             />
           </template>
@@ -692,46 +538,6 @@
 
               <div class="my-1 border-t border-gray-100 dark:border-dark-700"></div>
 
-              <!-- Deposit -->
-              <button
-                @click="handleDeposit(user); closeActionMenu()"
-                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
-              >
-                <Icon name="plus" size="sm" class="text-emerald-500" :stroke-width="2" />
-                {{ t('admin.users.deposit') }}
-              </button>
-
-              <!-- Withdraw -->
-              <button
-                @click="handleWithdraw(user); closeActionMenu()"
-                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
-              >
-                <svg class="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
-                </svg>
-                {{ t('admin.users.withdraw') }}
-              </button>
-
-              <!-- Platform Quotas -->
-              <button
-                @click="handlePlatformQuota(user); closeActionMenu()"
-                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
-              >
-                <Icon name="chartBar" size="sm" class="text-gray-400" :stroke-width="2" />
-                {{ t('admin.users.platformQuota.menuItem') }}
-              </button>
-
-              <!-- Balance History -->
-              <button
-                @click="handleBalanceHistory(user); closeActionMenu()"
-                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
-              >
-                <Icon name="dollar" size="sm" class="text-gray-400" :stroke-width="2" />
-                {{ t('admin.users.balanceHistory') }}
-              </button>
-
-              <div class="my-1 border-t border-gray-100 dark:border-dark-700"></div>
-
               <!-- Delete (not for admin) -->
               <button
                 v-if="user.role !== 'admin'"
@@ -756,18 +562,9 @@
       @close="showBulkEditModal = false"
       @success="handleBulkLimitsSuccess"
     />
-    <UserPlatformQuotaModal
-      :show="showPlatformQuotaModal"
-      :user="platformQuotaUser"
-      @close="closePlatformQuotaModal"
-      @success="loadUsers"
-    />
     <UserApiKeysModal :show="showApiKeysModal" :user="viewingUser" @close="closeApiKeysModal" />
     <UserAllowedGroupsModal :show="showAllowedGroupsModal" :user="allowedGroupsUser" @close="closeAllowedGroupsModal" @success="loadUsers" />
-    <UserBalanceModal :show="showBalanceModal" :user="balanceUser" :operation="balanceOperation" @close="closeBalanceModal" @success="loadUsers" />
-    <UserBalanceHistoryModal :show="showBalanceHistoryModal" :user="balanceHistoryUser" @close="closeBalanceHistoryModal" @deposit="handleDepositFromHistory" @withdraw="handleWithdrawFromHistory" />
     <GroupReplaceModal :show="showGroupReplaceModal" :user="groupReplaceUser" :old-group="groupReplaceOldGroup" :all-groups="allGroups" @close="closeGroupReplaceModal" @success="loadUsers" />
-    <UserAttributesConfigModal :show="showAttributesModal" @close="handleAttributesModalClose" />
   </AppLayout>
 </template>
 
@@ -782,9 +579,8 @@ import Icon from '@/components/icons/Icon.vue'
 
 const { t } = useI18n()
 import { adminAPI } from '@/api/admin'
-import type { AdminUser, AdminGroup, UserAttributeDefinition } from '@/types'
+import type { AdminUser, AdminGroup } from '@/types'
 import type { BatchUserUsageStats } from '@/api/admin/dashboard'
-import type { PlatformQuotaItem } from '@/api/admin/users'
 import type { Column } from '@/components/common/types'
 import type { SelectOption } from '@/components/common/Select.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -793,71 +589,19 @@ import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
-import GroupBadge from '@/components/common/GroupBadge.vue'
 import Select from '@/components/common/Select.vue'
 import { buildApiKeyGroupFilterOptions } from './apiKeyGroupFilterOptions'
-import UserAttributesConfigModal from '@/components/user/UserAttributesConfigModal.vue'
 import UserConcurrencyCell from '@/components/user/UserConcurrencyCell.vue'
 import PlatformUsageBreakdown from '@/components/user/PlatformUsageBreakdown.vue'
 import PlatformCostCell from '@/components/user/PlatformCostCell.vue'
-import UserPlatformQuotaCell from '@/components/user/UserPlatformQuotaCell.vue'
 import UserCreateModal from '@/components/admin/user/UserCreateModal.vue'
 import UserEditModal from '@/components/admin/user/UserEditModal.vue'
 import BulkEditUserModal from '@/components/admin/user/BulkEditUserModal.vue'
-import UserPlatformQuotaModal from '@/components/admin/user/UserPlatformQuotaModal.vue'
 import UserApiKeysModal from '@/components/admin/user/UserApiKeysModal.vue'
 import UserAllowedGroupsModal from '@/components/admin/user/UserAllowedGroupsModal.vue'
-import UserBalanceModal from '@/components/admin/user/UserBalanceModal.vue'
-import UserBalanceHistoryModal from '@/components/admin/user/UserBalanceHistoryModal.vue'
 import GroupReplaceModal from '@/components/admin/user/GroupReplaceModal.vue'
 
 const appStore = useAppStore()
-
-// Generate dynamic attribute columns from enabled definitions
-const attributeColumns = computed<Column[]>(() =>
-  attributeDefinitions.value
-    .filter(def => def.enabled)
-    .map(def => ({
-      key: `attr_${def.id}`,
-      label: def.name,
-      sortable: false
-    }))
-)
-
-// Get formatted attribute value for display in table
-const getAttributeValue = (userId: number, attrId: number): string => {
-  const userAttrs = userAttributeValues.value[userId]
-  if (!userAttrs) return '-'
-  const value = userAttrs[attrId]
-  if (!value) return '-'
-
-  // Find definition for this attribute
-  const def = attributeDefinitions.value.find(d => d.id === attrId)
-  if (!def) return value
-
-  // Format based on type
-  if (def.type === 'multi_select' && value) {
-    try {
-      const arr = JSON.parse(value)
-      if (Array.isArray(arr)) {
-        // Map values to labels
-        return arr.map(v => {
-          const opt = def.options?.find(o => o.value === v)
-          return opt?.label || v
-        }).join(', ')
-      }
-    } catch {
-      return value
-    }
-  }
-
-  if (def.type === 'select' && value && def.options) {
-    const opt = def.options.find(o => o.value === value)
-    return opt?.label || value
-  }
-
-  return value
-}
 
 // All possible columns (for column settings)
 const allColumns = computed<Column[]>(() => [
@@ -865,13 +609,8 @@ const allColumns = computed<Column[]>(() => [
   { key: 'id', label: t('admin.users.columns.id'), sortable: true },
   { key: 'username', label: t('admin.users.columns.username'), sortable: true },
   { key: 'notes', label: t('admin.users.columns.notes'), sortable: false },
-  // Dynamic attribute columns
-  ...attributeColumns.value,
   { key: 'role', label: t('admin.users.columns.role'), sortable: true },
   { key: 'groups', label: t('admin.users.columns.groups'), sortable: false },
-  { key: 'subscriptions', label: t('admin.users.columns.subscriptions'), sortable: false },
-  { key: 'balance', label: t('admin.users.columns.balance'), sortable: true },
-  { key: 'balance_platform_quota', label: t('admin.users.columns.balancePlatformQuota'), sortable: false },
   { key: 'usage', label: t('admin.users.columns.usage'), sortable: false },
   { key: 'usage_anthropic', label: t('admin.users.columns.usageAnthropic'), sortable: false },
   { key: 'usage_openai', label: t('admin.users.columns.usageOpenAI'), sortable: false },
@@ -896,9 +635,8 @@ const hiddenColumns = reactive<Set<string>>(new Set())
 
 // Default hidden columns (columns hidden by default on first load)
 const DEFAULT_HIDDEN_COLUMNS = [
-  'notes', 'groups', 'subscriptions', 'usage', 'concurrency',
+  'notes', 'groups', 'usage', 'concurrency',
   'usage_anthropic', 'usage_openai', 'usage_gemini', 'usage_antigravity',
-  'balance_platform_quota'
 ]
 const REMOVED_COLUMNS = new Set(['last_login_at'])
 // 强制可见列：加载时会被强制移出 hiddenColumns，并在列设置 UI 上 disabled。
@@ -914,7 +652,6 @@ const COLUMN_SETTINGS_VERSION_KEY = 'user-column-settings-version'
 const COLUMN_SETTINGS_VERSION = 3
 const VERSION_NEW_HIDDEN_COLUMNS: Record<number, string[]> = {
   2: ['usage_anthropic', 'usage_openai', 'usage_gemini', 'usage_antigravity'],
-  3: ['balance_platform_quota']
 }
 
 // Load saved column settings
@@ -977,11 +714,8 @@ const toggleColumn = (key: string) => {
     hiddenColumns.add(key)
   }
   saveColumnsToStorage()
-  if (wasHidden && (key === 'usage' || key.startsWith('usage_') || key.startsWith('attr_') || key === 'balance_platform_quota')) {
+  if (wasHidden && (key === 'usage' || key.startsWith('usage_') || key.startsWith('attr_'))) {
     refreshCurrentPageSecondaryData()
-  }
-  if (key === 'subscriptions') {
-    loadUsers()
   }
   if (wasHidden && key === 'groups') {
     loadAllGroups()
@@ -1007,10 +741,6 @@ const hasVisibleUsageColumn = computed(
   () => !hiddenColumns.has('usage') || PLATFORM_USAGE_COLUMNS.some((k) => !hiddenColumns.has(k))
 )
 const hasVisibleGroupsColumn = computed(() => !hiddenColumns.has('groups'))
-const hasVisiblePlatformQuotaColumn = computed(() => !hiddenColumns.has('balance_platform_quota'))
-const hasVisibleAttributeColumns = computed(() =>
-  attributeDefinitions.value.some((def) => def.enabled && !hiddenColumns.has(`attr_${def.id}`))
-)
 
 // Filtered columns based on visibility
 const columns = computed<Column[]>(() =>
@@ -1025,7 +755,7 @@ const searchQuery = ref('')
 const USER_SORT_STORAGE_KEY = 'admin-users-table-sort'
 const loadInitialSortState = (): { sort_by: string; sort_order: 'asc' | 'desc' } => {
   const fallback = { sort_by: 'created_at', sort_order: 'desc' as 'asc' | 'desc' }
-  const sortable = new Set(['email', 'id', 'username', 'role', 'balance', 'concurrency', 'status', 'last_used_at', 'last_active_at', 'created_at'])
+  const sortable = new Set(['email', 'id', 'username', 'role', 'concurrency', 'status', 'last_used_at', 'last_active_at', 'created_at'])
   try {
     const raw = localStorage.getItem(USER_SORT_STORAGE_KEY)
     if (!raw) return fallback
@@ -1069,7 +799,7 @@ const getUserGroups = (user: AdminUser) => {
   const exclusive: AdminGroup[] = []
   const publicGroups: AdminGroup[] = []
   for (const g of allGroups.value) {
-    if (g.status !== 'active' || g.subscription_type !== 'standard') continue
+		if (g.status !== 'active') continue
     if (g.is_exclusive) {
       if (user.allowed_groups?.includes(g.id)) {
         exclusive.push(g)
@@ -1087,7 +817,7 @@ const groupFilterOptions = computed(() => {
     { value: '', label: t('admin.users.allAuthorizedGroups') }
   ]
   for (const g of allGroups.value) {
-    if (g.status !== 'active' || !g.is_exclusive || g.subscription_type !== 'standard') continue
+		if (g.status !== 'active' || !g.is_exclusive) continue
     options.push({ value: g.name, label: g.name })
   }
   return options
@@ -1100,19 +830,17 @@ const apiKeyGroupFilterOptions = computed(() =>
     all: t('admin.users.allApiKeyGroups'),
     exclusive: t('admin.users.apiKeyGroupExclusive'),
     public: t('admin.users.apiKeyGroupPublic'),
-    subscription: t('admin.users.apiKeyGroupSubscription'),
     disabled: t('admin.users.apiKeyGroupDisabled'),
   }) as SelectOption[]
 )
 
-// Filter values (role, status, and custom attributes)
+// Filter values
 const filters = reactive({
   role: '',
   status: '',
   group: '',  // group name for fuzzy match, '' = all
   apiKeyGroup: null as number | null  // group id bound to the user's API keys, null = all
 })
-const activeAttributeFilters = reactive<Record<number, string>>({})
 
 // Visible filters tracking (which filters are shown in the UI)
 // Keys: 'role', 'status', 'attr_${id}'
@@ -1130,10 +858,6 @@ const columnDropdownRef = ref<HTMLElement | null>(null)
 const FILTER_VALUES_KEY = 'user-filter-values'
 const VISIBLE_FILTERS_KEY = 'user-visible-filters'
 
-// All filterable attribute definitions (enabled attributes)
-const filterableAttributes = computed(() =>
-  attributeDefinitions.value.filter(def => def.enabled)
-)
 
 // Built-in filter definitions
 const builtInFilters = computed(() => [
@@ -1160,9 +884,6 @@ const loadSavedFilters = () => {
       if (parsed.status) filters.status = parsed.status
       if (parsed.group) filters.group = parsed.group
       if (typeof parsed.apiKeyGroup === 'number') filters.apiKeyGroup = parsed.apiKeyGroup
-      if (parsed.attributes) {
-        Object.assign(activeAttributeFilters, parsed.attributes)
-      }
     }
   } catch (e) {
     console.error('Failed to load saved filters:', e)
@@ -1180,7 +901,6 @@ const saveFiltersToStorage = () => {
       status: filters.status,
       group: filters.group,
       apiKeyGroup: filters.apiKeyGroup,
-      attributes: activeAttributeFilters
     }
     localStorage.setItem(FILTER_VALUES_KEY, JSON.stringify(values))
   } catch (e) {
@@ -1188,12 +908,7 @@ const saveFiltersToStorage = () => {
   }
 }
 
-// Get attribute definition by ID
-const getAttributeDefinition = (attrId: number): UserAttributeDefinition | undefined => {
-  return attributeDefinitions.value.find(d => d.id === attrId)
-}
 const usageStats = ref<Record<string, BatchUserUsageStats>>({})
-const platformQuotaStats = ref<Record<number, PlatformQuotaItem[]>>({})
 
 const getPlatformUsage = (userId: number, platform: string) =>
   usageStats.value[userId]?.by_platform?.find((p) => p.platform === platform)
@@ -1268,11 +983,11 @@ const getUsageValue = (userId: number, key: string, metric: UsageMetric): number
   if (!stats) return 0
   const platform = USAGE_COLUMN_PLATFORMS[key]
   if (platform === null) {
-    return metric === 'today' ? stats.today_actual_cost ?? 0 : stats.total_actual_cost ?? 0
+    return metric === 'today' ? stats.today_requests ?? 0 : stats.total_requests ?? 0
   }
   const p = stats.by_platform?.find((x) => x.platform === platform)
   if (!p) return 0
-  return metric === 'today' ? p.today_actual_cost ?? 0 : p.total_actual_cost ?? 0
+  return metric === 'today' ? p.today_requests ?? 0 : p.total_requests ?? 0
 }
 
 // 在 server-side 排序结果之上叠加用量列的本地排序；无 usageSort 时直接透传原数组。
@@ -1308,9 +1023,6 @@ const handleSelectedKeysUpdate = (keys: Array<string | number>) => {
 const getUserSelectionLabel = (user: AdminUser) =>
   t('admin.users.bulkLimits.selectUser', { email: user.email })
 
-// User attribute definitions and values
-const attributeDefinitions = ref<UserAttributeDefinition[]>([])
-const userAttributeValues = ref<Record<number, Record<number, string>>>({})
 const pagination = reactive({
   page: 1,
   page_size: getPersistedPageSize(),
@@ -1323,22 +1035,9 @@ const showEditModal = ref(false)
 const showBulkEditModal = ref(false)
 const showDeleteDialog = ref(false)
 const showApiKeysModal = ref(false)
-const showAttributesModal = ref(false)
-const showPlatformQuotaModal = ref(false)
 const editingUser = ref<AdminUser | null>(null)
 const deletingUser = ref<AdminUser | null>(null)
 const viewingUser = ref<AdminUser | null>(null)
-const platformQuotaUser = ref<AdminUser | null>(null)
-
-const handlePlatformQuota = (user: AdminUser) => {
-  platformQuotaUser.value = user
-  showPlatformQuotaModal.value = true
-}
-
-const closePlatformQuotaModal = () => {
-  showPlatformQuotaModal.value = false
-  platformQuotaUser.value = null
-}
 let abortController: AbortController | null = null
 let secondaryDataSeq = 0
 
@@ -1367,52 +1066,6 @@ const loadUsersSecondaryData = async (
     )
   }
 
-  if (attributeDefinitions.value.length > 0 && hasVisibleAttributeColumns.value) {
-    tasks.push(
-      (async () => {
-        try {
-          const attrResponse = await adminAPI.userAttributes.getBatchUserAttributes(userIds)
-          if (signal?.aborted) return
-          if (typeof expectedSeq === 'number' && expectedSeq !== secondaryDataSeq) return
-          userAttributeValues.value = attrResponse.attributes
-        } catch (e) {
-          if (signal?.aborted) return
-          console.error('Failed to load user attribute values:', e)
-        }
-      })()
-    )
-  }
-
-  if (hasVisiblePlatformQuotaColumn.value) {
-    tasks.push(
-      (async () => {
-        try {
-          // 无批量端点：对当前页用户逐个拉取，分块并发（每批 6），批间检查中止条件，避免大 pageSize 时请求洪峰
-          const CHUNK = 6
-          for (let i = 0; i < userIds.length; i += CHUNK) {
-            if (signal?.aborted) return
-            if (typeof expectedSeq === 'number' && expectedSeq !== secondaryDataSeq) return
-            const chunk = userIds.slice(i, i + CHUNK)
-            const results = await Promise.allSettled(
-              chunk.map((id) => adminAPI.users.getPlatformQuotas(id))
-            )
-            if (signal?.aborted) return
-            if (typeof expectedSeq === 'number' && expectedSeq !== secondaryDataSeq) return
-            const merged = { ...platformQuotaStats.value }
-            results.forEach((r, idx) => {
-              if (r.status === 'fulfilled') {
-                merged[chunk[idx]] = r.value.platform_quotas || []
-              }
-            })
-            platformQuotaStats.value = merged
-          }
-        } catch (e) {
-          if (signal?.aborted) return
-          console.error('Failed to load platform quotas:', e)
-        }
-      })()
-    )
-  }
 
   if (tasks.length > 0) {
     await Promise.allSettled(tasks)
@@ -1527,38 +1180,6 @@ const showGroupReplaceModal = ref(false)
 const groupReplaceUser = ref<AdminUser | null>(null)
 const groupReplaceOldGroup = ref<{ id: number; name: string } | null>(null)
 
-// Balance (Deposit/Withdraw) modal state
-const showBalanceModal = ref(false)
-const balanceUser = ref<AdminUser | null>(null)
-const balanceOperation = ref<'add' | 'subtract'>('add')
-
-// Balance History modal state
-const showBalanceHistoryModal = ref(false)
-const balanceHistoryUser = ref<AdminUser | null>(null)
-
-// 计算剩余天数
-const getDaysRemaining = (expiresAt: string): number => {
-  const now = new Date()
-  const expires = new Date(expiresAt)
-  const diffMs = expires.getTime() - now.getTime()
-  return Math.ceil(diffMs / (1000 * 60 * 60 * 24))
-}
-
-const loadAttributeDefinitions = async () => {
-  try {
-    attributeDefinitions.value = await adminAPI.userAttributes.listEnabledDefinitions()
-  } catch (e) {
-    console.error('Failed to load attribute definitions:', e)
-  }
-}
-
-// Handle attributes modal close - reload definitions and users
-const handleAttributesModalClose = async () => {
-  showAttributesModal.value = false
-  await loadAttributeDefinitions()
-  loadUsers()
-}
-
 const loadUsers = async () => {
   abortController?.abort()
   const currentAbortController = new AbortController()
@@ -1566,14 +1187,6 @@ const loadUsers = async () => {
   const { signal } = currentAbortController
   loading.value = true
   try {
-    // Build attribute filters from active filters
-    const attrFilters: Record<number, string> = {}
-    for (const [attrId, value] of Object.entries(activeAttributeFilters)) {
-      if (value) {
-        attrFilters[Number(attrId)] = value
-      }
-    }
-
     const response = await adminAPI.users.list(
       pagination.page,
       pagination.page_size,
@@ -1583,8 +1196,7 @@ const loadUsers = async () => {
         search: searchQuery.value || undefined,
         group_name: filters.group || undefined,
         api_key_group_id: filters.apiKeyGroup ?? undefined,
-        attributes: Object.keys(attrFilters).length > 0 ? attrFilters : undefined,
-        // 始终请求 subscriptions：列隐藏时仍需用于 UserPlatformQuotaModal 的 active-subscription 警示 banner
+        // Subscription metadata remains available to the trusted-member management view.
         include_subscriptions: true,
         sort_by: sortState.sort_by,
         sort_order: sortState.sort_order
@@ -1598,8 +1210,6 @@ const loadUsers = async () => {
     pagination.total = response.total
     pagination.pages = response.pages
     usageStats.value = {}
-    userAttributeValues.value = {}
-    platformQuotaStats.value = {}
 
     // Defer heavy secondary data so table can render first.
     if (response.items.length > 0) {
@@ -1660,12 +1270,6 @@ const handleSort = (key: string, order: 'asc' | 'desc') => {
   loadUsers()
 }
 
-// Filter helpers
-const getAttributeDefinitionName = (attrId: number): string => {
-  const def = attributeDefinitions.value.find(d => d.id === attrId)
-  return def?.name || String(attrId)
-}
-
 // Toggle a built-in filter (role/status)
 const toggleBuiltInFilter = (key: string) => {
   if (visibleFilters.has(key)) {
@@ -1682,25 +1286,6 @@ const toggleBuiltInFilter = (key: string) => {
   saveFiltersToStorage()
   pagination.page = 1
   loadUsers()
-}
-
-// Toggle a custom attribute filter
-const toggleAttributeFilter = (attr: UserAttributeDefinition) => {
-  const key = `attr_${attr.id}`
-  if (visibleFilters.has(key)) {
-    visibleFilters.delete(key)
-    delete activeAttributeFilters[attr.id]
-  } else {
-    visibleFilters.add(key)
-    activeAttributeFilters[attr.id] = ''
-  }
-  saveFiltersToStorage()
-  pagination.page = 1
-  loadUsers()
-}
-
-const updateAttributeFilter = (attrId: number, value: string) => {
-  activeAttributeFilters[attrId] = value
 }
 
 // Apply filter and save to localStorage
@@ -1785,54 +1370,12 @@ const confirmDelete = async () => {
   }
 }
 
-const handleDeposit = (user: AdminUser) => {
-  balanceUser.value = user
-  balanceOperation.value = 'add'
-  showBalanceModal.value = true
-}
-
-const handleWithdraw = (user: AdminUser) => {
-  balanceUser.value = user
-  balanceOperation.value = 'subtract'
-  showBalanceModal.value = true
-}
-
-const closeBalanceModal = () => {
-  showBalanceModal.value = false
-  balanceUser.value = null
-}
-
-const handleBalanceHistory = (user: AdminUser) => {
-  balanceHistoryUser.value = user
-  showBalanceHistoryModal.value = true
-}
-
-const closeBalanceHistoryModal = () => {
-  showBalanceHistoryModal.value = false
-  balanceHistoryUser.value = null
-}
-
-// Handle deposit from balance history modal
-const handleDepositFromHistory = () => {
-  if (balanceHistoryUser.value) {
-    handleDeposit(balanceHistoryUser.value)
-  }
-}
-
-// Handle withdraw from balance history modal
-const handleWithdrawFromHistory = () => {
-  if (balanceHistoryUser.value) {
-    handleWithdraw(balanceHistoryUser.value)
-  }
-}
-
 // 滚动时关闭菜单
 const handleScroll = () => {
   closeActionMenu()
 }
 
-onMounted(async () => {
-  await loadAttributeDefinitions()
+onMounted(() => {
   loadSavedFilters()
   loadSavedColumns()
   loadUsers()

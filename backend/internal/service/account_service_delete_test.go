@@ -50,16 +50,8 @@ func (s *accountRepoStub) ExistsByID(ctx context.Context, id int64) (bool, error
 	return s.exists, s.existsErr
 }
 
-func (s *accountRepoStub) GetByCRSAccountID(ctx context.Context, crsAccountID string) (*Account, error) {
-	panic("unexpected GetByCRSAccountID call")
-}
-
 func (s *accountRepoStub) FindByExtraField(ctx context.Context, key string, value any) ([]Account, error) {
 	panic("unexpected FindByExtraField call")
-}
-
-func (s *accountRepoStub) ListCRSAccountIDs(ctx context.Context) (map[string]int64, error) {
-	panic("unexpected ListCRSAccountIDs call")
 }
 
 func (s *accountRepoStub) Update(ctx context.Context, account *Account) error {

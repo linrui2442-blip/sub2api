@@ -442,6 +442,12 @@ func (s *AccountTestService) fetchAntigravityOAuthUpstreamModels(ctx context.Con
 		return nil, newUpstreamModelSyncConfigError("Failed to configure Antigravity client", err)
 	}
 	modelsResp, _, err := client.FetchAvailableModels(ctx, accessToken, strings.TrimSpace(account.GetCredential("project_id")))
+	if err != nil && isAntigravityUnauthorized(err) && account.Type == AccountTypeOAuth {
+		accessToken, err = s.antigravityGatewayService.GetTokenProvider().RecoverRejectedAccessToken(ctx, account, accessToken)
+		if err == nil {
+			modelsResp, _, err = client.FetchAvailableModels(ctx, accessToken, strings.TrimSpace(account.GetCredential("project_id")))
+		}
+	}
 	if err != nil {
 		return nil, newUpstreamModelSyncUpstreamError("Failed to fetch Antigravity available models", err)
 	}

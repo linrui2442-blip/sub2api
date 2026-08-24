@@ -160,107 +160,6 @@
             </span>
           </template>
 
-          <template #cell-billing_type="{ row }">
-            <div class="space-y-1">
-              <!-- Type Badge -->
-              <span
-                :class="[
-                  'inline-block rounded-full px-2 py-0.5 text-xs font-medium',
-                  row.subscription_type === 'subscription'
-                    ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
-                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
-                ]"
-              >
-                {{
-                  row.subscription_type === "subscription"
-                    ? t("admin.groups.subscription.subscription")
-                    : t("admin.groups.subscription.standard")
-                }}
-              </span>
-              <!-- Subscription Limits - compact single line -->
-              <div
-                v-if="row.subscription_type === 'subscription'"
-                class="space-y-0.5 text-xs text-gray-500 dark:text-gray-400"
-              >
-                <div
-                  v-if="
-                    row.daily_limit_usd ||
-                    row.weekly_limit_usd ||
-                    row.monthly_limit_usd
-                  "
-                  class="flex flex-wrap items-center gap-x-1 gap-y-0.5"
-                >
-                  <span v-if="row.daily_limit_usd" class="whitespace-nowrap">
-                    <span
-                      v-if="usageLoading"
-                      class="font-medium text-gray-400 dark:text-gray-500"
-                      >—</span
-                    >
-                    <span
-                      v-else
-                      :class="
-                        getQuotaUsageClass(
-                          usageMap.get(row.id)?.today_cost ?? 0,
-                          row.daily_limit_usd
-                        )
-                      "
-                      >{{
-                        formatUsd(usageMap.get(row.id)?.today_cost ?? 0)
-                      }}</span
-                    >
-                    <span class="text-gray-400 dark:text-gray-500">
-                      / {{ formatUsd(row.daily_limit_usd) }}/{{
-                        t("admin.groups.limitDay")
-                      }}</span
-                    >
-                  </span>
-                  <span
-                    v-if="
-                      row.daily_limit_usd &&
-                      (row.weekly_limit_usd || row.monthly_limit_usd)
-                    "
-                    class="mx-1 text-gray-300 dark:text-gray-600"
-                    >·</span
-                  >
-                  <span v-if="row.weekly_limit_usd" class="whitespace-nowrap"
-                    >{{ formatUsd(row.weekly_limit_usd) }}/{{
-                      t("admin.groups.limitWeek")
-                    }}</span
-                  >
-                  <span
-                    v-if="row.weekly_limit_usd && row.monthly_limit_usd"
-                    class="mx-1 text-gray-300 dark:text-gray-600"
-                    >·</span
-                  >
-                  <span v-if="row.monthly_limit_usd" class="whitespace-nowrap"
-                    >{{ formatUsd(row.monthly_limit_usd) }}/{{
-                      t("admin.groups.limitMonth")
-                    }}</span
-                  >
-                </div>
-                <span v-else class="text-gray-400 dark:text-gray-500">{{
-                  t("admin.groups.subscription.noLimit")
-                }}</span>
-                <div class="text-gray-400 dark:text-gray-500">
-                  {{ t("admin.groups.usageTotal") }}
-                  <span class="ml-1 font-medium text-gray-600 dark:text-gray-300"
-                    >{{
-                      usageLoading
-                        ? "—"
-                        : formatUsd(usageMap.get(row.id)?.total_cost ?? 0)
-                    }}</span
-                  >
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <template #cell-rate_multiplier="{ value }">
-            <span class="text-sm text-gray-700 dark:text-gray-300"
-              >{{ value }}x</span
-            >
-          </template>
-
           <template #cell-is_exclusive="{ value }">
             <span :class="['badge', value ? 'badge-primary' : 'badge-gray']">
               {{
@@ -334,9 +233,8 @@
                   t("admin.groups.usageToday")
                 }}</span>
                 <span class="ml-1 font-medium text-gray-700 dark:text-gray-300"
-                  >${{
-                    formatCost(usageMap.get(row.id)?.today_cost ?? 0)
-                  }}</span
+                  >{{ formatNumber(usageMap.get(row.id)?.today_requests ?? 0) }} req /
+                  {{ formatTokens(usageMap.get(row.id)?.today_tokens ?? 0) }} tok</span
                 >
               </div>
               <div class="text-gray-500 dark:text-gray-400">
@@ -344,9 +242,8 @@
                   t("admin.groups.usageYesterday")
                 }}</span>
                 <span class="ml-1 font-medium text-gray-700 dark:text-gray-300"
-                  >${{
-                    formatCost(usageMap.get(row.id)?.yesterday_cost ?? 0)
-                  }}</span
+                  >{{ formatNumber(usageMap.get(row.id)?.yesterday_requests ?? 0) }} req /
+                  {{ formatTokens(usageMap.get(row.id)?.yesterday_tokens ?? 0) }} tok</span
                 >
               </div>
               <div class="text-gray-500 dark:text-gray-400">
@@ -354,9 +251,8 @@
                   t("admin.groups.usageTotal")
                 }}</span>
                 <span class="ml-1 font-medium text-gray-700 dark:text-gray-300"
-                  >${{
-                    formatCost(usageMap.get(row.id)?.total_cost ?? 0)
-                  }}</span
+                  >{{ formatNumber(usageMap.get(row.id)?.total_requests ?? 0) }} req /
+                  {{ formatTokens(usageMap.get(row.id)?.total_tokens ?? 0) }} tok</span
                 >
               </div>
             </div>
@@ -410,24 +306,6 @@
                 <Icon name="swap" size="sm" />
                 <span class="text-xs">{{
                   t("admin.groups.compositeRoutes.action")
-                }}</span>
-              </button>
-              <button
-                @click="handleRateMultipliers(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-purple-600 dark:hover:bg-dark-700 dark:hover:text-purple-400"
-              >
-                <Icon name="dollar" size="sm" />
-                <span class="text-xs">{{
-                  t("admin.groups.rateMultipliers")
-                }}</span>
-              </button>
-              <button
-                @click="handleRPMOverrides(row)"
-                class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-gray-100 hover:text-orange-600 dark:hover:bg-dark-700 dark:hover:text-orange-400"
-              >
-                <Icon name="bolt" size="sm" />
-                <span class="text-xs">{{
-                  t("admin.groups.rpmOverrides")
                 }}</span>
               </button>
               <button
@@ -599,21 +477,6 @@
           <p class="input-hint">{{ t("admin.groups.copyAccounts.hint") }}</p>
         </div>
         <div>
-          <label class="input-label">{{
-            t("admin.groups.form.rateMultiplier")
-          }}</label>
-          <input
-            v-model.number="createForm.rate_multiplier"
-            type="number"
-            step="0.001"
-            min="0.001"
-            required
-            class="input"
-            data-tour="group-form-multiplier"
-          />
-          <p class="input-hint">{{ t("admin.groups.rateMultiplierHint") }}</p>
-        </div>
-        <div>
           <label class="input-label">{{ t("admin.groups.form.rpmLimit") }}</label>
           <input
             v-model.number="createForm.rpm_limit"
@@ -633,10 +496,7 @@
           v-model:max-effort="createForm.max_reasoning_effort"
           v-model:mappings="createForm.reasoning_effort_mappings"
         />
-        <div
-          v-if="createForm.subscription_type !== 'subscription'"
-          data-tour="group-form-exclusive"
-        >
+        <div data-tour="group-form-exclusive">
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t("admin.groups.form.exclusive") }}
@@ -705,68 +565,6 @@
                   : t("admin.groups.public")
               }}
             </span>
-          </div>
-        </div>
-
-        <!-- Subscription Configuration -->
-        <div class="mt-4 border-t pt-4">
-          <div>
-            <label class="input-label">{{
-              t("admin.groups.subscription.type")
-            }}</label>
-            <Select
-              v-model="createForm.subscription_type"
-              :options="subscriptionTypeOptions"
-            />
-            <p class="input-hint">
-              {{ t("admin.groups.subscription.typeHint") }}
-            </p>
-          </div>
-
-          <!-- Subscription limits (only show when subscription type is selected) -->
-          <div
-            v-if="createForm.subscription_type === 'subscription'"
-            class="space-y-4 border-l-2 border-primary-200 pl-4 dark:border-primary-800"
-          >
-            <div>
-              <label class="input-label">{{
-                t("admin.groups.subscription.dailyLimit")
-              }}</label>
-              <input
-                v-model.number="createForm.daily_limit_usd"
-                type="number"
-                step="0.01"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.subscription.noLimit')"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{
-                t("admin.groups.subscription.weeklyLimit")
-              }}</label>
-              <input
-                v-model.number="createForm.weekly_limit_usd"
-                type="number"
-                step="0.01"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.subscription.noLimit')"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{
-                t("admin.groups.subscription.monthlyLimit")
-              }}</label>
-              <input
-                v-model.number="createForm.monthly_limit_usd"
-                type="number"
-                step="0.01"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.subscription.noLimit')"
-              />
-            </div>
           </div>
         </div>
 
@@ -873,386 +671,6 @@
                   <Icon name="arrowDown" size="sm" />
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 图片生成计费配置 -->
-        <div
-          v-if="supportsImagePricingPlatform(createForm.platform)"
-          class="border-t pt-4"
-        >
-          <label
-            class="block mb-2 font-medium text-gray-700 dark:text-gray-300"
-          >
-            {{ t(imagePricingI18nKey(createForm.platform, "title")) }}
-          </label>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            {{ t(imagePricingI18nKey(createForm.platform, "description")) }}
-          </p>
-          <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input
-                v-model="createForm.allow_image_generation"
-                type="checkbox"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t(imagePricingI18nKey(createForm.platform, "allowImageGeneration")) }}
-            </label>
-            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input
-                v-model="createForm.image_rate_independent"
-                type="checkbox"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t(imagePricingI18nKey(createForm.platform, "independentMultiplier")) }}
-            </label>
-          </div>
-          <div
-            v-if="createForm.image_rate_independent"
-            class="mb-4"
-          >
-            <label class="input-label">{{
-              t(imagePricingI18nKey(createForm.platform, "imageMultiplier"))
-            }}</label>
-            <input
-              v-model.number="createForm.image_rate_multiplier"
-              type="number"
-              step="0.0001"
-              min="0"
-              class="input"
-              placeholder="1"
-            />
-          </div>
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="input-label">1K ($)</label>
-              <input
-                v-model.number="createForm.image_price_1k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(createForm.platform, 'image_price_1k')"
-              />
-            </div>
-            <div>
-              <label class="input-label">2K ($)</label>
-              <input
-                v-model.number="createForm.image_price_2k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(createForm.platform, 'image_price_2k')"
-              />
-            </div>
-            <div>
-              <label class="input-label">4K ($)</label>
-              <input
-                v-model.number="createForm.image_price_4k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(createForm.platform, 'image_price_4k')"
-              />
-            </div>
-          </div>
-          <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            {{ t(imagePricingI18nKey(createForm.platform, "modeHint")) }}
-          </p>
-          <div class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-            <div class="mb-1 font-medium">
-              {{ t(imagePricingI18nKey(createForm.platform, "finalPricePreview")) }}
-            </div>
-            <div class="grid grid-cols-3 gap-2">
-              <div
-                v-for="item in createImageFinalPricePreview"
-                :key="item.label"
-              >
-                {{ item.label }}: {{ item.value }}
-              </div>
-            </div>
-          </div>
-          <div v-if="createForm.platform === 'gemini' && createForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
-            <label
-              class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              <input
-                v-model="createForm.allow_batch_image_generation"
-                type="checkbox"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t("admin.groups.imagePricing.allowBatchImageGeneration") }}
-            </label>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              {{ t("admin.groups.imagePricing.batchSectionHint") }}
-            </p>
-            <div
-              v-if="createForm.allow_batch_image_generation"
-              class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2"
-            >
-              <div>
-                <label class="input-label">{{
-                  t("admin.groups.imagePricing.batchDiscountMultiplier")
-                }}</label>
-                <input
-                  v-model.number="createForm.batch_image_discount_multiplier"
-                  type="number"
-                  step="0.0001"
-                  min="0"
-                  class="input"
-                  placeholder="0.5"
-                />
-              </div>
-              <div>
-                <label class="input-label">{{
-                  t("admin.groups.imagePricing.batchHoldMultiplier")
-                }}</label>
-                <input
-                  v-model.number="createForm.batch_image_hold_multiplier"
-                  type="number"
-                  step="0.0001"
-                  min="0"
-                  class="input"
-                  placeholder="0.6"
-                />
-              </div>
-            </div>
-          </div>
-          <p
-            v-else-if="createForm.platform !== 'gemini'"
-            class="mt-4 border-t border-dashed border-gray-200 pt-4 text-xs text-gray-500 dark:border-dark-700 dark:text-gray-400"
-          >
-            {{ t("admin.groups.imagePricing.batchGeminiOnlyHint") }}
-          </p>
-        </div>
-
-        <!-- 视频生成计费配置（仅 Grok 平台） -->
-        <div
-          v-if="supportsVideoPricingPlatform(createForm.platform)"
-          class="border-t pt-4"
-        >
-          <label
-            class="block mb-2 font-medium text-gray-700 dark:text-gray-300"
-          >
-            {{ t(videoPricingI18nKey("title")) }}
-          </label>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            {{ t(videoPricingI18nKey("description")) }}
-          </p>
-          <div class="mb-4">
-            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input
-                v-model="createForm.video_rate_independent"
-                type="checkbox"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t(videoPricingI18nKey("independentMultiplier")) }}
-            </label>
-          </div>
-          <div
-            v-if="createForm.video_rate_independent"
-            class="mb-4"
-          >
-            <label class="input-label">{{
-              t(videoPricingI18nKey("videoMultiplier"))
-            }}</label>
-            <input
-              v-model.number="createForm.video_rate_multiplier"
-              type="number"
-              step="0.0001"
-              min="0"
-              class="input"
-              placeholder="1"
-            />
-          </div>
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="input-label">480p ($/s)</label>
-              <input
-                v-model.number="createForm.video_price_480p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(createForm.platform, 'video_price_480p')"
-              />
-            </div>
-            <div>
-              <label class="input-label">720p ($/s)</label>
-              <input
-                v-model.number="createForm.video_price_720p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(createForm.platform, 'video_price_720p')"
-              />
-            </div>
-            <div>
-              <label class="input-label">1080p ($/s)</label>
-              <input
-                v-model.number="createForm.video_price_1080p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(createForm.platform, 'video_price_1080p')"
-              />
-            </div>
-          </div>
-          <div
-            class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700"
-            data-testid="create-grok-video-model-prices"
-          >
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {{ t("admin.groups.videoPricing.modelOverridesTitle") }}
-            </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {{ t("admin.groups.videoPricing.modelOverridesDescription") }}
-            </p>
-            <div class="mt-3 space-y-3">
-              <div
-                v-for="family in videoModelPriceFamilyRows(createForm.video_model_prices)"
-                :key="family.key"
-                class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,7rem))] sm:items-end"
-              >
-                <div class="min-w-0 pb-1 font-mono text-xs text-gray-700 dark:text-gray-300">
-                  {{ family.label }}
-                </div>
-                <label
-                  v-for="resolution in grokVideoPriceResolutions"
-                  :key="resolution.key"
-                  class="block"
-                >
-                  <span class="mb-1 block text-xs text-gray-500 dark:text-gray-400">
-                    {{ resolution.label }} ($/s)
-                  </span>
-                  <input
-                    v-model.number="createForm.video_model_prices[family.key][resolution.key]"
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    class="input"
-                    :data-testid="`create-grok-video-price-${family.key}-${resolution.key}`"
-                  />
-                </label>
-              </div>
-            </div>
-          </div>
-          <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            {{ t(videoPricingI18nKey("modeHint")) }}
-          </p>
-          <div class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-            <div class="mb-1 font-medium">
-              {{ t(videoPricingI18nKey("finalPricePreview")) }}
-            </div>
-            <div class="grid grid-cols-3 gap-2">
-              <div
-                v-for="item in createVideoFinalPricePreview"
-                :key="item.label"
-              >
-                {{ item.label }}: {{ item.value }}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 高峰时段倍率配置（仅订阅类型分组） -->
-        <div v-if="createForm.subscription_type === 'subscription'" class="border-t pt-4">
-          <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input
-                v-model="createForm.peak_rate_enabled"
-                type="checkbox"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span>{{ t("admin.groups.peakRate.enable") }}</span>
-            </label>
-          </div>
-          <div
-            v-if="createForm.peak_rate_enabled"
-            class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3"
-          >
-            <div>
-              <label class="input-label">{{ t("admin.groups.peakRate.peakStart") }}</label>
-              <input
-                v-model="createForm.peak_start"
-                type="time"
-                class="input"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{ t("admin.groups.peakRate.peakEnd") }}</label>
-              <input
-                v-model="createForm.peak_end"
-                type="time"
-                class="input"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{ t("admin.groups.peakRate.peakMultiplier") }}</label>
-              <input
-                v-model.number="createForm.peak_rate_multiplier"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                placeholder="1"
-                :title="t('admin.groups.peakRate.multiplierHint')"
-              />
-            </div>
-          </div>
-        </div>
-
-        <!-- 分组利润控制（五个平台 token 请求） -->
-        <div v-if="isProfitControlPlatform(createForm.platform)" class="border-t pt-4">
-          <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <input
-              v-model="createForm.profit_control_enabled"
-              type="checkbox"
-              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span>{{ t("admin.groups.profitControl.enable") }}</span>
-          </label>
-          <p class="mb-3 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-            {{
-              createForm.profit_control_enabled
-                ? t("admin.groups.profitControl.enabledHint")
-                : t("admin.groups.profitControl.disabledHint")
-            }}
-          </p>
-          <div
-            v-if="createForm.profit_control_enabled"
-            class="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2"
-          >
-            <div>
-              <label class="input-label">{{ t("admin.groups.profitControl.minMargin") }}</label>
-              <input
-                v-model.number="createForm.profit_min_margin_percent"
-                type="number"
-                step="0.1"
-                min="0"
-                max="99.99"
-                class="input"
-                placeholder="0"
-                :title="t('admin.groups.profitControl.minMarginHint')"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{ t("admin.groups.profitControl.safetyBuffer") }}</label>
-              <input
-                v-model.number="createForm.profit_safety_buffer_percent"
-                type="number"
-                step="0.1"
-                min="0"
-                max="99.99"
-                class="input"
-                placeholder="0"
-                :title="t('admin.groups.profitControl.safetyBufferHint')"
-              />
             </div>
           </div>
         </div>
@@ -1464,123 +882,6 @@
           </div>
         </div>
 
-        <!-- Codex 网页搜索按次计费（仅 openai 平台） -->
-        <div
-          v-if="createForm.platform === 'openai'"
-          class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
-        >
-          <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            {{ t("admin.groups.webSearchPricing.title") }}
-          </h4>
-          <div>
-            <label class="input-label">{{
-              t("admin.groups.webSearchPricing.pricePerCall")
-            }}</label>
-            <input
-              v-model.number="createForm.web_search_price_per_call"
-              type="number"
-              step="0.001"
-              min="0"
-              placeholder="0.01"
-              class="input"
-            />
-            <p class="input-hint">
-              {{ t("admin.groups.webSearchPricing.pricePerCallHint") }}
-            </p>
-            <div
-              class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-600 dark:bg-dark-700 dark:text-gray-300"
-            >
-              {{
-                t("admin.groups.webSearchPricing.finalPricePreview", {
-                  price: createWebSearchFinalPricePreview,
-                })
-              }}
-            </div>
-          </div>
-        </div>
-
-
-        <div class="border-t border-gray-200 pt-4 mt-4 dark:border-dark-400">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.title") }}</h4>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.groups.modelPricing.description") }}</p>
-            </div>
-            <button type="button" class="btn btn-secondary" @click="addGroupPricing(createForm.model_pricing)">
-              <Icon name="plus" size="sm" class="mr-1" />{{ t("admin.groups.modelPricing.add") }}
-            </button>
-          </div>
-          <label class="mt-3 flex items-start gap-2">
-            <input v-model="createForm.long_context_pricing_enabled" type="checkbox" class="mt-0.5" />
-            <span><span class="block text-sm text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.longContext") }}</span><span class="block text-xs text-gray-500">{{ t("admin.groups.modelPricing.longContextHint") }}</span></span>
-          </label>
-          <div class="mt-3 space-y-2">
-            <PricingEntryCard v-for="(entry, index) in createForm.model_pricing" :key="index" :entry="entry" :platform="createForm.platform" hide-token-intervals @update="createForm.model_pricing[index] = $event" @remove="createForm.model_pricing.splice(index, 1)" />
-          </div>
-        </div>
-
-        <!-- Grok Voice 显式定价（仅 grok 平台） -->
-        <div
-          v-if="createForm.platform === 'grok'"
-          class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
-        >
-          <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            {{ t("admin.groups.explicitPricing.title") }}
-          </h4>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            {{ t("admin.groups.explicitPricing.description") }}
-          </p>
-          <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <div>
-              <label class="input-label">{{ t("admin.groups.explicitPricing.searchPricePer1k") }}</label>
-              <input
-                v-model.number="createForm.search_price_per_1k"
-                type="number"
-                step="0.000001"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.explicitPricing.pricePlaceholder')"
-                data-testid="create-search-price"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{ t("admin.groups.voicePricing.audioRealtimePerMin") }}</label>
-              <input
-                v-model.number="createForm.audio_realtime_price_per_min"
-                type="number"
-                step="0.000001"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.voicePricing.pricePlaceholder')"
-                data-testid="create-audio-realtime-price"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{ t("admin.groups.voicePricing.audioTtsPerMillionChars") }}</label>
-              <input
-                v-model.number="createForm.audio_tts_price_per_million_chars"
-                type="number"
-                step="0.000001"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.voicePricing.pricePlaceholder')"
-                data-testid="create-audio-tts-price"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{ t("admin.groups.voicePricing.audioSttPerHour") }}</label>
-              <input
-                v-model.number="createForm.audio_stt_price_per_hour"
-                type="number"
-                step="0.000001"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.voicePricing.pricePlaceholder')"
-                data-testid="create-audio-stt-price"
-              />
-            </div>
-          </div>
-        </div>
         <!-- Codex Live 开关（OpenAI 与 Composite 平台） -->
         <div
           v-if="supportsLivePlatform(createForm.platform)"
@@ -1929,11 +1230,10 @@
           </div>
         </div>
 
-        <!-- 无效请求兜底（仅 anthropic/antigravity 平台，且非订阅分组） -->
+        <!-- 无效请求兜底（仅 anthropic/antigravity 平台） -->
         <div
           v-if="
-            ['anthropic', 'antigravity'].includes(createForm.platform) &&
-            createForm.subscription_type !== 'subscription'
+            ['anthropic', 'antigravity'].includes(createForm.platform)
           "
           class="border-t pt-4"
         >
@@ -2324,20 +1624,6 @@
           </p>
         </div>
         <div>
-          <label class="input-label">{{
-            t("admin.groups.form.rateMultiplier")
-          }}</label>
-          <input
-            v-model.number="editForm.rate_multiplier"
-            type="number"
-            step="0.001"
-            min="0.001"
-            required
-            class="input"
-            data-tour="group-form-multiplier"
-          />
-        </div>
-        <div>
           <label class="input-label">{{ t("admin.groups.form.rpmLimit") }}</label>
           <input
             v-model.number="editForm.rpm_limit"
@@ -2357,7 +1643,7 @@
           v-model:max-effort="editForm.max_reasoning_effort"
           v-model:mappings="editForm.reasoning_effort_mappings"
         />
-        <div v-if="editForm.subscription_type !== 'subscription'">
+        <div>
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
               {{ t("admin.groups.form.exclusive") }}
@@ -2431,69 +1717,6 @@
         <div>
           <label class="input-label">{{ t("admin.groups.form.status") }}</label>
           <Select v-model="editForm.status" :options="editStatusOptions" />
-        </div>
-
-        <!-- Subscription Configuration -->
-        <div class="mt-4 border-t pt-4">
-          <div>
-            <label class="input-label">{{
-              t("admin.groups.subscription.type")
-            }}</label>
-            <Select
-              v-model="editForm.subscription_type"
-              :options="subscriptionTypeOptions"
-              :disabled="true"
-            />
-            <p class="input-hint">
-              {{ t("admin.groups.subscription.typeNotEditable") }}
-            </p>
-          </div>
-
-          <!-- Subscription limits (only show when subscription type is selected) -->
-          <div
-            v-if="editForm.subscription_type === 'subscription'"
-            class="space-y-4 border-l-2 border-primary-200 pl-4 dark:border-primary-800"
-          >
-            <div>
-              <label class="input-label">{{
-                t("admin.groups.subscription.dailyLimit")
-              }}</label>
-              <input
-                v-model.number="editForm.daily_limit_usd"
-                type="number"
-                step="0.01"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.subscription.noLimit')"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{
-                t("admin.groups.subscription.weeklyLimit")
-              }}</label>
-              <input
-                v-model.number="editForm.weekly_limit_usd"
-                type="number"
-                step="0.01"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.subscription.noLimit')"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{
-                t("admin.groups.subscription.monthlyLimit")
-              }}</label>
-              <input
-                v-model.number="editForm.monthly_limit_usd"
-                type="number"
-                step="0.01"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.subscription.noLimit')"
-              />
-            </div>
-          </div>
         </div>
 
         <div class="border-t pt-4">
@@ -2599,386 +1822,6 @@
                   <Icon name="arrowDown" size="sm" />
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 图片生成计费配置 -->
-        <div
-          v-if="supportsImagePricingPlatform(editForm.platform)"
-          class="border-t pt-4"
-        >
-          <label
-            class="block mb-2 font-medium text-gray-700 dark:text-gray-300"
-          >
-            {{ t(imagePricingI18nKey(editForm.platform, "title")) }}
-          </label>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            {{ t(imagePricingI18nKey(editForm.platform, "description")) }}
-          </p>
-          <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input
-                v-model="editForm.allow_image_generation"
-                type="checkbox"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t(imagePricingI18nKey(editForm.platform, "allowImageGeneration")) }}
-            </label>
-            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input
-                v-model="editForm.image_rate_independent"
-                type="checkbox"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t(imagePricingI18nKey(editForm.platform, "independentMultiplier")) }}
-            </label>
-          </div>
-          <div
-            v-if="editForm.image_rate_independent"
-            class="mb-4"
-          >
-            <label class="input-label">{{
-              t(imagePricingI18nKey(editForm.platform, "imageMultiplier"))
-            }}</label>
-            <input
-              v-model.number="editForm.image_rate_multiplier"
-              type="number"
-              step="0.0001"
-              min="0"
-              class="input"
-              placeholder="1"
-            />
-          </div>
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="input-label">1K ($)</label>
-              <input
-                v-model.number="editForm.image_price_1k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(editForm.platform, 'image_price_1k')"
-              />
-            </div>
-            <div>
-              <label class="input-label">2K ($)</label>
-              <input
-                v-model.number="editForm.image_price_2k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(editForm.platform, 'image_price_2k')"
-              />
-            </div>
-            <div>
-              <label class="input-label">4K ($)</label>
-              <input
-                v-model.number="editForm.image_price_4k"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getImagePricePlaceholder(editForm.platform, 'image_price_4k')"
-              />
-            </div>
-          </div>
-          <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            {{ t(imagePricingI18nKey(editForm.platform, "modeHint")) }}
-          </p>
-          <div class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-            <div class="mb-1 font-medium">
-              {{ t(imagePricingI18nKey(editForm.platform, "finalPricePreview")) }}
-            </div>
-            <div class="grid grid-cols-3 gap-2">
-              <div
-                v-for="item in editImageFinalPricePreview"
-                :key="item.label"
-              >
-                {{ item.label }}: {{ item.value }}
-              </div>
-            </div>
-          </div>
-          <div v-if="editForm.platform === 'gemini' && editForm.allow_image_generation" class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700">
-            <label
-              class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300"
-            >
-              <input
-                v-model="editForm.allow_batch_image_generation"
-                type="checkbox"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t("admin.groups.imagePricing.allowBatchImageGeneration") }}
-            </label>
-            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              {{ t("admin.groups.imagePricing.batchSectionHint") }}
-            </p>
-            <div
-              v-if="editForm.allow_batch_image_generation"
-              class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2"
-            >
-              <div>
-                <label class="input-label">{{
-                  t("admin.groups.imagePricing.batchDiscountMultiplier")
-                }}</label>
-                <input
-                  v-model.number="editForm.batch_image_discount_multiplier"
-                  type="number"
-                  step="0.0001"
-                  min="0"
-                  class="input"
-                  placeholder="0.5"
-                />
-              </div>
-              <div>
-                <label class="input-label">{{
-                  t("admin.groups.imagePricing.batchHoldMultiplier")
-                }}</label>
-                <input
-                  v-model.number="editForm.batch_image_hold_multiplier"
-                  type="number"
-                  step="0.0001"
-                  min="0"
-                  class="input"
-                  placeholder="0.6"
-                />
-              </div>
-            </div>
-          </div>
-          <p
-            v-else-if="editForm.platform !== 'gemini'"
-            class="mt-4 border-t border-dashed border-gray-200 pt-4 text-xs text-gray-500 dark:border-dark-700 dark:text-gray-400"
-          >
-            {{ t("admin.groups.imagePricing.batchGeminiOnlyHint") }}
-          </p>
-        </div>
-
-        <!-- 视频生成计费配置（仅 Grok 平台） -->
-        <div
-          v-if="supportsVideoPricingPlatform(editForm.platform)"
-          class="border-t pt-4"
-        >
-          <label
-            class="block mb-2 font-medium text-gray-700 dark:text-gray-300"
-          >
-            {{ t(videoPricingI18nKey("title")) }}
-          </label>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            {{ t(videoPricingI18nKey("description")) }}
-          </p>
-          <div class="mb-4">
-            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input
-                v-model="editForm.video_rate_independent"
-                type="checkbox"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              {{ t(videoPricingI18nKey("independentMultiplier")) }}
-            </label>
-          </div>
-          <div
-            v-if="editForm.video_rate_independent"
-            class="mb-4"
-          >
-            <label class="input-label">{{
-              t(videoPricingI18nKey("videoMultiplier"))
-            }}</label>
-            <input
-              v-model.number="editForm.video_rate_multiplier"
-              type="number"
-              step="0.0001"
-              min="0"
-              class="input"
-              placeholder="1"
-            />
-          </div>
-          <div class="grid grid-cols-3 gap-3">
-            <div>
-              <label class="input-label">480p ($/s)</label>
-              <input
-                v-model.number="editForm.video_price_480p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(editForm.platform, 'video_price_480p')"
-              />
-            </div>
-            <div>
-              <label class="input-label">720p ($/s)</label>
-              <input
-                v-model.number="editForm.video_price_720p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(editForm.platform, 'video_price_720p')"
-              />
-            </div>
-            <div>
-              <label class="input-label">1080p ($/s)</label>
-              <input
-                v-model.number="editForm.video_price_1080p"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                :placeholder="getVideoPricePlaceholder(editForm.platform, 'video_price_1080p')"
-              />
-            </div>
-          </div>
-          <div
-            class="mt-4 border-t border-dashed border-gray-200 pt-4 dark:border-dark-700"
-            data-testid="edit-grok-video-model-prices"
-          >
-            <p class="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {{ t("admin.groups.videoPricing.modelOverridesTitle") }}
-            </p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {{ t("admin.groups.videoPricing.modelOverridesDescription") }}
-            </p>
-            <div class="mt-3 space-y-3">
-              <div
-                v-for="family in videoModelPriceFamilyRows(editForm.video_model_prices)"
-                :key="family.key"
-                class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_repeat(3,minmax(0,7rem))] sm:items-end"
-              >
-                <div class="min-w-0 pb-1 font-mono text-xs text-gray-700 dark:text-gray-300">
-                  {{ family.label }}
-                </div>
-                <label
-                  v-for="resolution in grokVideoPriceResolutions"
-                  :key="resolution.key"
-                  class="block"
-                >
-                  <span class="mb-1 block text-xs text-gray-500 dark:text-gray-400">
-                    {{ resolution.label }} ($/s)
-                  </span>
-                  <input
-                    v-model.number="editForm.video_model_prices[family.key][resolution.key]"
-                    type="number"
-                    step="0.001"
-                    min="0"
-                    class="input"
-                    :data-testid="`edit-grok-video-price-${family.key}-${resolution.key}`"
-                  />
-                </label>
-              </div>
-            </div>
-          </div>
-          <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            {{ t(videoPricingI18nKey("modeHint")) }}
-          </p>
-          <div class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-            <div class="mb-1 font-medium">
-              {{ t(videoPricingI18nKey("finalPricePreview")) }}
-            </div>
-            <div class="grid grid-cols-3 gap-2">
-              <div
-                v-for="item in editVideoFinalPricePreview"
-                :key="item.label"
-              >
-                {{ item.label }}: {{ item.value }}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 高峰时段倍率配置（仅订阅类型分组） -->
-        <div v-if="editForm.subscription_type === 'subscription'" class="border-t pt-4">
-          <div class="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input
-                v-model="editForm.peak_rate_enabled"
-                type="checkbox"
-                class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <span>{{ t("admin.groups.peakRate.enable") }}</span>
-            </label>
-          </div>
-          <div
-            v-if="editForm.peak_rate_enabled"
-            class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3"
-          >
-            <div>
-              <label class="input-label">{{ t("admin.groups.peakRate.peakStart") }}</label>
-              <input
-                v-model="editForm.peak_start"
-                type="time"
-                class="input"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{ t("admin.groups.peakRate.peakEnd") }}</label>
-              <input
-                v-model="editForm.peak_end"
-                type="time"
-                class="input"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{ t("admin.groups.peakRate.peakMultiplier") }}</label>
-              <input
-                v-model.number="editForm.peak_rate_multiplier"
-                type="number"
-                step="0.001"
-                min="0"
-                class="input"
-                placeholder="1"
-                :title="t('admin.groups.peakRate.multiplierHint')"
-              />
-            </div>
-          </div>
-        </div>
-
-        <!-- 分组利润控制（五个平台 token 请求） -->
-        <div v-if="isProfitControlPlatform(editForm.platform)" class="border-t pt-4">
-          <label class="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <input
-              v-model="editForm.profit_control_enabled"
-              type="checkbox"
-              class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span>{{ t("admin.groups.profitControl.enable") }}</span>
-          </label>
-          <p class="mb-3 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-            {{
-              editForm.profit_control_enabled
-                ? t("admin.groups.profitControl.enabledHint")
-                : t("admin.groups.profitControl.disabledHint")
-            }}
-          </p>
-          <div
-            v-if="editForm.profit_control_enabled"
-            class="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2"
-          >
-            <div>
-              <label class="input-label">{{ t("admin.groups.profitControl.minMargin") }}</label>
-              <input
-                v-model.number="editForm.profit_min_margin_percent"
-                type="number"
-                step="0.1"
-                min="0"
-                max="99.99"
-                class="input"
-                placeholder="0"
-                :title="t('admin.groups.profitControl.minMarginHint')"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{ t("admin.groups.profitControl.safetyBuffer") }}</label>
-              <input
-                v-model.number="editForm.profit_safety_buffer_percent"
-                type="number"
-                step="0.1"
-                min="0"
-                max="99.99"
-                class="input"
-                placeholder="0"
-                :title="t('admin.groups.profitControl.safetyBufferHint')"
-              />
             </div>
           </div>
         </div>
@@ -3186,123 +2029,6 @@
           </div>
         </div>
 
-        <!-- Codex 网页搜索按次计费（仅 openai 平台） -->
-        <div
-          v-if="editForm.platform === 'openai'"
-          class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
-        >
-          <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            {{ t("admin.groups.webSearchPricing.title") }}
-          </h4>
-          <div>
-            <label class="input-label">{{
-              t("admin.groups.webSearchPricing.pricePerCall")
-            }}</label>
-            <input
-              v-model.number="editForm.web_search_price_per_call"
-              type="number"
-              step="0.001"
-              min="0"
-              placeholder="0.01"
-              class="input"
-            />
-            <p class="input-hint">
-              {{ t("admin.groups.webSearchPricing.pricePerCallHint") }}
-            </p>
-            <div
-              class="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-600 dark:bg-dark-700 dark:text-gray-300"
-            >
-              {{
-                t("admin.groups.webSearchPricing.finalPricePreview", {
-                  price: editWebSearchFinalPricePreview,
-                })
-              }}
-            </div>
-          </div>
-        </div>
-
-
-        <div class="border-t border-gray-200 pt-4 mt-4 dark:border-dark-400">
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.title") }}</h4>
-              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t("admin.groups.modelPricing.description") }}</p>
-            </div>
-            <button type="button" class="btn btn-secondary" @click="addGroupPricing(editForm.model_pricing)">
-              <Icon name="plus" size="sm" class="mr-1" />{{ t("admin.groups.modelPricing.add") }}
-            </button>
-          </div>
-          <label class="mt-3 flex items-start gap-2">
-            <input v-model="editForm.long_context_pricing_enabled" type="checkbox" class="mt-0.5" />
-            <span><span class="block text-sm text-gray-700 dark:text-gray-300">{{ t("admin.groups.modelPricing.longContext") }}</span><span class="block text-xs text-gray-500">{{ t("admin.groups.modelPricing.longContextHint") }}</span></span>
-          </label>
-          <div class="mt-3 space-y-2">
-            <PricingEntryCard v-for="(entry, index) in editForm.model_pricing" :key="index" :entry="entry" :platform="editForm.platform" hide-token-intervals @update="editForm.model_pricing[index] = $event" @remove="editForm.model_pricing.splice(index, 1)" />
-          </div>
-        </div>
-
-        <!-- Grok Voice 显式定价（仅 grok 平台） -->
-        <div
-          v-if="editForm.platform === 'grok'"
-          class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
-        >
-          <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            {{ t("admin.groups.explicitPricing.title") }}
-          </h4>
-          <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            {{ t("admin.groups.explicitPricing.description") }}
-          </p>
-          <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <div>
-              <label class="input-label">{{ t("admin.groups.explicitPricing.searchPricePer1k") }}</label>
-              <input
-                v-model.number="editForm.search_price_per_1k"
-                type="number"
-                step="0.000001"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.explicitPricing.pricePlaceholder')"
-                data-testid="edit-search-price"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{ t("admin.groups.voicePricing.audioRealtimePerMin") }}</label>
-              <input
-                v-model.number="editForm.audio_realtime_price_per_min"
-                type="number"
-                step="0.000001"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.voicePricing.pricePlaceholder')"
-                data-testid="edit-audio-realtime-price"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{ t("admin.groups.voicePricing.audioTtsPerMillionChars") }}</label>
-              <input
-                v-model.number="editForm.audio_tts_price_per_million_chars"
-                type="number"
-                step="0.000001"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.voicePricing.pricePlaceholder')"
-                data-testid="edit-audio-tts-price"
-              />
-            </div>
-            <div>
-              <label class="input-label">{{ t("admin.groups.voicePricing.audioSttPerHour") }}</label>
-              <input
-                v-model.number="editForm.audio_stt_price_per_hour"
-                type="number"
-                step="0.000001"
-                min="0"
-                class="input"
-                :placeholder="t('admin.groups.voicePricing.pricePlaceholder')"
-                data-testid="edit-audio-stt-price"
-              />
-            </div>
-          </div>
-        </div>
         <!-- Codex Live 开关（OpenAI 与 Composite 平台） -->
         <div
           v-if="supportsLivePlatform(editForm.platform)"
@@ -3651,11 +2377,10 @@
           </div>
         </div>
 
-        <!-- 无效请求兜底（仅 anthropic/antigravity 平台，且非订阅分组） -->
+        <!-- 无效请求兜底（仅 anthropic/antigravity 平台） -->
         <div
           v-if="
-            ['anthropic', 'antigravity'].includes(editForm.platform) &&
-            editForm.subscription_type !== 'subscription'
+            ['anthropic', 'antigravity'].includes(editForm.platform)
           "
           class="border-t pt-4"
         >
@@ -4388,21 +3113,6 @@
       </template>
     </BaseDialog>
 
-    <!-- Group Rate Multipliers Modal -->
-    <GroupRateMultipliersModal
-      :show="showRateMultipliersModal"
-      :group="rateMultipliersGroup"
-      @close="showRateMultipliersModal = false"
-      @success="loadGroups"
-    />
-
-    <!-- Group RPM Overrides Modal -->
-    <GroupRPMOverridesModal
-      :show="showRPMOverridesModal"
-      :group="rpmOverridesGroup"
-      @close="showRPMOverridesModal = false"
-      @success="loadGroups"
-    />
   </AppLayout>
 </template>
 
@@ -4410,7 +3120,6 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
-import { useOnboardingStore } from "@/stores/onboarding";
 import { adminAPI } from "@/api/admin";
 import type {
   AdminGroup,
@@ -4420,7 +3129,6 @@ import type {
   CompositeRouteEndpoint,
   CompositeRouteMatchType,
   GroupPlatform,
-  SubscriptionType,
 } from "@/types";
 import type { Column } from "@/components/common/types";
 import AppLayout from "@/components/layout/AppLayout.vue";
@@ -4433,21 +3141,8 @@ import EmptyState from "@/components/common/EmptyState.vue";
 import Select from "@/components/common/Select.vue";
 import PlatformIcon from "@/components/common/PlatformIcon.vue";
 import Icon from "@/components/icons/Icon.vue";
-import GroupRateMultipliersModal from "@/components/admin/group/GroupRateMultipliersModal.vue";
-import GroupRPMOverridesModal from "@/components/admin/group/GroupRPMOverridesModal.vue";
 import GroupCapacityBadge from "@/components/common/GroupCapacityBadge.vue";
 import ReasoningEffortPolicyFields from "@/components/admin/group/ReasoningEffortPolicyFields.vue";
-import PricingEntryCard from "@/components/admin/channel/PricingEntryCard.vue";
-import type { PricingFormEntry } from "@/components/admin/channel/types";
-import {
-  apiIntervalsToForm,
-  createDefaultTimePricingForm,
-  formIntervalsToAPI,
-  mTokToPerToken,
-  perTokenToMTok,
-  toNullableNumber,
-} from "@/components/admin/channel/types";
-import type { ChannelModelPricing } from "@/api/admin/channels";
 import { VueDraggable } from "vue-draggable-plus";
 import { createStableObjectKeyResolver } from "@/utils/stableObjectKey";
 import { extractApiErrorMessage } from "@/utils/apiError";
@@ -4471,100 +3166,19 @@ import {
 import { createModelsListCandidatesTracker } from "./groupsModelsListCandidates";
 import { normalizeSupportedModelScopesForPlatform } from "./groupsSupportedModelScopes";
 import {
-  isProfitControlPlatform,
-  profitPercentToDecimal,
-  profitDecimalToPercent,
-  validateProfitControlFormState,
-  type ProfitControlFormState,
-} from "./groupsProfitControl";
-import {
   normalizeReasoningEffortForPlatform,
   reasoningEffortMappingsToAPI,
   reasoningEffortMappingsToRows,
   supportsReasoningEffortPolicyPlatform,
   type ReasoningEffortMappingRow,
 } from "./groupsReasoningEffort";
-import {
-  getDefaultImagePreviewPrice,
-  getDefaultVideoPreviewPrice,
-  getImagePricePlaceholder,
-  getVideoPricePlaceholder,
-  imagePricingI18nKey,
-  supportsImagePricingPlatform,
-  supportsVideoPricingPlatform,
-  videoPricingI18nKey,
-} from "./groupsImagePricing";
-import {
-  createVideoModelPricesForm,
-  grokVideoPriceResolutions,
-  serializeVideoModelPrices,
-  videoModelPriceFamilyRows,
-} from "./groupsVideoModelPricing";
 
 const supportsLivePlatform = (platform: string): boolean =>
   platform === "openai" || platform === "composite";
 
-const emptyGroupPricing = (): PricingFormEntry => ({
-  models: [],
-  billing_mode: "token",
-  input_price: null,
-  output_price: null,
-  cache_write_price: null,
-  cache_read_price: null,
-  image_input_price: null,
-  image_output_price: null,
-  per_request_price: null,
-  intervals: [],
-  time_pricing: createDefaultTimePricingForm(),
-});
-
-const addGroupPricing = (entries: PricingFormEntry[]) =>
-  entries.push(emptyGroupPricing());
-
-const groupPricingFromAPI = (
-  pricing: ChannelModelPricing[] | undefined,
-): PricingFormEntry[] =>
-  (pricing || []).map((entry) => ({
-    models: entry.models || [],
-    billing_mode: entry.billing_mode || "token",
-    input_price: perTokenToMTok(entry.input_price),
-    output_price: perTokenToMTok(entry.output_price),
-    cache_write_price: perTokenToMTok(entry.cache_write_price),
-    cache_read_price: perTokenToMTok(entry.cache_read_price),
-    image_input_price: perTokenToMTok(entry.image_input_price),
-    image_output_price: perTokenToMTok(entry.image_output_price),
-    per_request_price: entry.per_request_price,
-    intervals: apiIntervalsToForm(entry.intervals || []),
-    time_pricing: createDefaultTimePricingForm(),
-  }));
-
-const groupPricingToAPI = (
-  pricing: PricingFormEntry[],
-  platform: string,
-): ChannelModelPricing[] =>
-  pricing
-    .filter((entry) => entry.models.length > 0)
-    .map((entry) => ({
-      platform,
-      models: entry.models,
-      billing_mode: entry.billing_mode,
-      input_price: mTokToPerToken(entry.input_price),
-      output_price: mTokToPerToken(entry.output_price),
-      cache_write_price: mTokToPerToken(entry.cache_write_price),
-      cache_read_price: mTokToPerToken(entry.cache_read_price),
-      image_input_price: mTokToPerToken(entry.image_input_price),
-      image_output_price: mTokToPerToken(entry.image_output_price),
-      per_request_price: toNullableNumber(entry.per_request_price),
-      intervals:
-        entry.billing_mode === "token"
-          ? []
-          : formIntervalsToAPI(entry.intervals || []),
-      time_pricing: null,
-    }));
 
 const { t } = useI18n();
 const appStore = useAppStore();
-const onboardingStore = useOnboardingStore();
 
 const ALWAYS_VISIBLE_COLUMNS = new Set(["name", "actions"]);
 // Default hidden columns (hidden on first load / after schema bumps).
@@ -4583,16 +3197,6 @@ const allColumns = computed<Column[]>(() => [
   {
     key: "platform",
     label: t("admin.groups.columns.platform"),
-    sortable: true,
-  },
-  {
-    key: "billing_type",
-    label: t("admin.groups.columns.billingType"),
-    sortable: true,
-  },
-  {
-    key: "rate_multiplier",
-    label: t("admin.groups.columns.rateMultiplier"),
     sortable: true,
   },
   {
@@ -4693,7 +3297,7 @@ const saveColumnsToStorage = () => {
 
 const isColumnVisible = (key: string) => !hiddenColumns.has(key);
 const hasVisibleUsageSummaryConsumer = computed(
-  () => isColumnVisible("usage") || isColumnVisible("billing_type"),
+  () => isColumnVisible("usage"),
 );
 const hasVisibleCapacityColumn = computed(() => isColumnVisible("capacity"));
 
@@ -4709,7 +3313,7 @@ const toggleColumn = (key: string) => {
   }
   saveColumnsToStorage();
 
-  if (wasHidden && (key === "usage" || key === "billing_type")) {
+  if (wasHidden && key === "usage") {
     loadUsageSummary();
   }
   if (wasHidden && key === "capacity") {
@@ -4812,11 +3416,6 @@ const editStatusOptions = computed(() => [
   { value: "inactive", label: t("admin.accounts.status.inactive") },
 ]);
 
-const subscriptionTypeOptions = computed(() => [
-  { value: "standard", label: t("admin.groups.subscription.standard") },
-  { value: "subscription", label: t("admin.groups.subscription.subscription") },
-]);
-
 // 降级分组选项（创建时）- 仅包含 anthropic 平台且未启用 claude_code_only 的分组
 const fallbackGroupOptions = computed(() => {
   const options: { value: number | null; label: string }[] = [
@@ -4862,7 +3461,6 @@ const invalidRequestFallbackOptions = computed(() => {
     (g) =>
       g.platform === "anthropic" &&
       g.status === "active" &&
-      g.subscription_type !== "subscription" &&
       g.fallback_group_id_on_invalid_request === null,
   );
   eligibleGroups.forEach((g) => {
@@ -4881,7 +3479,6 @@ const invalidRequestFallbackOptionsForEdit = computed(() => {
     (g) =>
       g.platform === "anthropic" &&
       g.status === "active" &&
-      g.subscription_type !== "subscription" &&
       g.fallback_group_id_on_invalid_request === null &&
       g.id !== currentId,
   );
@@ -4931,9 +3528,12 @@ const copyAccountsGroupOptionsForEdit = computed(() => {
 const groups = ref<AdminGroup[]>([]);
 const loading = ref(false);
 type GroupUsageSummary = {
-  today_cost: number;
-  yesterday_cost: number;
-  total_cost: number;
+  today_requests: number;
+  today_tokens: number;
+  yesterday_requests: number;
+  yesterday_tokens: number;
+  total_requests: number;
+  total_tokens: number;
 };
 
 const usageMap = ref<Map<number, GroupUsageSummary>>(new Map());
@@ -4988,10 +3588,6 @@ const sortSubmitting = ref(false);
 const editingGroup = ref<AdminGroup | null>(null);
 const deletingGroup = ref<AdminGroup | null>(null);
 const duplicatingGroupIds = reactive(new Set<number>());
-const showRateMultipliersModal = ref(false);
-const rateMultipliersGroup = ref<AdminGroup | null>(null);
-const showRPMOverridesModal = ref(false);
-const rpmOverridesGroup = ref<AdminGroup | null>(null);
 const sortableGroups = ref<AdminGroup[]>([]);
 type ConcreteGroupPlatform = Exclude<GroupPlatform, "composite">;
 type CompositeRouteFormState = {
@@ -5049,46 +3645,7 @@ const createForm = reactive({
   name: "",
   description: "",
   platform: "anthropic" as GroupPlatform,
-  rate_multiplier: 1.0,
   is_exclusive: false,
-  subscription_type: "standard" as SubscriptionType,
-  daily_limit_usd: null as number | null,
-  weekly_limit_usd: null as number | null,
-  monthly_limit_usd: null as number | null,
-  long_context_pricing_enabled: true,
-  model_pricing: [] as PricingFormEntry[],
-  // 图片生成计费配置
-  allow_image_generation: false,
-  allow_batch_image_generation: false,
-  image_rate_independent: false,
-  image_rate_multiplier: 1,
-  batch_image_discount_multiplier: 0.5,
-  batch_image_hold_multiplier: 0.6,
-  image_price_1k: null as number | null,
-  image_price_2k: null as number | null,
-  image_price_4k: null as number | null,
-  // 视频生成计费配置（仅 Grok 平台）
-  video_rate_independent: false,
-  video_rate_multiplier: 1,
-  video_price_480p: null as number | null,
-  video_price_720p: null as number | null,
-  video_price_1080p: null as number | null,
-  video_model_prices: createVideoModelPricesForm(),
-  // Codex 网页搜索按次计费（仅 openai 平台使用）；null = 使用默认价 0.01
-  web_search_price_per_call: null as number | null,
-  search_price_per_1k: null as number | null,
-  audio_realtime_price_per_min: null as number | null,
-  audio_tts_price_per_million_chars: null as number | null,
-  audio_stt_price_per_hour: null as number | null,
-  // 高峰时段倍率配置
-  peak_rate_enabled: false,
-  peak_start: "",
-  peak_end: "",
-  peak_rate_multiplier: 1.0,
-  // 分组利润控制（五个 token 平台）；界面按百分比输入，提交时转小数
-  profit_control_enabled: false,
-  profit_min_margin_percent: 0,
-  profit_safety_buffer_percent: 0,
   // Claude Code 客户端限制（仅 anthropic 平台使用）
   claude_code_only: false,
   fallback_group_id: null as number | null,
@@ -5409,47 +3966,8 @@ const editForm = reactive({
   name: "",
   description: "",
   platform: "anthropic" as GroupPlatform,
-  rate_multiplier: 1.0,
   is_exclusive: false,
   status: "active" as "active" | "inactive",
-  subscription_type: "standard" as SubscriptionType,
-  daily_limit_usd: null as number | null,
-  weekly_limit_usd: null as number | null,
-  monthly_limit_usd: null as number | null,
-  long_context_pricing_enabled: true,
-  model_pricing: [] as PricingFormEntry[],
-  // 图片生成计费配置
-  allow_image_generation: false,
-  allow_batch_image_generation: false,
-  image_rate_independent: false,
-  image_rate_multiplier: 1,
-  batch_image_discount_multiplier: 0.5,
-  batch_image_hold_multiplier: 0.6,
-  image_price_1k: null as number | null,
-  image_price_2k: null as number | null,
-  image_price_4k: null as number | null,
-  // 视频生成计费配置（仅 Grok 平台）
-  video_rate_independent: false,
-  video_rate_multiplier: 1,
-  video_price_480p: null as number | null,
-  video_price_720p: null as number | null,
-  video_price_1080p: null as number | null,
-  video_model_prices: createVideoModelPricesForm(),
-  // Codex 网页搜索按次计费（仅 openai 平台使用）；null = 使用默认价 0.01
-  web_search_price_per_call: null as number | null,
-  search_price_per_1k: null as number | null,
-  audio_realtime_price_per_min: null as number | null,
-  audio_tts_price_per_million_chars: null as number | null,
-  audio_stt_price_per_hour: null as number | null,
-  // 高峰时段倍率配置
-  peak_rate_enabled: false,
-  peak_start: "",
-  peak_end: "",
-  peak_rate_multiplier: 1.0,
-  // 分组利润控制（五个 token 平台）；界面按百分比输入，提交时转小数
-  profit_control_enabled: false,
-  profit_min_margin_percent: 0,
-  profit_safety_buffer_percent: 0,
   // Claude Code 客户端限制（仅 anthropic 平台使用）
   claude_code_only: false,
   fallback_group_id: null as number | null,
@@ -5479,177 +3997,10 @@ const editForm = reactive({
   reasoning_effort_mappings: [] as ReasoningEffortMappingRow[],
 });
 
-type ImagePricingFormState = {
-  platform: GroupPlatform;
-  allow_image_generation: boolean;
-  allow_batch_image_generation: boolean;
-  rate_multiplier: number;
-  image_rate_independent: boolean;
-  image_rate_multiplier: number;
-  batch_image_discount_multiplier: number;
-  batch_image_hold_multiplier: number;
-  image_price_1k: number | string | null;
-  image_price_2k: number | string | null;
-  image_price_4k: number | string | null;
-  peak_rate_enabled: boolean;
-  peak_start: string;
-  peak_end: string;
-  peak_rate_multiplier: number;
-};
-
-type VideoPricingFormState = {
-  platform: GroupPlatform;
-  rate_multiplier: number;
-  video_rate_independent: boolean;
-  video_rate_multiplier: number;
-  video_price_480p: number | string | null;
-  video_price_720p: number | string | null;
-  video_price_1080p: number | string | null;
-};
-
-const imagePricingTiers = [
-  { key: "image_price_1k", label: "1K" },
-  { key: "image_price_2k", label: "2K" },
-  { key: "image_price_4k", label: "4K" },
-] as const;
-
-const videoPricingTiers = [
-  { key: "video_price_480p", label: "480p" },
-  { key: "video_price_720p", label: "720p" },
-  { key: "video_price_1080p", label: "1080p" },
-] as const;
-
-const normalizePreviewNumber = (value: number | string | null | undefined, fallback = 0) => {
-  if (value === null || value === undefined || value === "") {
-    return fallback;
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-};
-
-const parsePreviewPrice = (value: number | string | null | undefined) => {
-  if (value === null || value === undefined || value === "") {
-    return null;
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-};
-
-const formatImagePricePreview = (value: number | string | null | undefined) => {
-  if (value === null || value === undefined || value === "") {
-    return t("admin.groups.imagePricing.notConfigured");
-  }
-  const price = Number(value);
-  if (!Number.isFinite(price) || price < 0) {
-    return t("admin.groups.imagePricing.notConfigured");
-  }
-  return `$${price.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}`;
-};
-
-const formatVideoPricePreview = (value: number | string | null | undefined) => {
-  if (value === null || value === undefined || value === "") {
-    return t("admin.groups.videoPricing.notConfigured");
-  }
-  const price = Number(value);
-  if (!Number.isFinite(price) || price < 0) {
-    return t("admin.groups.videoPricing.notConfigured");
-  }
-  return `$${price.toFixed(6).replace(/0+$/, "").replace(/\.$/, "")}`;
-};
-
-const buildImageFinalPricePreview = (form: ImagePricingFormState) => {
-  const imageMultiplier = form.image_rate_independent
-    ? normalizePreviewNumber(form.image_rate_multiplier, 1)
-    : normalizePreviewNumber(form.rate_multiplier, 1);
-  const multiplier = imageMultiplier;
-  return imagePricingTiers.map((tier) => {
-    const basePrice =
-      parsePreviewPrice(form[tier.key]) ??
-      getDefaultImagePreviewPrice(form.platform, tier.key);
-    return {
-      label: tier.label,
-      value: basePrice !== null
-        ? formatImagePricePreview(basePrice * multiplier)
-        : t("admin.groups.imagePricing.notConfigured"),
-    };
-  });
-};
-
-const buildVideoFinalPricePreview = (form: VideoPricingFormState) => {
-  const multiplier = form.video_rate_independent
-    ? normalizePreviewNumber(form.video_rate_multiplier, 1)
-    : normalizePreviewNumber(form.rate_multiplier, 1);
-  return videoPricingTiers.map((tier) => {
-    const basePrice =
-      parsePreviewPrice(form[tier.key]) ??
-      getDefaultVideoPreviewPrice(form.platform, tier.key);
-    return {
-      label: tier.label,
-      value: basePrice !== null
-        ? formatVideoPricePreview(basePrice * multiplier)
-        : t("admin.groups.videoPricing.notConfigured"),
-    };
-  });
-};
-
-const createImageFinalPricePreview = computed(() =>
-  buildImageFinalPricePreview(createForm),
-);
-const editImageFinalPricePreview = computed(() =>
-  buildImageFinalPricePreview(editForm),
-);
-const createVideoFinalPricePreview = computed(() =>
-  buildVideoFinalPricePreview(createForm),
-);
-const editVideoFinalPricePreview = computed(() =>
-  buildVideoFinalPricePreview(editForm),
-);
-
-// Codex 网页搜索单次默认价（与后端 defaultWebSearchPricePerCall 一致，官方 $10/1000 次）
-const DEFAULT_WEB_SEARCH_PRICE_PER_CALL = 0.01;
-
-const buildWebSearchFinalPricePreview = (form: {
-  web_search_price_per_call: number | string | null;
-  rate_multiplier: number | string | null;
-}) => {
-  const basePrice =
-    parsePreviewPrice(form.web_search_price_per_call) ??
-    DEFAULT_WEB_SEARCH_PRICE_PER_CALL;
-  const multiplier = normalizePreviewNumber(form.rate_multiplier, 1);
-  return formatImagePricePreview(basePrice * multiplier);
-};
-
-const createWebSearchFinalPricePreview = computed(() =>
-  buildWebSearchFinalPricePreview(createForm),
-);
-const editWebSearchFinalPricePreview = computed(() =>
-  buildWebSearchFinalPricePreview(editForm),
-);
-
-const resetDisabledBatchImagePricing = (
-  form: Pick<
-    ImagePricingFormState,
-    "platform" | "allow_image_generation" | "allow_batch_image_generation" | "batch_image_discount_multiplier" | "batch_image_hold_multiplier"
-  >,
-) => {
-  if (form.platform !== "gemini" || !form.allow_image_generation) {
-    form.allow_batch_image_generation = false;
-  }
-  if (!form.allow_batch_image_generation) {
-    form.batch_image_discount_multiplier = 0.5;
-    form.batch_image_hold_multiplier = 0.6;
-  }
-};
-
 // 根据分组类型返回不同的删除确认消息
 const deleteConfirmMessage = computed(() => {
   if (!deletingGroup.value) {
     return "";
-  }
-  if (deletingGroup.value.subscription_type === "subscription") {
-    return t("admin.groups.deleteConfirmSubscription", {
-      name: deletingGroup.value.name,
-    });
   }
   return t("admin.groups.deleteConfirm", { name: deletingGroup.value.name });
 });
@@ -5745,30 +4096,12 @@ const loadGroups = async () => {
   }
 };
 
-const formatCost = (cost: number): string => {
-  if (cost >= 1000) return cost.toFixed(0);
-  if (cost >= 100) return cost.toFixed(1);
-  return cost.toFixed(2);
-};
+const formatNumber = (value: number): string => value.toLocaleString();
 
-const formatUsd = (cost: number | null | undefined): string =>
-  `$${formatCost(cost ?? 0)}`;
-
-const getQuotaUsageClass = (
-  used: number,
-  limit: number | null | undefined,
-): string => {
-  if (!limit || limit <= 0) {
-    return "font-medium text-gray-700 dark:text-gray-300";
-  }
-  const ratio = used / limit;
-  if (ratio >= 1) {
-    return "font-semibold text-red-600 dark:text-red-400";
-  }
-  if (ratio >= 0.8) {
-    return "font-semibold text-amber-600 dark:text-amber-400";
-  }
-  return "font-medium text-gray-700 dark:text-gray-300";
+const formatTokens = (value: number): string => {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return value.toLocaleString();
 };
 
 const loadUsageSummary = async () => {
@@ -5782,9 +4115,12 @@ const loadUsageSummary = async () => {
     const map = new Map<number, GroupUsageSummary>();
     for (const item of data) {
       map.set(item.group_id, {
-        today_cost: item.today_cost,
-        yesterday_cost: item.yesterday_cost,
-        total_cost: item.total_cost,
+        today_requests: item.today_requests,
+        today_tokens: item.today_tokens,
+        yesterday_requests: item.yesterday_requests,
+        yesterday_tokens: item.yesterday_tokens,
+        total_requests: item.total_requests,
+        total_tokens: item.total_tokens,
       });
     }
     usageMap.value = map;
@@ -5869,41 +4205,7 @@ const closeCreateModal = () => {
   createForm.name = "";
   createForm.description = "";
   createForm.platform = "anthropic";
-  createForm.rate_multiplier = 1.0;
   createForm.is_exclusive = false;
-  createForm.subscription_type = "standard";
-  createForm.daily_limit_usd = null;
-  createForm.weekly_limit_usd = null;
-  createForm.monthly_limit_usd = null;
-  createForm.allow_image_generation = false;
-  createForm.allow_batch_image_generation = false;
-  createForm.image_rate_independent = false;
-  createForm.image_rate_multiplier = 1;
-  createForm.batch_image_discount_multiplier = 0.5;
-  createForm.batch_image_hold_multiplier = 0.6;
-  createForm.image_price_1k = null;
-  createForm.image_price_2k = null;
-  createForm.image_price_4k = null;
-  createForm.video_rate_independent = false;
-  createForm.video_rate_multiplier = 1;
-  createForm.video_price_480p = null;
-  createForm.video_price_720p = null;
-  createForm.video_price_1080p = null;
-  createForm.video_model_prices = createVideoModelPricesForm();
-  createForm.long_context_pricing_enabled = true;
-  createForm.model_pricing = [];
-  createForm.web_search_price_per_call = null;
-  createForm.search_price_per_1k = null;
-  createForm.audio_realtime_price_per_min = null;
-  createForm.audio_tts_price_per_million_chars = null;
-  createForm.audio_stt_price_per_hour = null;
-  createForm.peak_rate_enabled = false;
-  createForm.peak_start = "";
-  createForm.peak_end = "";
-  createForm.peak_rate_multiplier = 1.0;
-  createForm.profit_control_enabled = false;
-  createForm.profit_min_margin_percent = 0;
-  createForm.profit_safety_buffer_percent = 0;
   createForm.claude_code_only = false;
   createForm.fallback_group_id = null;
   createForm.fallback_group_id_on_invalid_request = null;
@@ -5911,6 +4213,7 @@ const closeCreateModal = () => {
   createForm.allow_live = false;
   createForm.require_oauth_only = false;
   createForm.require_privacy_set = false;
+  createForm.model_routing_enabled = false;
   createForm.supported_model_scopes = ["claude", "gemini_text", "gemini_image"];
   createForm.mcp_xml_inject = true;
   createForm.copy_accounts_from_group_ids = [];
@@ -5921,49 +4224,6 @@ const closeCreateModal = () => {
   resetModelsListState(createModelsListState);
   createModelRoutingRules.value = [];
 };
-
-const normalizeOptionalLimit = (
-  value: number | string | null | undefined,
-): number | null => {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed) {
-      return null;
-    }
-    const parsed = Number(trimmed);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-  }
-
-  return Number.isFinite(value) && value > 0 ? value : null;
-};
-
-const normalizeRateMultiplier = (
-  value: number | string | null | undefined,
-): number => {
-  if (value === null || value === undefined || value === "") {
-    return 1;
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1;
-};
-
-// 利润控制表单辅助（换算与校验逻辑见 groupsProfitControl.ts，便于单测）。
-const percentToDecimal = profitPercentToDecimal;
-const decimalToPercent = profitDecimalToPercent;
-
-const validateProfitControlForm = (form: ProfitControlFormState): boolean => {
-  const errorKey = validateProfitControlFormState(form);
-  if (errorKey) {
-    appStore.showError(t(`admin.groups.profitControl.${errorKey}`));
-    return false;
-  }
-  return true;
-};
-
 const handleCreateGroup = async () => {
   if (!createForm.name.trim()) {
     appStore.showError(t("admin.groups.nameRequired"));
@@ -5976,45 +4236,31 @@ const handleCreateGroup = async () => {
   ) {
     return;
   }
-  if (!validateProfitControlForm(createForm)) {
-    return;
-  }
+
   submitting.value = true;
   try {
-    const {
-      video_model_prices: _createFormVideoModelPrices,
-      ...createGroupForm
-    } = createForm;
-    const videoModelPrices = serializeVideoModelPrices(
-      createForm.video_model_prices,
-    );
-    // 构建请求数据，包含模型路由配置
-    const requestData = {
-      ...createGroupForm,
-      model_pricing: groupPricingToAPI(
-        createForm.model_pricing,
-        createForm.platform,
-      ),
-      daily_limit_usd: normalizeOptionalLimit(
-        createForm.daily_limit_usd as number | string | null,
-      ),
-      weekly_limit_usd: normalizeOptionalLimit(
-        createForm.weekly_limit_usd as number | string | null,
-      ),
-      monthly_limit_usd: normalizeOptionalLimit(
-        createForm.monthly_limit_usd as number | string | null,
-      ),
-      ...(Object.keys(videoModelPrices).length > 0
-        ? { video_model_prices: videoModelPrices }
-        : {}),
-      model_routing: convertRoutingRulesToApiFormat(
-        createModelRoutingRules.value,
-      ),
+    await adminAPI.groups.create({
+      name: createForm.name.trim(),
+      description: createForm.description.trim() || null,
+      platform: createForm.platform,
+      is_exclusive: createForm.is_exclusive,
+      claude_code_only: createForm.claude_code_only,
+      fallback_group_id:
+        createForm.fallback_group_id === null ? 0 : createForm.fallback_group_id,
+      fallback_group_id_on_invalid_request:
+        createForm.fallback_group_id_on_invalid_request === null
+          ? 0
+          : createForm.fallback_group_id_on_invalid_request,
+      model_routing_enabled: createForm.model_routing_enabled,
+      model_routing: convertRoutingRulesToApiFormat(createModelRoutingRules.value),
       models_list_config: buildModelsListConfig(createModelsListState),
       supported_model_scopes: normalizeSupportedModelScopesForPlatform(
         createForm.platform,
         createForm.supported_model_scopes,
       ),
+      mcp_xml_inject: createForm.mcp_xml_inject,
+      allow_messages_dispatch: createForm.allow_messages_dispatch,
+      allow_live: createForm.allow_live,
       messages_dispatch_model_config:
         createForm.platform === "openai"
           ? messagesDispatchFormStateToConfig({
@@ -6025,136 +4271,34 @@ const handleCreateGroup = async () => {
               exact_model_mappings: createForm.exact_model_mappings,
             })
           : undefined,
+      require_oauth_only: createForm.require_oauth_only,
+      require_privacy_set: createForm.require_privacy_set,
+      copy_accounts_from_group_ids: createForm.copy_accounts_from_group_ids,
+      rpm_limit: createForm.rpm_limit,
+      max_reasoning_effort: createForm.max_reasoning_effort,
       reasoning_effort_mappings: reasoningEffortMappingsToAPI(
         createForm.reasoning_effort_mappings,
       ),
-      // 利润控制：界面百分比转小数提交；仅五个 token 平台可启用
-      profit_control_enabled:
-        isProfitControlPlatform(createForm.platform) &&
-        createForm.profit_control_enabled,
-      profit_min_margin: percentToDecimal(createForm.profit_min_margin_percent),
-      profit_safety_buffer: percentToDecimal(
-        createForm.profit_safety_buffer_percent,
-      ),
-    };
-    delete (requestData as Record<string, unknown>).profit_min_margin_percent;
-    delete (requestData as Record<string, unknown>).profit_safety_buffer_percent;
-    // v-model.number 清空输入框时产生 ""，转为 null 让后端设为无限制
-    const emptyToNull = (v: any) => (v === "" ? null : v);
-    requestData.daily_limit_usd = emptyToNull(requestData.daily_limit_usd);
-    requestData.weekly_limit_usd = emptyToNull(requestData.weekly_limit_usd);
-    requestData.monthly_limit_usd = emptyToNull(requestData.monthly_limit_usd);
-    requestData.image_rate_multiplier = normalizeRateMultiplier(
-      requestData.image_rate_multiplier,
-    );
-    resetDisabledBatchImagePricing(requestData);
-    requestData.batch_image_discount_multiplier = normalizeRateMultiplier(
-      requestData.batch_image_discount_multiplier,
-    );
-    requestData.batch_image_hold_multiplier = normalizeRateMultiplier(
-      requestData.batch_image_hold_multiplier,
-    );
-    requestData.video_rate_multiplier = normalizeRateMultiplier(
-      requestData.video_rate_multiplier,
-    );
-    // 媒体价格输入清空时 v-model.number 产生 ""，直接提交会被后端 *float64 反序列化拒绝（400），
-    // 创建时按"未配置"（null）处理。
-    requestData.image_price_1k = emptyToNull(requestData.image_price_1k);
-    requestData.image_price_2k = emptyToNull(requestData.image_price_2k);
-    requestData.image_price_4k = emptyToNull(requestData.image_price_4k);
-    requestData.video_price_480p = emptyToNull(requestData.video_price_480p);
-    requestData.video_price_720p = emptyToNull(requestData.video_price_720p);
-    requestData.video_price_1080p = emptyToNull(requestData.video_price_1080p);
-    requestData.search_price_per_1k = emptyToNull(
-      requestData.search_price_per_1k,
-    );
-    requestData.audio_realtime_price_per_min = emptyToNull(
-      requestData.audio_realtime_price_per_min,
-    );
-    requestData.audio_tts_price_per_million_chars = emptyToNull(
-      requestData.audio_tts_price_per_million_chars,
-    );
-    requestData.audio_stt_price_per_hour = emptyToNull(
-      requestData.audio_stt_price_per_hour,
-    );
-    requestData.web_search_price_per_call = emptyToNull(
-      requestData.web_search_price_per_call,
-    );
-    requestData.peak_rate_enabled = createForm.peak_rate_enabled;
-    requestData.peak_start = createForm.peak_start;
-    requestData.peak_end = createForm.peak_end;
-    requestData.peak_rate_multiplier = normalizeRateMultiplier(
-      createForm.peak_rate_multiplier,
-    );
-    await adminAPI.groups.create(requestData);
+    });
     appStore.showSuccess(t("admin.groups.groupCreated"));
     closeCreateModal();
     loadGroups();
-    // Only advance tour if active, on submit step, and creation succeeded
-    if (onboardingStore.isCurrentStep('[data-tour="group-form-submit"]')) {
-      onboardingStore.nextStep(500);
-    }
   } catch (error: any) {
     appStore.showError(
       error.response?.data?.detail || t("admin.groups.failedToCreate"),
     );
     console.error("Error creating group:", error);
-    // Don't advance tour on error
   } finally {
     submitting.value = false;
   }
 };
-
 const handleEdit = async (group: AdminGroup) => {
   editingGroup.value = group;
   editForm.name = group.name;
   editForm.description = group.description || "";
   editForm.platform = group.platform;
-  editForm.rate_multiplier = group.rate_multiplier;
   editForm.is_exclusive = group.is_exclusive;
   editForm.status = group.status;
-  editForm.subscription_type = group.subscription_type || "standard";
-  editForm.daily_limit_usd = group.daily_limit_usd;
-  editForm.weekly_limit_usd = group.weekly_limit_usd;
-  editForm.monthly_limit_usd = group.monthly_limit_usd;
-  editForm.long_context_pricing_enabled =
-    group.long_context_pricing_enabled ?? true;
-  editForm.model_pricing = groupPricingFromAPI(group.model_pricing);
-  editForm.allow_image_generation = group.allow_image_generation ?? false;
-  editForm.allow_batch_image_generation =
-    group.allow_batch_image_generation ?? false;
-  editForm.image_rate_independent = group.image_rate_independent ?? false;
-  editForm.image_rate_multiplier = group.image_rate_multiplier ?? 1;
-  editForm.batch_image_discount_multiplier =
-    group.batch_image_discount_multiplier ?? 0.5;
-  editForm.batch_image_hold_multiplier = group.batch_image_hold_multiplier ?? 0.6;
-  editForm.image_price_1k = group.image_price_1k;
-  editForm.image_price_2k = group.image_price_2k;
-  editForm.image_price_4k = group.image_price_4k;
-  editForm.video_rate_independent = group.video_rate_independent ?? false;
-  editForm.video_rate_multiplier = group.video_rate_multiplier ?? 1;
-  editForm.video_price_480p = group.video_price_480p;
-  editForm.video_price_720p = group.video_price_720p;
-  editForm.video_price_1080p = group.video_price_1080p;
-  editForm.video_model_prices = createVideoModelPricesForm(
-    group.video_model_prices,
-  );
-  editForm.web_search_price_per_call = group.web_search_price_per_call ?? null;
-  editForm.search_price_per_1k = group.search_price_per_1k ?? null;
-  editForm.audio_realtime_price_per_min = group.audio_realtime_price_per_min ?? null;
-  editForm.audio_tts_price_per_million_chars = group.audio_tts_price_per_million_chars ?? null;
-  editForm.audio_stt_price_per_hour = group.audio_stt_price_per_hour ?? null;
-  editForm.peak_rate_enabled = group.peak_rate_enabled ?? false;
-  editForm.peak_start = group.peak_start ?? "";
-  editForm.peak_end = group.peak_end ?? "";
-  editForm.peak_rate_multiplier = group.peak_rate_multiplier ?? 1.0;
-  editForm.profit_control_enabled = group.profit_control_enabled ?? false;
-  editForm.profit_min_margin_percent = decimalToPercent(
-    group.profit_min_margin ?? 0,
-  );
-  editForm.profit_safety_buffer_percent = decimalToPercent(
-    group.profit_safety_buffer ?? 0,
-  );
   editForm.claude_code_only = group.claude_code_only || false;
   editForm.fallback_group_id = group.fallback_group_id;
   editForm.fallback_group_id_on_invalid_request =
@@ -6211,31 +4355,10 @@ const closeEditModal = () => {
   editReasoningEffortPolicyRef.value?.resetValidation();
   editModelRoutingRules.value = [];
   editForm.copy_accounts_from_group_ids = [];
-  editForm.peak_rate_enabled = false;
-  editForm.peak_start = "";
-  editForm.peak_end = "";
-  editForm.peak_rate_multiplier = 1.0;
-  editForm.profit_control_enabled = false;
-  editForm.profit_min_margin_percent = 0;
-  editForm.profit_safety_buffer_percent = 0;
-  editForm.video_rate_independent = false;
-  editForm.video_rate_multiplier = 1;
-  editForm.video_price_480p = null;
-  editForm.video_price_720p = null;
-  editForm.video_price_1080p = null;
-  editForm.video_model_prices = createVideoModelPricesForm();
-  editForm.long_context_pricing_enabled = true;
-  editForm.model_pricing = [];
-  editForm.web_search_price_per_call = null;
-  editForm.search_price_per_1k = null;
-  editForm.audio_realtime_price_per_min = null;
-  editForm.audio_tts_price_per_million_chars = null;
-  editForm.audio_stt_price_per_hour = null;
   resetMessagesDispatchFormState(editForm);
   editForm.allow_live = false;
   resetModelsListState(editModelsListState);
 };
-
 const handleUpdateGroup = async () => {
   if (!editingGroup.value) return;
   if (!editForm.name.trim()) {
@@ -6249,45 +4372,32 @@ const handleUpdateGroup = async () => {
   ) {
     return;
   }
-  if (!validateProfitControlForm(editForm)) {
-    return;
-  }
 
   submitting.value = true;
   try {
-    // 转换 fallback_group_id: null -> 0 (后端使用 0 表示清除)
-    const payload = {
-      ...editForm,
-      model_pricing: groupPricingToAPI(
-        editForm.model_pricing,
-        editForm.platform,
-      ),
-      daily_limit_usd: normalizeOptionalLimit(
-        editForm.daily_limit_usd as number | string | null,
-      ),
-      weekly_limit_usd: normalizeOptionalLimit(
-        editForm.weekly_limit_usd as number | string | null,
-      ),
-      monthly_limit_usd: normalizeOptionalLimit(
-        editForm.monthly_limit_usd as number | string | null,
-      ),
-      video_model_prices: serializeVideoModelPrices(
-        editForm.video_model_prices,
-      ),
+    await adminAPI.groups.update(editingGroup.value.id, {
+      name: editForm.name.trim(),
+      description: editForm.description.trim() || null,
+      platform: editForm.platform,
+      is_exclusive: editForm.is_exclusive,
+      status: editForm.status,
+      claude_code_only: editForm.claude_code_only,
       fallback_group_id:
         editForm.fallback_group_id === null ? 0 : editForm.fallback_group_id,
       fallback_group_id_on_invalid_request:
         editForm.fallback_group_id_on_invalid_request === null
           ? 0
           : editForm.fallback_group_id_on_invalid_request,
-      model_routing: convertRoutingRulesToApiFormat(
-        editModelRoutingRules.value,
-      ),
+      model_routing_enabled: editForm.model_routing_enabled,
+      model_routing: convertRoutingRulesToApiFormat(editModelRoutingRules.value),
       models_list_config: buildModelsListConfig(editModelsListState),
       supported_model_scopes: normalizeSupportedModelScopesForPlatform(
         editForm.platform,
         editForm.supported_model_scopes,
       ),
+      mcp_xml_inject: editForm.mcp_xml_inject,
+      allow_messages_dispatch: editForm.allow_messages_dispatch,
+      allow_live: editForm.allow_live,
       messages_dispatch_model_config:
         editForm.platform === "openai"
           ? messagesDispatchFormStateToConfig({
@@ -6298,70 +4408,15 @@ const handleUpdateGroup = async () => {
               exact_model_mappings: editForm.exact_model_mappings,
             })
           : undefined,
+      require_oauth_only: editForm.require_oauth_only,
+      require_privacy_set: editForm.require_privacy_set,
+      copy_accounts_from_group_ids: editForm.copy_accounts_from_group_ids,
+      rpm_limit: editForm.rpm_limit,
+      max_reasoning_effort: editForm.max_reasoning_effort,
       reasoning_effort_mappings: reasoningEffortMappingsToAPI(
         editForm.reasoning_effort_mappings,
       ),
-      // 利润控制：界面百分比转小数提交；仅五个 token 平台可启用
-      profit_control_enabled:
-        isProfitControlPlatform(editForm.platform) &&
-        editForm.profit_control_enabled,
-      profit_min_margin: percentToDecimal(editForm.profit_min_margin_percent),
-      profit_safety_buffer: percentToDecimal(
-        editForm.profit_safety_buffer_percent,
-      ),
-    };
-    delete (payload as Record<string, unknown>).profit_min_margin_percent;
-    delete (payload as Record<string, unknown>).profit_safety_buffer_percent;
-    // v-model.number 清空输入框时产生 ""，转为 null 让后端设为无限制
-    const emptyToNull = (v: any) => (v === "" ? null : v);
-    payload.daily_limit_usd = emptyToNull(payload.daily_limit_usd);
-    payload.weekly_limit_usd = emptyToNull(payload.weekly_limit_usd);
-    payload.monthly_limit_usd = emptyToNull(payload.monthly_limit_usd);
-    payload.image_rate_multiplier = normalizeRateMultiplier(
-      payload.image_rate_multiplier,
-    );
-    resetDisabledBatchImagePricing(payload);
-    payload.batch_image_discount_multiplier = normalizeRateMultiplier(
-      payload.batch_image_discount_multiplier,
-    );
-    payload.batch_image_hold_multiplier = normalizeRateMultiplier(
-      payload.batch_image_hold_multiplier,
-    );
-    payload.video_rate_multiplier = normalizeRateMultiplier(
-      payload.video_rate_multiplier,
-    );
-    // 媒体价格输入清空时 v-model.number 产生 ""，直接提交会被后端 *float64 反序列化拒绝（400）。
-    // 更新语义中 null 表示"不修改"，因此清空后的字段发送 -1：后端 normalizePrice 将负价归一为
-    // NULL，从而真正清除已配置的价格。
-    const emptyPriceToClear = (v: any) => (v === "" || v === null ? -1 : v);
-    payload.image_price_1k = emptyPriceToClear(payload.image_price_1k);
-    payload.image_price_2k = emptyPriceToClear(payload.image_price_2k);
-    payload.image_price_4k = emptyPriceToClear(payload.image_price_4k);
-    payload.video_price_480p = emptyPriceToClear(payload.video_price_480p);
-    payload.video_price_720p = emptyPriceToClear(payload.video_price_720p);
-    payload.video_price_1080p = emptyPriceToClear(payload.video_price_1080p);
-    payload.search_price_per_1k = emptyPriceToClear(
-      payload.search_price_per_1k,
-    );
-    payload.audio_realtime_price_per_min = emptyPriceToClear(
-      payload.audio_realtime_price_per_min,
-    );
-    payload.audio_tts_price_per_million_chars = emptyPriceToClear(
-      payload.audio_tts_price_per_million_chars,
-    );
-    payload.audio_stt_price_per_hour = emptyPriceToClear(
-      payload.audio_stt_price_per_hour,
-    );
-    payload.web_search_price_per_call = emptyPriceToClear(
-      payload.web_search_price_per_call,
-    );
-    payload.peak_rate_enabled = editForm.peak_rate_enabled;
-    payload.peak_start = editForm.peak_start;
-    payload.peak_end = editForm.peak_end;
-    payload.peak_rate_multiplier = normalizeRateMultiplier(
-      editForm.peak_rate_multiplier,
-    );
-    await adminAPI.groups.update(editingGroup.value.id, payload);
+    });
     appStore.showSuccess(t("admin.groups.groupUpdated"));
     closeEditModal();
     loadGroups();
@@ -6374,7 +4429,6 @@ const handleUpdateGroup = async () => {
     submitting.value = false;
   }
 };
-
 const addCreateMessagesDispatchMapping = () => {
   createForm.exact_model_mappings.push({ claude_model: "", target_model: "" });
 };
@@ -6397,16 +4451,6 @@ const removeEditMessagesDispatchMapping = (row: MessagesDispatchMappingRow) => {
   if (index !== -1) {
     editForm.exact_model_mappings.splice(index, 1);
   }
-};
-
-const handleRateMultipliers = (group: AdminGroup) => {
-  rateMultipliersGroup.value = group;
-  showRateMultipliersModal.value = true;
-};
-
-const handleRPMOverrides = (group: AdminGroup) => {
-  rpmOverridesGroup.value = group;
-  showRPMOverridesModal.value = true;
 };
 
 const handleDuplicate = async (group: AdminGroup) => {
@@ -6631,137 +4675,6 @@ const confirmDelete = async () => {
     console.error("Error deleting group:", error);
   }
 };
-
-// 监听 subscription_type 变化，订阅模式时 is_exclusive 默认为 true；标准模式清空高峰配置
-watch(
-  () => createForm.subscription_type,
-  (newVal) => {
-    if (newVal === "subscription") {
-      createForm.is_exclusive = true;
-      createForm.fallback_group_id_on_invalid_request = null;
-    } else {
-      createForm.peak_rate_enabled = false;
-      createForm.peak_start = "";
-      createForm.peak_end = "";
-      createForm.peak_rate_multiplier = 1.0;
-    }
-  },
-);
-
-// 编辑表单：切回标准模式时清空高峰配置，避免残留随更新请求提交被后端拒绝
-watch(
-  () => editForm.subscription_type,
-  (newVal) => {
-    if (newVal !== "subscription") {
-      editForm.peak_rate_enabled = false;
-      editForm.peak_start = "";
-      editForm.peak_end = "";
-      editForm.peak_rate_multiplier = 1.0;
-    }
-  },
-);
-
-watch(
-  () => createForm.platform,
-  (newVal) => {
-    if (!["anthropic", "antigravity"].includes(newVal)) {
-      createForm.fallback_group_id_on_invalid_request = null;
-    }
-    if (newVal !== "openai") {
-      resetMessagesDispatchFormState(createForm);
-    }
-    if (!supportsLivePlatform(newVal)) {
-      createForm.allow_live = false;
-    }
-    if (!isProfitControlPlatform(newVal)) {
-      createForm.profit_control_enabled = false;
-      createForm.profit_min_margin_percent = 0;
-      createForm.profit_safety_buffer_percent = 0;
-    }
-    createForm.max_reasoning_effort = normalizeReasoningEffortForPlatform(
-      newVal,
-      createForm.max_reasoning_effort,
-    );
-    createForm.reasoning_effort_mappings = reasoningEffortMappingsToRows(
-      reasoningEffortMappingsToAPI(createForm.reasoning_effort_mappings),
-      newVal,
-    );
-    createReasoningEffortPolicyRef.value?.resetValidation();
-    if (!["openai", "antigravity", "anthropic", "gemini"].includes(newVal)) {
-      createForm.require_oauth_only = false;
-      createForm.require_privacy_set = false;
-    }
-    resetDisabledBatchImagePricing(createForm);
-    resetModelsListState(createModelsListState);
-    loadModelsListCandidates("create", 0, newVal);
-  },
-);
-
-watch(
-  () => createForm.allow_image_generation,
-  () => {
-    resetDisabledBatchImagePricing(createForm);
-  },
-);
-
-watch(
-  () => createForm.allow_batch_image_generation,
-  () => {
-    resetDisabledBatchImagePricing(createForm);
-  },
-);
-
-watch(
-  () => editForm.platform,
-  (newVal) => {
-    if (!["anthropic", "antigravity"].includes(newVal)) {
-      editForm.fallback_group_id_on_invalid_request = null;
-    }
-    if (newVal !== "openai") {
-      resetMessagesDispatchFormState(editForm);
-    }
-    if (!supportsLivePlatform(newVal)) {
-      editForm.allow_live = false;
-    }
-    if (!isProfitControlPlatform(newVal)) {
-      editForm.profit_control_enabled = false;
-      editForm.profit_min_margin_percent = 0;
-      editForm.profit_safety_buffer_percent = 0;
-    }
-    editForm.max_reasoning_effort = normalizeReasoningEffortForPlatform(
-      newVal,
-      editForm.max_reasoning_effort,
-    );
-    editForm.reasoning_effort_mappings = reasoningEffortMappingsToRows(
-      reasoningEffortMappingsToAPI(editForm.reasoning_effort_mappings),
-      newVal,
-    );
-    editReasoningEffortPolicyRef.value?.resetValidation();
-    if (!["openai", "antigravity", "anthropic", "gemini"].includes(newVal)) {
-      editForm.require_oauth_only = false;
-      editForm.require_privacy_set = false;
-    }
-    resetDisabledBatchImagePricing(editForm);
-    if (editingGroup.value) {
-      resetModelsListState(editModelsListState, editForm.platform === editingGroup.value.platform ? editingGroup.value.models_list_config : undefined);
-      loadModelsListCandidates("edit", editingGroup.value.id, newVal);
-    }
-  },
-);
-
-watch(
-  () => editForm.allow_image_generation,
-  () => {
-    resetDisabledBatchImagePricing(editForm);
-  },
-);
-
-watch(
-  () => editForm.allow_batch_image_generation,
-  () => {
-    resetDisabledBatchImagePricing(editForm);
-  },
-);
 
 watch(
   () => editForm.platform,

@@ -2,16 +2,17 @@ package service
 
 import (
 	"context"
-	"fmt"
+	"encoding/binary"
+	"hash/fnv"
 	"log"
+	"log/slog"
 	"strings"
 	"time"
 )
 
 const (
-	// antigravityRefreshWindow Antigravity token 提前刷新窗口：15分钟
-	// Google OAuth token 有效期55分钟，提前15分钟刷新
-	antigravityRefreshWindow = 15 * time.Minute
+	antigravityBackgroundRefreshBase   = 5 * time.Minute
+	antigravityBackgroundRefreshJitter = time.Minute
 
 	antigravityForceTokenRefreshExtraKey       = "antigravity_force_token_refresh"
 	antigravityForceTokenRefreshReasonExtraKey = "antigravity_force_token_refresh_reason"
@@ -40,7 +41,8 @@ func (r *AntigravityTokenRefresher) CanRefresh(account *Account) bool {
 }
 
 // NeedsRefresh 检查账户是否需要刷新
-// Antigravity 使用固定的15分钟刷新窗口，忽略全局配置
+// Antigravity uses a narrow deterministic background window. Request-path
+// emergency refresh remains governed by AntigravityTokenProvider.
 func (r *AntigravityTokenRefresher) NeedsRefresh(account *Account, _ time.Duration) bool {
 	if !r.CanRefresh(account) {
 		return false
@@ -53,12 +55,26 @@ func (r *AntigravityTokenRefresher) NeedsRefresh(account *Account, _ time.Durati
 		return false
 	}
 	timeUntilExpiry := time.Until(*expiresAt)
-	needsRefresh := timeUntilExpiry < antigravityRefreshWindow
+	refreshWindow := antigravityBackgroundRefreshWindow(account.ID)
+	needsRefresh := timeUntilExpiry <= refreshWindow
 	if needsRefresh {
-		fmt.Printf("[AntigravityTokenRefresher] Account %d needs refresh: expires_at=%s, time_until_expiry=%v, window=%v\n",
-			account.ID, expiresAt.Format("2006-01-02 15:04:05"), timeUntilExpiry, antigravityRefreshWindow)
+		slog.Debug("antigravity.background_refresh_due",
+			"account_id", account.ID,
+			"time_until_expiry", timeUntilExpiry,
+			"refresh_window", refreshWindow,
+		)
 	}
 	return needsRefresh
+}
+
+func antigravityBackgroundRefreshWindow(accountID int64) time.Duration {
+	h := fnv.New32a()
+	var raw [8]byte
+	binary.LittleEndian.PutUint64(raw[:], uint64(accountID))
+	_, _ = h.Write(raw[:])
+	spanSeconds := int64((2 * antigravityBackgroundRefreshJitter) / time.Second)
+	offsetSeconds := int64(h.Sum32())%(spanSeconds+1) - spanSeconds/2
+	return antigravityBackgroundRefreshBase + time.Duration(offsetSeconds)*time.Second
 }
 
 func accountNeedsAntigravityForceTokenRefresh(account *Account) bool {

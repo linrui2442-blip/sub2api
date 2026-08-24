@@ -818,6 +818,51 @@ func TestRefreshIfNeeded_InvalidGrantRaceRecovered(t *testing.T) {
 	require.Equal(t, 0, repo.updateCalls) // no DB update needed, another worker did it
 }
 
+func TestRefreshIfNeeded_AntigravityInvalidGrantRaceRecoveredByTokenVersion(t *testing.T) {
+	account := &Account{
+		ID: 101, Platform: PlatformAntigravity, Type: AccountTypeOAuth, Status: StatusActive,
+		Credentials: map[string]any{
+			"refresh_token": "stable-rt", "access_token": "old-at", "_token_version": int64(10),
+		},
+	}
+	racedAccount := &Account{
+		ID: 101, Platform: PlatformAntigravity, Type: AccountTypeOAuth, Status: StatusActive,
+		Credentials: map[string]any{
+			"refresh_token": "stable-rt", "access_token": "new-at", "_token_version": int64(11),
+		},
+	}
+	repo := &refreshAPIAccountRepoWithRace{
+		refreshAPIAccountRepo: refreshAPIAccountRepo{account: account},
+		raceAccount:           racedAccount,
+	}
+	executor := &refreshAPIExecutorStub{needsRefresh: true, err: errors.New("invalid_grant")}
+
+	result, err := NewOAuthRefreshAPI(repo, nil).RefreshIfNeeded(context.Background(), account, executor, 3*time.Minute)
+
+	require.NoError(t, err)
+	require.NotNil(t, result.Account)
+	require.Equal(t, "new-at", result.Account.GetCredential("access_token"))
+	require.Equal(t, "stable-rt", result.Account.GetCredential("refresh_token"))
+}
+
+func TestRefreshIfNeeded_AntigravityMissingRefreshTokenIsFinalReauth(t *testing.T) {
+	account := &Account{
+		ID: 102, Platform: PlatformAntigravity, Type: AccountTypeOAuth, Status: StatusActive,
+		Credentials: map[string]any{"access_token": "expired-at"},
+	}
+	repo := &refreshAPIAccountRepo{account: account}
+	executor := &refreshAPIExecutorStub{needsRefresh: true, cannotRefresh: true}
+
+	result, err := NewOAuthRefreshAPI(repo, nil).RefreshIfNeeded(context.Background(), account, executor, 3*time.Minute)
+
+	require.Error(t, err)
+	require.NotNil(t, result)
+	class, ok := antigravityFailureClass(err)
+	require.True(t, ok)
+	require.Equal(t, antigravityAuthFailureReauthRequired, class)
+	require.Zero(t, executor.refreshCalls)
+}
+
 func TestRefreshIfNeeded_InvalidGrantGenuine(t *testing.T) {
 	// Account with revoked refresh token - DB still has the same token
 	account := &Account{

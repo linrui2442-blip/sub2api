@@ -54,16 +54,11 @@ describe('ProfileView', () => {
       concurrency: 2,
       status: 'active',
       allowed_groups: null,
-      balance_notify_enabled: true,
-      balance_notify_threshold: null,
-      balance_notify_extra_emails: [],
       created_at: '2026-04-20T00:00:00Z',
       updated_at: '2026-04-20T00:00:00Z'
     }
     fetchPublicSettingsMock.mockResolvedValue({
       contact_info: '',
-      balance_low_notify_enabled: false,
-      balance_low_notify_threshold: 0,
       linuxdo_oauth_enabled: true,
       wechat_oauth_enabled: true,
       wechat_oauth_open_enabled: true,
@@ -80,7 +75,6 @@ describe('ProfileView', () => {
           AppLayout: { template: '<div><slot /></div>' },
           StatCard: { template: '<div class="stat-card" />' },
           ProfileInfoCard: { template: '<div data-testid="profile-info-card" />' },
-          ProfileBalanceNotifyCard: { template: '<div data-testid="profile-balance-notify-card" />' },
           ProfilePasswordForm: { template: '<div data-testid="profile-password-form" />' },
           ProfileTotpCard: { template: '<div data-testid="profile-totp-card" />' },
           Icon: true

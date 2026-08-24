@@ -6,44 +6,6 @@
 import { apiClient } from '../client'
 import type { AdminUser, UpdateUserRequest, PaginatedResponse, ApiKey } from '@/types'
 
-export interface AdminBindAuthIdentityChannelRequest {
-  channel: string
-  channel_app_id: string
-  channel_subject: string
-  metadata?: Record<string, unknown> | null
-}
-
-export interface AdminBindAuthIdentityRequest {
-  provider_type: string
-  provider_key: string
-  provider_subject: string
-  issuer?: string | null
-  metadata?: Record<string, unknown> | null
-  channel?: AdminBindAuthIdentityChannelRequest
-}
-
-export interface AdminBoundAuthIdentityChannel {
-  channel: string
-  channel_app_id: string
-  channel_subject: string
-  metadata: Record<string, unknown> | null
-  created_at: string
-  updated_at: string
-}
-
-export interface AdminBoundAuthIdentity {
-  user_id: number
-  provider_type: string
-  provider_key: string
-  provider_subject: string
-  verified_at?: string | null
-  issuer?: string | null
-  metadata: Record<string, unknown> | null
-  created_at: string
-  updated_at: string
-  channel?: AdminBoundAuthIdentityChannel | null
-}
-
 export interface BatchUpdateUserLimitsRequest {
   user_ids: number[]
   all?: boolean
@@ -59,7 +21,7 @@ export interface BatchUpdateUserLimitsResponse {
  * List all users with pagination
  * @param page - Page number (default: 1)
  * @param pageSize - Items per page (default: 20)
- * @param filters - Optional filters (status, role, search, attributes)
+ * @param filters - Optional filters (status, role, search, groups)
  * @param options - Optional request options (signal)
  * @returns Paginated list of users
  */
@@ -72,7 +34,6 @@ export async function list(
     search?: string
     group_name?: string         // fuzzy filter by allowed group name
     api_key_group_id?: number   // filter users by the group their API keys are bound to
-    attributes?: Record<number, string>  // attributeId -> value
     include_subscriptions?: boolean
     sort_by?: string
     sort_order?: 'asc' | 'desc'
@@ -81,7 +42,6 @@ export async function list(
     signal?: AbortSignal
   }
 ): Promise<PaginatedResponse<AdminUser>> {
-  // Build params with attribute filters in attr[id]=value format
   const params: Record<string, any> = {
     page,
     page_size: pageSize,
@@ -95,14 +55,6 @@ export async function list(
     sort_order: filters?.sort_order
   }
 
-  // Add attribute filters as attr[id]=value
-  if (filters?.attributes) {
-    for (const [attrId, value] of Object.entries(filters.attributes)) {
-      if (value) {
-        params[`attr[${attrId}]`] = value
-      }
-    }
-  }
   const { data } = await apiClient.get<PaginatedResponse<AdminUser>>('/admin/users', {
     params,
     signal: options?.signal
@@ -133,7 +85,6 @@ export async function create(userData: {
   username?: string
   notes?: string
   role?: 'admin' | 'user'
-  balance?: number
   concurrency?: number
   rpm_limit?: number
   allowed_groups?: number[] | null
@@ -160,28 +111,6 @@ export async function update(id: number, updates: UpdateUserRequest): Promise<Ad
  */
 export async function deleteUser(id: number): Promise<{ message: string }> {
   const { data } = await apiClient.delete<{ message: string }>(`/admin/users/${id}`)
-  return data
-}
-
-/**
- * Update user balance
- * @param id - User ID
- * @param balance - New balance
- * @param operation - Operation type ('set', 'add', 'subtract')
- * @param notes - Optional notes for the balance adjustment
- * @returns Updated user
- */
-export async function updateBalance(
-  id: number,
-  balance: number,
-  operation: 'set' | 'add' | 'subtract' = 'set',
-  notes?: string
-): Promise<AdminUser> {
-  const { data } = await apiClient.post<AdminUser>(`/admin/users/${id}/balance`, {
-    balance,
-    operation,
-    notes: notes || ''
-  })
   return data
 }
 
@@ -251,53 +180,6 @@ export async function getUserUsageStats(
 }
 
 /**
- * Balance history item returned from the API
- */
-export interface BalanceHistoryItem {
-  id: number
-  code: string
-  type: string
-  value: number
-  status: string
-  used_by: number | null
-  used_at: string | null
-  created_at: string
-  group_id: number | null
-  validity_days: number
-  notes: string
-  user?: { id: number; email: string } | null
-  group?: { id: number; name: string } | null
-}
-
-// Balance history response extends pagination with total_recharged summary
-export interface BalanceHistoryResponse extends PaginatedResponse<BalanceHistoryItem> {
-  total_recharged: number
-}
-
-/**
- * Get user's balance/concurrency change history
- * @param id - User ID
- * @param page - Page number
- * @param pageSize - Items per page
- * @param type - Optional type filter (balance, affiliate_balance, admin_balance, concurrency, admin_concurrency, subscription)
- * @returns Paginated balance history with total_recharged
- */
-export async function getUserBalanceHistory(
-  id: number,
-  page: number = 1,
-  pageSize: number = 20,
-  type?: string
-): Promise<BalanceHistoryResponse> {
-  const params: Record<string, any> = { page, page_size: pageSize }
-  if (type) params.type = type
-  const { data } = await apiClient.get<BalanceHistoryResponse>(
-    `/admin/users/${id}/balance-history`,
-    { params }
-  )
-  return data
-}
-
-/**
  * Replace user's exclusive group
  * @param userId - User ID
  * @param oldGroupId - Current group ID to replace
@@ -316,107 +198,18 @@ export async function replaceGroup(
   return data
 }
 
-export async function bindUserAuthIdentity(
-  userId: number,
-  input: AdminBindAuthIdentityRequest
-): Promise<AdminBoundAuthIdentity> {
-  const { data } = await apiClient.post<AdminBoundAuthIdentity>(
-    `/admin/users/${userId}/auth-identities`,
-    input
-  )
-  return data
-}
-
-/**
- * Platform quota types
- */
-export type PlatformQuotaPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok'
-export type PlatformQuotaWindow = 'daily' | 'weekly' | 'monthly'
-
-export interface PlatformQuotaItem {
-  platform: PlatformQuotaPlatform
-  daily_limit_usd: number | null
-  weekly_limit_usd: number | null
-  monthly_limit_usd: number | null
-  daily_usage_usd: number
-  weekly_usage_usd: number
-  monthly_usage_usd: number
-  daily_window_start?: string | null
-  weekly_window_start?: string | null
-  monthly_window_start?: string | null
-  daily_window_resets_at?: string | null
-  weekly_window_resets_at?: string | null
-  monthly_window_resets_at?: string | null
-}
-
-export interface PlatformQuotaUpdateItem {
-  platform: PlatformQuotaPlatform
-  daily_limit_usd: number | null
-  weekly_limit_usd: number | null
-  monthly_limit_usd: number | null
-}
-
-export interface PlatformQuotasResponse {
-  platform_quotas: PlatformQuotaItem[]
-}
-
-/**
- * Get user's platform quotas
- */
-export async function getPlatformQuotas(id: number): Promise<PlatformQuotasResponse> {
-  const { data } = await apiClient.get<PlatformQuotasResponse>(
-    `/admin/users/${id}/platform-quotas`
-  )
-  return data
-}
-
-/**
- * Replace user's platform quotas (全量替换)
- */
-export async function updatePlatformQuotas(
-  id: number,
-  quotas: PlatformQuotaUpdateItem[]
-): Promise<PlatformQuotasResponse> {
-  const { data } = await apiClient.put<PlatformQuotasResponse>(
-    `/admin/users/${id}/platform-quotas`,
-    { quotas }
-  )
-  return data
-}
-
-/**
- * Reset a single (platform, window) usage immediately
- */
-export async function resetPlatformQuotaWindow(
-  id: number,
-  platform: PlatformQuotaPlatform,
-  window: PlatformQuotaWindow
-): Promise<PlatformQuotasResponse> {
-  const { data } = await apiClient.post<PlatformQuotasResponse>(
-    `/admin/users/${id}/platform-quotas/reset`,
-    { platform, window }
-  )
-  return data
-}
-
 export const usersAPI = {
   list,
   getById,
   create,
   update,
   delete: deleteUser,
-  updateBalance,
   updateConcurrency,
   batchUpdateLimits,
   toggleStatus,
   getUserApiKeys,
   getUserUsageStats,
-  getUserBalanceHistory,
   replaceGroup,
-  bindUserAuthIdentity,
-  getPlatformQuotas,
-  updatePlatformQuotas,
-  resetPlatformQuotaWindow,
 }
 
 export default usersAPI

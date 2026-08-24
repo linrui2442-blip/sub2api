@@ -16,6 +16,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/gin-gonic/gin"
+	"github.com/imroc/req/v3"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 )
@@ -576,6 +577,99 @@ func collectOpenAIImagesFromResponsesBody(body []byte) ([]openAIResponsesImageRe
 		return fallbackResults, createdAt, usageRaw, firstMeta, foundFinal, nil
 	}
 	return nil, createdAt, usageRaw, openAIResponsesImageResult{}, foundFinal, nil
+}
+
+// hydrateOpenAIResponsesImagePointers converts OAuth backend image pointers
+// into the b64_json payload required by the public OpenAI Images API. Most
+// responses already contain base64 and therefore take the no-op fast path.
+func (s *OpenAIGatewayService) hydrateOpenAIResponsesImagePointers(
+	ctx context.Context,
+	account *Account,
+	headers http.Header,
+	body []byte,
+	results []openAIResponsesImageResult,
+) error {
+	if s == nil || len(results) == 0 || len(body) == 0 {
+		return nil
+	}
+	pointers := collectOpenAIImagePointers(body)
+	// The OAuth Responses backend returns Server-Sent Events even when the
+	// public Images request is non-streaming. Inspect each JSON event as well
+	// as a plain JSON body so inline image metadata is not lost.
+	forEachOpenAISSEDataPayload(string(body), func(payload []byte) {
+		pointers = mergeOpenAIImagePointerInfos(pointers, collectOpenAIImagePointers(payload))
+	})
+	if len(pointers) == 0 {
+		return nil
+	}
+
+	byPointer := make(map[string]openAIImagePointerInfo, len(pointers))
+	for _, pointer := range pointers {
+		if key := strings.TrimSpace(pointer.Pointer); key != "" {
+			byPointer[key] = pointer
+		}
+	}
+
+	needsResolution := false
+	for _, result := range results {
+		if _, ok := byPointer[strings.TrimSpace(result.Result)]; ok {
+			needsResolution = true
+			break
+		}
+	}
+	if !needsResolution {
+		return nil
+	}
+	var client *req.Client
+	for _, result := range results {
+		pointer, ok := byPointer[strings.TrimSpace(result.Result)]
+		if !ok || normalizeOpenAIImageBase64(pointer.B64JSON) != "" {
+			continue
+		}
+		if account == nil || s.privacyClientFactory == nil {
+			return fmt.Errorf("openai OAuth image pointer resolution is unavailable")
+		}
+		proxyURL := ""
+		if account.ProxyID != nil && account.Proxy != nil {
+			proxyURL = account.Proxy.URL()
+		}
+		var err error
+		client, err = s.privacyClientFactory(proxyURL)
+		if err != nil {
+			return fmt.Errorf("create openai image resolver client: %w", err)
+		}
+		break
+	}
+	conversationID := openAIResponsesConversationID(body)
+	for index := range results {
+		pointer, ok := byPointer[strings.TrimSpace(results[index].Result)]
+		if !ok {
+			continue
+		}
+		data, err := resolveOpenAIImageBytes(ctx, client, headers, conversationID, pointer, openAIUpstreamErrorBodyReadLimit)
+		if err != nil {
+			return fmt.Errorf("resolve openai image output: %w", err)
+		}
+		results[index].Result = base64.StdEncoding.EncodeToString(data)
+		if strings.TrimSpace(results[index].OutputFormat) == "" && strings.HasPrefix(http.DetectContentType(data), "image/") {
+			results[index].OutputFormat = strings.TrimPrefix(http.DetectContentType(data), "image/")
+		}
+	}
+	return nil
+}
+
+func openAIResponsesConversationID(body []byte) string {
+	conversationID := ""
+	forEachOpenAISSEDataPayload(string(body), func(payload []byte) {
+		if conversationID != "" || !gjson.ValidBytes(payload) {
+			return
+		}
+		conversationID = strings.TrimSpace(gjson.GetBytes(payload, "response.id").String())
+		if conversationID == "" {
+			conversationID = strings.TrimSpace(gjson.GetBytes(payload, "response_id").String())
+		}
+	})
+	return conversationID
 }
 
 func extractOpenAIImagesUpstreamError(body []byte) *OpenAIImagesUpstreamError {
@@ -1236,6 +1330,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthNonStreamingResponse(
 	c *gin.Context,
 	responseFormat string,
 	fallbackModel string,
+	ctx context.Context,
+	account *Account,
+	headers http.Header,
 ) (OpenAIUsage, int, []string, error) {
 	body, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, openAITooLargeError)
 	if err != nil {
@@ -1295,6 +1392,9 @@ func (s *OpenAIGatewayService) handleOpenAIImagesOAuthNonStreamingResponse(
 	}
 	if strings.TrimSpace(firstMeta.Model) == "" {
 		firstMeta.Model = strings.TrimSpace(fallbackModel)
+	}
+	if err := s.hydrateOpenAIResponsesImagePointers(ctx, account, headers, body, results); err != nil {
+		return OpenAIUsage{}, 0, nil, err
 	}
 
 	responseBody, err := buildOpenAIImagesAPIResponse(results, createdAt, usageRaw, firstMeta, responseFormat)
@@ -1810,7 +1910,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 			)
 		}
 	} else {
-		usage, imageCount, imageOutputSizes, err = s.handleOpenAIImagesOAuthNonStreamingResponse(resp, c, parsed.ResponseFormat, requestModel)
+		usage, imageCount, imageOutputSizes, err = s.handleOpenAIImagesOAuthNonStreamingResponse(resp, c, parsed.ResponseFormat, requestModel, upstreamCtx, account, upstreamReq.Header)
 		if err != nil {
 			return nil, s.handleOpenAIImagesOAuthResponseError(
 				upstreamCtx,

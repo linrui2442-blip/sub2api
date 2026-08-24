@@ -19,13 +19,10 @@ function createPublicSettings(overrides: Partial<PublicSettings> = {}): PublicSe
   return {
     registration_enabled: false,
     email_verify_enabled: false,
-    force_email_on_third_party_signup: false,
     registration_email_suffix_whitelist: [],
     promo_code_enabled: true,
     password_reset_enabled: false,
     invitation_code_enabled: false,
-    turnstile_enabled: false,
-    turnstile_site_key: '',
     site_name: 'Test Site',
     site_logo: '',
     site_subtitle: '',
@@ -35,30 +32,15 @@ function createPublicSettings(overrides: Partial<PublicSettings> = {}): PublicSe
     home_content: '',
     compact_home_enabled: false,
     hide_ccs_import_button: false,
-    payment_enabled: false,
     risk_control_enabled: false,
     table_default_page_size: 20,
     table_page_size_options: [10, 20, 50, 100],
     custom_menu_items: [],
     custom_endpoints: [],
-    linuxdo_oauth_enabled: false,
-    wechat_oauth_enabled: false,
-    oidc_oauth_enabled: false,
-    oidc_oauth_provider_name: 'OIDC',
-    github_oauth_enabled: false,
-    google_oauth_enabled: false,
     backend_mode_enabled: false,
     version: '1.0.0',
-    balance_low_notify_enabled: false,
     account_quota_notify_enabled: false,
-    balance_low_notify_threshold: 0,
-    channel_monitor_enabled: true,
-    channel_monitor_default_interval_seconds: 60,
-    available_channels_enabled: false,
-    model_plaza_enabled: false,
-    model_plaza_require_auth: false,
     service_quota_enabled: false,
-    affiliate_enabled: false,
     ...overrides,
   }
 }
@@ -327,7 +309,7 @@ describe('useAppStore', () => {
     it('并发调用复用并等待同一个请求，包括 force 调用', async () => {
       const deferred = createDeferred<PublicSettings>()
       vi.mocked(getPublicSettings).mockReturnValue(deferred.promise)
-      const settings = createPublicSettings({ payment_enabled: true })
+      const settings = createPublicSettings({ site_name: 'Concurrent settings' })
       const store = useAppStore()
 
       const first = store.fetchPublicSettings()
@@ -350,7 +332,7 @@ describe('useAppStore', () => {
         settings,
       ])
       expect(store.publicSettingsLoaded).toBe(true)
-      expect(store.cachedPublicSettings?.payment_enabled).toBe(true)
+      expect(store.cachedPublicSettings?.site_name).toBe('Concurrent settings')
     })
 
     it('force 在无活动请求时绕过缓存，刷新期间的普通调用等待刷新结果', async () => {
@@ -444,8 +426,6 @@ describe('useAppStore', () => {
         promo_code_enabled: true,
         password_reset_enabled: false,
         invitation_code_enabled: false,
-        turnstile_enabled: false,
-        turnstile_site_key: '',
         site_name: 'Updated Site',
         site_logo: '',
         site_subtitle: '',
@@ -455,13 +435,10 @@ describe('useAppStore', () => {
         home_content: '',
         compact_home_enabled: false,
         hide_ccs_import_button: false,
-        purchase_subscription_enabled: false,
-        purchase_subscription_url: '',
         table_default_page_size: 1000,
         table_page_size_options: [20, 100, 1000],
         custom_menu_items: [],
         custom_endpoints: [],
-        linuxdo_oauth_enabled: false,
         backend_mode_enabled: false,
         version: '1.0.0'
       })

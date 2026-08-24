@@ -129,6 +129,15 @@ type OAuthRefreshAPI struct {
 	tokenCache  GeminiTokenCache // 可选，nil = 无分布式锁
 	lockTTL     time.Duration
 	localLocks  sync.Map // key: cacheKey string -> value: *contextMutex
+	postRefresh func(*Account)
+}
+
+// SetPostRefreshHook registers a startup-time callback used to invalidate
+// provider-specific derived caches after durable credential persistence.
+func (api *OAuthRefreshAPI) SetPostRefreshHook(hook func(*Account)) {
+	if api != nil {
+		api.postRefresh = hook
+	}
 }
 
 // NewOAuthRefreshAPI 创建统一刷新 API
@@ -170,6 +179,43 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 	account *Account,
 	executor OAuthRefreshExecutor,
 	refreshWindow time.Duration,
+) (*OAuthRefreshResult, error) {
+	return api.refresh(ctx, account, executor, refreshWindow, false, "", 0, false)
+}
+
+// ForceRefresh executes the existing locked OAuth refresh flow even when the
+// durable access token has not reached its normal refresh window. It is used
+// for a single recovery attempt after an upstream 401.
+func (api *OAuthRefreshAPI) ForceRefresh(
+	ctx context.Context,
+	account *Account,
+	executor OAuthRefreshExecutor,
+) (*OAuthRefreshResult, error) {
+	return api.refresh(ctx, account, executor, 0, true, "", 0, false)
+}
+
+// RecoverRejectedAccessToken refreshes only while the durable credential still
+// matches the token/version rejected by a business API. The comparison is made
+// under the existing refresh lock so concurrent 401 responses share one refresh.
+func (api *OAuthRefreshAPI) RecoverRejectedAccessToken(
+	ctx context.Context,
+	account *Account,
+	executor OAuthRefreshExecutor,
+	rejectedToken string,
+	rejectedVersion int64,
+) (*OAuthRefreshResult, error) {
+	return api.refresh(ctx, account, executor, 0, true, rejectedToken, rejectedVersion, true)
+}
+
+func (api *OAuthRefreshAPI) refresh(
+	ctx context.Context,
+	account *Account,
+	executor OAuthRefreshExecutor,
+	refreshWindow time.Duration,
+	force bool,
+	rejectedToken string,
+	rejectedVersion int64,
+	conditionalRecovery bool,
 ) (*OAuthRefreshResult, error) {
 	if api == nil || api.accountRepo == nil {
 		return nil, errors.New("oauth refresh account repository is not configured")
@@ -237,6 +283,11 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 		}
 	}
 	if !executor.CanRefresh(freshAccount) {
+		if freshAccount.Platform == PlatformAntigravity && freshAccount.Type == AccountTypeOAuth &&
+			strings.TrimSpace(freshAccount.GetCredential("refresh_token")) == "" {
+			return &OAuthRefreshResult{Account: snapshotOAuthRefreshAccount(freshAccount)},
+				classifyFinalAntigravityRefreshError(errors.New("refresh token missing"))
+		}
 		if requestPath && freshAccount.IsGrokOAuth() && strings.TrimSpace(freshAccount.GetGrokRefreshToken()) == "" {
 			return nil, withGrokCredentialFailureSnapshot(errGrokOAuthRefreshTokenMissing, freshAccount)
 		}
@@ -246,8 +297,16 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 		return &OAuthRefreshResult{Account: freshAccount}, nil
 	}
 
+	if conditionalRecovery {
+		currentToken := strings.TrimSpace(freshAccount.GetCredential("access_token"))
+		currentVersion := freshAccount.GetCredentialAsInt64("_token_version")
+		if currentToken != strings.TrimSpace(rejectedToken) || currentVersion > rejectedVersion {
+			return &OAuthRefreshResult{Account: freshAccount}, nil
+		}
+	}
+
 	// 3. 二次检查是否仍需刷新（另一条路径可能已刷新）
-	if !executor.NeedsRefresh(freshAccount, refreshWindow) {
+	if !force && !executor.NeedsRefresh(freshAccount, refreshWindow) {
 		return &OAuthRefreshResult{
 			Account: freshAccount,
 		}, nil
@@ -286,6 +345,9 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 		result := &OAuthRefreshResult{Account: attemptedAccount}
 		if requestPath && attemptedAccount.Platform == PlatformGrok {
 			return result, withGrokCredentialFailureSnapshot(refreshErr, attemptedAccount)
+		}
+		if attemptedAccount.Platform == PlatformAntigravity {
+			return result, classifyFinalAntigravityRefreshError(refreshErr)
 		}
 		return result, refreshErr
 	}
@@ -364,6 +426,9 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 			return nil, withGrokCredentialFailureSnapshot(eligibilityErr, freshAccount)
 		}
 	}
+	if api.postRefresh != nil {
+		api.postRefresh(freshAccount)
+	}
 
 	return &OAuthRefreshResult{
 		Refreshed:      true,
@@ -423,16 +488,38 @@ func (api *OAuthRefreshAPI) tryRecoverFromRefreshRace(ctx context.Context, usedA
 	if err != nil || reReadAccount == nil {
 		return nil, false
 	}
+	usedVersion := credentialTokenVersion(usedAccount.Credentials)
+	currentVersion := credentialTokenVersion(reReadAccount.Credentials)
+	if currentVersion > usedVersion {
+		return reReadAccount, true
+	}
 	usedRT := usedAccount.GetCredential("refresh_token")
 	currentRT := reReadAccount.GetCredential("refresh_token")
-	if usedRT == "" || currentRT == "" {
-		return nil, false
-	}
-	// refresh_token 不同 → 另一个 worker 已成功刷新
-	if usedRT != currentRT {
+	// Older rows may not have a version. A rotated refresh token remains valid
+	// evidence that another worker won the refresh race.
+	if usedRT != "" && currentRT != "" && usedRT != currentRT {
 		return reReadAccount, true
 	}
 	return nil, false
+}
+
+func credentialTokenVersion(credentials map[string]any) int64 {
+	if credentials == nil {
+		return 0
+	}
+	switch value := credentials["_token_version"].(type) {
+	case int64:
+		return value
+	case int:
+		return int64(value)
+	case float64:
+		return int64(value)
+	case string:
+		version, _ := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+		return version
+	default:
+		return 0
+	}
 }
 
 // MergeCredentials 将旧 credentials 中不存在于新 map 的字段保留到新 map 中

@@ -17,8 +17,8 @@ import (
 // ---------------------------------------------------------------------------
 
 type errSettingRepo struct {
-	mockSettingRepo // embed the existing mock from backup_service_test.go
-	readErr         error
+	mockSettingRepo
+	readErr error
 }
 
 func (r *errSettingRepo) GetValue(_ context.Context, _ string) (string, error) {

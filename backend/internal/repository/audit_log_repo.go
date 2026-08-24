@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
-	"github.com/lib/pq"
 )
 
 // auditLogRepository 审计日志仓储（raw SQL，append-only）。
@@ -70,12 +69,8 @@ func (r *auditLogRepository) BatchInsert(ctx context.Context, logs []*service.Au
 	if err != nil {
 		return 0, err
 	}
-	stmt, err := tx.PrepareContext(ctx, pq.CopyIn(
-		"audit_logs",
-		"created_at", "actor_user_id", "actor_email", "actor_role", "auth_method",
-		"credential_masked", "action", "method", "path", "request_id", "client_ip", "user_agent",
-		"request_body", "status_code", "latency_ms", "extra",
-	))
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO audit_logs (`+auditLogInsertColumns+`)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`)
 	if err != nil {
 		_ = tx.Rollback()
 		return 0, err
@@ -94,11 +89,6 @@ func (r *auditLogRepository) BatchInsert(ctx context.Context, logs []*service.Au
 		inserted++
 	}
 
-	if _, err := stmt.ExecContext(ctx); err != nil {
-		_ = stmt.Close()
-		_ = tx.Rollback()
-		return inserted, err
-	}
 	if err := stmt.Close(); err != nil {
 		_ = tx.Rollback()
 		return inserted, err
@@ -141,7 +131,7 @@ func buildAuditLogsWhere(filter *service.AuditLogFilter) (string, []any) {
 	}
 	if v := strings.TrimSpace(filter.ActorEmail); v != "" {
 		args = append(args, "%"+escapeLikePattern(v)+"%")
-		clauses = append(clauses, "l.actor_email ILIKE $"+itoa(len(args)))
+		clauses = append(clauses, "LOWER(l.actor_email) LIKE LOWER($"+itoa(len(args))+")")
 	}
 	if v := strings.TrimSpace(filter.AuthMethod); v != "" {
 		args = append(args, v)
@@ -149,7 +139,7 @@ func buildAuditLogsWhere(filter *service.AuditLogFilter) (string, []any) {
 	}
 	if v := strings.TrimSpace(filter.Action); v != "" {
 		args = append(args, "%"+escapeLikePattern(v)+"%")
-		clauses = append(clauses, "l.action ILIKE $"+itoa(len(args)))
+		clauses = append(clauses, "LOWER(l.action) LIKE LOWER($"+itoa(len(args))+")")
 	}
 	if v := strings.TrimSpace(filter.Method); v != "" {
 		args = append(args, strings.ToUpper(v))
@@ -169,7 +159,7 @@ func buildAuditLogsWhere(filter *service.AuditLogFilter) (string, []any) {
 	if v := strings.TrimSpace(filter.Query); v != "" {
 		args = append(args, "%"+escapeLikePattern(v)+"%")
 		idx := itoa(len(args))
-		clauses = append(clauses, "(l.path ILIKE $"+idx+" OR l.action ILIKE $"+idx+" OR l.actor_email ILIKE $"+idx+")")
+		clauses = append(clauses, "(LOWER(l.path) LIKE LOWER($"+idx+") OR LOWER(l.action) LIKE LOWER($"+idx+") OR LOWER(l.actor_email) LIKE LOWER($"+idx+"))")
 	}
 
 	return "WHERE " + strings.Join(clauses, " AND "), args
@@ -192,7 +182,7 @@ const auditLogSelectColumns = `
   COALESCE(l.request_body, ''),
   l.status_code,
   l.latency_ms,
-  COALESCE(l.extra::text, '{}')`
+  COALESCE(l.extra, '{}')`
 
 func scanAuditLogRow(scan func(dest ...any) error) (*service.AuditLog, error) {
 	item := &service.AuditLog{}
@@ -325,7 +315,7 @@ func (r *auditLogRepository) TruncateAll(ctx context.Context) error {
 	if r == nil || r.db == nil {
 		return fmt.Errorf("nil audit log repository")
 	}
-	_, err := r.db.ExecContext(ctx, "TRUNCATE TABLE audit_logs")
+	_, err := r.db.ExecContext(ctx, "DELETE FROM audit_logs")
 	return err
 }
 

@@ -71,7 +71,6 @@
             <td class="whitespace-nowrap px-4 py-3 text-right text-sm tabular-nums text-gray-500 dark:text-gray-400">{{ fmtTokens(item.output_tokens) }}</td>
             <td class="whitespace-nowrap px-4 py-3 text-right text-sm tabular-nums text-gray-500 dark:text-gray-400">{{ fmtTokens(item.cache_tokens) }}</td>
             <td class="whitespace-nowrap px-4 py-3 text-right text-sm font-medium tabular-nums text-gray-900 dark:text-gray-100">{{ fmtTokens(item.total_tokens) }}</td>
-            <td class="whitespace-nowrap px-4 py-3 text-right text-sm font-medium tabular-nums text-green-600 dark:text-green-400">${{ fmtCost(item.actual_cost) }}</td>
           </tr>
         </tbody>
       </table>
@@ -83,7 +82,7 @@
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getUserBreakdown, type UserBreakdownParams } from '@/api/admin/dashboard'
-import { formatCompactNumber, formatCostFixed } from '@/utils/format'
+import { formatCompactNumber } from '@/utils/format'
 import type { UserBreakdownItem } from '@/types'
 import Select from '@/components/common/Select.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
@@ -106,7 +105,6 @@ const sortableColumns: { key: SortKey; label: string }[] = [
   { key: 'output_tokens', label: 'admin.usage.tokenRanking.columns.outputTokens' },
   { key: 'cache_tokens', label: 'admin.usage.tokenRanking.columns.cacheTokens' },
   { key: 'total_tokens', label: 'admin.usage.tokenRanking.columns.totalTokens' },
-  { key: 'actual_cost', label: 'admin.usage.tokenRanking.columns.cost' },
 ]
 
 const limitOptions = [
@@ -130,7 +128,6 @@ const limit = ref(50)
 let reqSeq = 0
 
 const fmtTokens = (v: number) => formatCompactNumber(v)
-const fmtCost = (v: number) => formatCostFixed(v, 4)
 
 const setSort = (key: SortKey) => {
   if (sortBy.value === key) return

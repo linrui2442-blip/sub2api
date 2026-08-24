@@ -3,12 +3,37 @@ package service
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 )
+
+type AntigravityInteractiveOAuthReason string
+
+const (
+	AntigravityOAuthReasonFirstAdd        AntigravityInteractiveOAuthReason = "first_add"
+	AntigravityOAuthReasonConfirmedReauth AntigravityInteractiveOAuthReason = "confirmed_reauth"
+	AntigravityOAuthReasonManualForce     AntigravityInteractiveOAuthReason = "manual_force"
+)
+
+func validateAntigravityInteractiveOAuthStart(reason AntigravityInteractiveOAuthReason, accountID *int64) error {
+	switch reason {
+	case AntigravityOAuthReasonFirstAdd:
+		if accountID != nil {
+			return fmt.Errorf("first_add must not target an existing account")
+		}
+	case AntigravityOAuthReasonConfirmedReauth, AntigravityOAuthReasonManualForce:
+		if accountID == nil || *accountID <= 0 {
+			return fmt.Errorf("%s requires an existing account", reason)
+		}
+	default:
+		return fmt.Errorf("unsupported interactive OAuth reason")
+	}
+	return nil
+}
 
 type AntigravityOAuthService struct {
 	sessionStore *antigravity.SessionStore
@@ -30,7 +55,11 @@ type AntigravityAuthURLResult struct {
 }
 
 // GenerateAuthURL 生成 Google OAuth 授权链接
-func (s *AntigravityOAuthService) GenerateAuthURL(ctx context.Context, proxyID *int64) (*AntigravityAuthURLResult, error) {
+func (s *AntigravityOAuthService) GenerateAuthURL(ctx context.Context, proxyID, accountID *int64, reason AntigravityInteractiveOAuthReason) (*AntigravityAuthURLResult, error) {
+	if err := validateAntigravityInteractiveOAuthStart(reason, accountID); err != nil {
+		return nil, err
+	}
+
 	state, err := antigravity.GenerateState()
 	if err != nil {
 		return nil, fmt.Errorf("生成 state 失败: %w", err)
@@ -62,6 +91,17 @@ func (s *AntigravityOAuthService) GenerateAuthURL(ctx context.Context, proxyID *
 	}
 	s.sessionStore.Set(sessionID, session)
 
+	accountIDValue := int64(0)
+	if accountID != nil {
+		accountIDValue = *accountID
+	}
+	slog.Info("interactive_oauth_started",
+		"provider", PlatformAntigravity,
+		"reason", reason,
+		"account_id", accountIDValue,
+		"proxy_configured", proxyID != nil,
+	)
+
 	codeChallenge := antigravity.GenerateCodeChallenge(codeVerifier)
 	authURL := antigravity.BuildAuthorizationURL(state, codeChallenge)
 
@@ -91,6 +131,7 @@ type AntigravityTokenInfo struct {
 	ProjectID        string `json:"project_id,omitempty"`
 	ProjectIDMissing bool   `json:"-"`
 	PlanType         string `json:"-"`
+	PaidTierID       string `json:"-"`
 	PrivacyMode      string `json:"-"`
 }
 
@@ -157,6 +198,7 @@ func (s *AntigravityOAuthService) ExchangeCode(ctx context.Context, input *Antig
 		result.ProjectID = loadResult.ProjectID
 		if loadResult.Subscription != nil {
 			result.PlanType = loadResult.Subscription.PlanType
+			result.PaidTierID = loadResult.Subscription.PaidTierID
 		}
 	}
 
@@ -249,6 +291,7 @@ func (s *AntigravityOAuthService) ValidateRefreshToken(ctx context.Context, refr
 		tokenInfo.ProjectID = loadResult.ProjectID
 		if loadResult.Subscription != nil {
 			tokenInfo.PlanType = loadResult.Subscription.PlanType
+			tokenInfo.PaidTierID = loadResult.Subscription.PaidTierID
 		}
 	}
 
@@ -320,6 +363,7 @@ func (s *AntigravityOAuthService) RefreshAccountToken(ctx context.Context, accou
 		}
 		if loadResult.Subscription != nil {
 			tokenInfo.PlanType = loadResult.Subscription.PlanType
+			tokenInfo.PaidTierID = loadResult.Subscription.PaidTierID
 		}
 	}
 
@@ -476,6 +520,9 @@ func (s *AntigravityOAuthService) BuildAccountCredentials(tokenInfo *Antigravity
 	if tokenInfo.PlanType != "" {
 		creds["plan_type"] = tokenInfo.PlanType
 	}
+	// Always write the key so refresh can clear a formerly paid account instead
+	// of preserving a stale paid tier during credential merging.
+	creds["paid_tier"] = tokenInfo.PaidTierID
 	return creds
 }
 

@@ -19,7 +19,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
-	"github.com/Wei-Shaw/sub2api/internal/platform/liveattestation"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/cespare/xxhash/v2"
 	"github.com/gin-gonic/gin"
@@ -405,33 +404,24 @@ var ErrNoAvailableCompactAccounts = errors.New("no available accounts support /r
 
 // OpenAIGatewayService handles OpenAI API gateway operations
 type OpenAIGatewayService struct {
-	accountRepo           AccountRepository
-	usageLogRepo          UsageLogRepository
-	usageBillingRepo      UsageBillingRepository
-	userRepo              UserRepository
-	userSubRepo           UserSubscriptionRepository
-	cache                 GatewayCache
-	cfg                   *config.Config
-	codexDetector         CodexClientRestrictionDetector
-	schedulerSnapshot     *SchedulerSnapshotService
-	concurrencyService    *ConcurrencyService
-	billingService        *BillingService
-	rateLimitService      *RateLimitService
-	billingCacheService   *BillingCacheService
-	userGroupRateResolver *userGroupRateResolver
-	httpUpstream          HTTPUpstream
-	deferredService       *DeferredService
-	openAITokenProvider   *OpenAITokenProvider
-	grokTokenProvider     *GrokTokenProvider
-	toolCorrector         *CodexToolCorrector
-	openaiWSResolver      OpenAIWSProtocolResolver
-	resolver              *ModelPricingResolver
-	channelService        *ChannelService
-	balanceNotifyService  *BalanceNotifyService
-	settingService        *SettingService
-	userPlatformQuotaRepo UserPlatformQuotaRepository
-	liveAttestation       liveattestation.Provider
-	liveAttestationCipher SecretEncryptor
+	accountRepo          AccountRepository
+	usageLogRepo         UsageLogRepository
+	userRepo             UserRepository
+	cache                GatewayCache
+	cfg                  *config.Config
+	codexDetector        CodexClientRestrictionDetector
+	schedulerSnapshot    *SchedulerSnapshotService
+	concurrencyService   *ConcurrencyService
+	rateLimitService     *RateLimitService
+	httpUpstream         HTTPUpstream
+	deferredService      *DeferredService
+	openAITokenProvider  *OpenAITokenProvider
+	grokTokenProvider    *GrokTokenProvider
+	toolCorrector        *CodexToolCorrector
+	openaiWSResolver     OpenAIWSProtocolResolver
+	channelService       *ChannelService
+	settingService       *SettingService
+	privacyClientFactory PrivacyClientFactory
 
 	openaiWSPoolOnce               sync.Once
 	openaiWSStateStoreOnce         sync.Once
@@ -470,30 +460,30 @@ type OpenAIGatewayService struct {
 	openaiCodexTurnStateWrites  atomic.Uint64
 }
 
+// SetPrivacyClientFactory supplies the impersonated, per-proxy client used to
+// resolve image pointers returned by the ChatGPT OAuth image backend.
+func (s *OpenAIGatewayService) SetPrivacyClientFactory(factory PrivacyClientFactory) {
+	if s != nil {
+		s.privacyClientFactory = factory
+	}
+}
+
 // NewOpenAIGatewayService creates a new OpenAIGatewayService
 func NewOpenAIGatewayService(
 	accountRepo AccountRepository,
 	usageLogRepo UsageLogRepository,
-	usageBillingRepo UsageBillingRepository,
 	userRepo UserRepository,
-	userSubRepo UserSubscriptionRepository,
-	userGroupRateRepo UserGroupRateRepository,
 	cache GatewayCache,
 	cfg *config.Config,
 	schedulerSnapshot *SchedulerSnapshotService,
 	concurrencyService *ConcurrencyService,
-	billingService *BillingService,
 	rateLimitService *RateLimitService,
-	billingCacheService *BillingCacheService,
 	httpUpstream HTTPUpstream,
 	deferredService *DeferredService,
 	openAITokenProvider *OpenAITokenProvider,
 	grokTokenProvider *GrokTokenProvider,
-	resolver *ModelPricingResolver,
 	channelService *ChannelService,
-	balanceNotifyService *BalanceNotifyService,
 	settingService *SettingService,
-	userPlatformQuotaRepo UserPlatformQuotaRepository,
 ) *OpenAIGatewayService {
 	// enforceCodexIdentityHeaders 是 HTTP / 透传 / WS / 探针 等出站路径共用的纯函数收口点，
 	// 拿不到配置，故在此发布进程级开关快照。配置取反义，零值即「强制统一出口开启」。
@@ -501,39 +491,23 @@ func NewOpenAIGatewayService(
 		SetCodexIdentityEnforcementEnabled(!cfg.Gateway.DisableCodexIdentityEnforcement)
 	}
 	svc := &OpenAIGatewayService{
-		accountRepo:         accountRepo,
-		usageLogRepo:        usageLogRepo,
-		usageBillingRepo:    usageBillingRepo,
-		userRepo:            userRepo,
-		userSubRepo:         userSubRepo,
-		cache:               cache,
-		cfg:                 cfg,
-		codexDetector:       NewOpenAICodexClientRestrictionDetector(cfg),
-		schedulerSnapshot:   schedulerSnapshot,
-		concurrencyService:  concurrencyService,
-		billingService:      billingService,
-		rateLimitService:    rateLimitService,
-		billingCacheService: billingCacheService,
-		userGroupRateResolver: newUserGroupRateResolver(
-			userGroupRateRepo,
-			nil,
-			resolveUserGroupRateCacheTTL(cfg),
-			nil,
-			"service.openai_gateway",
-		),
+		accountRepo:           accountRepo,
+		usageLogRepo:          usageLogRepo,
+		userRepo:              userRepo,
+		cache:                 cache,
+		cfg:                   cfg,
+		codexDetector:         NewOpenAICodexClientRestrictionDetector(cfg),
+		schedulerSnapshot:     schedulerSnapshot,
+		concurrencyService:    concurrencyService,
+		rateLimitService:      rateLimitService,
 		httpUpstream:          httpUpstream,
 		deferredService:       deferredService,
 		openAITokenProvider:   openAITokenProvider,
 		grokTokenProvider:     grokTokenProvider,
 		toolCorrector:         NewCodexToolCorrector(),
 		openaiWSResolver:      NewOpenAIWSProtocolResolver(cfg),
-		resolver:              resolver,
 		channelService:        channelService,
-		balanceNotifyService:  balanceNotifyService,
 		settingService:        settingService,
-		userPlatformQuotaRepo: userPlatformQuotaRepo,
-		liveAttestation:       liveattestation.NewProvider(),
-		liveAttestationCipher: newLiveAttestationCipher(cfg),
 		responseHeaderFilter:  compileResponseHeaderFilter(cfg),
 		codexSnapshotThrottle: newAccountWriteThrottle(openAICodexSnapshotPersistMinInterval),
 		openaiModelTransient:  newOpenAIAccountModelTransientState(openAIModelTransientDefaultMax),
@@ -640,18 +614,6 @@ func (s *OpenAIGatewayService) getCodexSnapshotThrottle() *accountWriteThrottle 
 		return s.codexSnapshotThrottle
 	}
 	return defaultOpenAICodexSnapshotPersistThrottle
-}
-
-func (s *OpenAIGatewayService) billingDeps() *billingDeps {
-	return &billingDeps{
-		accountRepo:           s.accountRepo,
-		userRepo:              s.userRepo,
-		userSubRepo:           s.userSubRepo,
-		billingCacheService:   s.billingCacheService,
-		deferredService:       s.deferredService,
-		balanceNotifyService:  s.balanceNotifyService,
-		userPlatformQuotaRepo: s.userPlatformQuotaRepo,
-	}
 }
 
 // CloseOpenAIWSPool 关闭 OpenAI WebSocket 连接池的后台 worker 和空闲连接。

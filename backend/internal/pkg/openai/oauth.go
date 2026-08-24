@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// OpenAI OAuth Constants (from CRS project - Codex CLI client)
+// OpenAI OAuth constants for the official Codex CLI client.
 const (
 	// OAuth Client ID for OpenAI (Codex CLI official)
 	ClientID = "app_EMoamEEZ73f0CkXaXp7hrann"
@@ -27,7 +27,7 @@ const (
 
 	// Scopes
 	DefaultScopes = "openid profile email offline_access"
-	// RefreshScopes - scope for token refresh (without offline_access, aligned with CRS project)
+	// RefreshScopes - scope for token refresh (without offline_access)
 	RefreshScopes = "openid profile email"
 
 	// Session TTL

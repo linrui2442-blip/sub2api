@@ -32,13 +32,6 @@ func TestGrokAPIKeyURLPolicyFollowsGlobalSecurityConfig(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "http://grok.example.test/v1/chat/completions", chatURL)
 
-		mediaURL, err := buildGrokMediaURL(account, cfg, GrokMediaEndpointImagesGenerations, "")
-		require.NoError(t, err)
-		require.Equal(t, "http://grok.example.test/v1/images/generations", mediaURL)
-
-		contentURL, err := buildGrokMediaURL(account, cfg, GrokMediaEndpointVideoContent, "request 123")
-		require.NoError(t, err)
-		require.Equal(t, "http://grok.example.test/v1/videos/request%20123/content", contentURL)
 	})
 
 	t.Run("insecure HTTP disabled", func(t *testing.T) {

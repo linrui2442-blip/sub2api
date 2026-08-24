@@ -22,9 +22,7 @@ func TestDeriveAuditAction(t *testing.T) {
 	}{
 		{"PUT", "/api/v1/admin/accounts/:id", "admin.accounts.update"},
 		{"POST", "/api/v1/admin/accounts", "admin.accounts.create"},
-		{"DELETE", "/api/v1/admin/backups/:id", "admin.backups.delete"},
 		{"GET", "/api/v1/admin/users/:id/api-keys", "admin.users.api_keys.read"},
-		{"POST", "/api/v1/admin/redeem-codes/batch", "admin.redeem_codes.batch.create"},
 	}
 	for _, tc := range cases {
 		if got := deriveAuditAction(tc.method, tc.path); got != tc.want {
@@ -65,7 +63,7 @@ func (r *auditCaptureRepository) DeleteBefore(context.Context, time.Time, int) (
 func TestPromptAuditAdminOperationsUseOmittedBodiesAndAllowlistedDetails(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repository := &auditCaptureRepository{}
-	auditService := service.NewAuditLogService(repository, nil)
+	auditService := service.NewAuditLogService(repository)
 	auditService.Start()
 
 	router := gin.New()
@@ -159,7 +157,7 @@ func TestOllamaCloudUsageSessionRouteOmitsAuditBody(t *testing.T) {
 	require.Contains(t, auditBodyOmittedRoutes, "PUT /api/v1/admin/accounts/:id/ollama-cloud-usage/session")
 
 	repository := &auditCaptureRepository{}
-	auditService := service.NewAuditLogService(repository, nil)
+	auditService := service.NewAuditLogService(repository)
 	auditService.Start()
 
 	router := gin.New()

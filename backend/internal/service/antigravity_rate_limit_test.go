@@ -225,6 +225,21 @@ func TestHandleUpstreamError_429_NonModelRateLimit_UsesMappedModelKey(t *testing
 	require.Equal(t, "claude-opus-4-6-thinking", repo.modelRateLimitCalls[0].modelKey)
 }
 
+func TestHandleUpstreamError_404ScopesUnsupportedToAccountAndModel(t *testing.T) {
+	repo := &stubAntigravityAccountRepo{}
+	svc := &AntigravityGatewayService{accountRepo: repo}
+	account := &Account{ID: 21, Name: "acc-21", Platform: PlatformAntigravity}
+
+	result := svc.handleUpstreamError(context.Background(), "[test]", account, http.StatusNotFound, http.Header{}, []byte(`{"error":{"message":"model not found"}}`), "gemini-3.6-flash", 0, "", false)
+
+	require.Nil(t, result)
+	require.Len(t, repo.modelRateLimitCalls, 1)
+	require.Equal(t, account.ID, repo.modelRateLimitCalls[0].accountID)
+	require.Equal(t, "gemini-3.6-flash", repo.modelRateLimitCalls[0].modelKey)
+	require.Empty(t, repo.rateCalls, "unsupported model must not rate-limit the whole account")
+	require.True(t, svc.shouldFailoverUpstreamError(http.StatusNotFound), "existing failover should try another account")
+}
+
 // TestHandleUpstreamError_503_ModelCapacityExhausted 测试 503 模型容量不足场景
 // MODEL_CAPACITY_EXHAUSTED 时应等待重试，不切换账号
 func TestHandleUpstreamError_503_ModelCapacityExhausted(t *testing.T) {
@@ -1009,20 +1024,31 @@ func TestIsAntigravityAccountSwitchError(t *testing.T) {
 	}
 }
 
-func TestResolveAntigravityForwardBaseURL_DefaultDaily(t *testing.T) {
-	t.Setenv(antigravityForwardBaseURLEnv, "")
+func TestResolveAntigravityForwardBaseURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		override string
+		paidTier string
+		want     string
+	}{
+		{name: "pro tier", paidTier: "g1-pro-tier", want: "https://daily-cloudcode-pa.googleapis.com"},
+		{name: "ultra tier", paidTier: "g1-ultra-tier", want: "https://daily-cloudcode-pa.googleapis.com"},
+		{name: "free tier", paidTier: "free-tier", want: "https://cloudcode-pa.googleapis.com"},
+		{name: "missing paid tier", want: "https://cloudcode-pa.googleapis.com"},
+		{name: "daily override", override: "daily", want: "https://daily-cloudcode-pa.googleapis.com"},
+		{name: "empty override remains tier aware", override: "", paidTier: "g1-pro-tier", want: "https://daily-cloudcode-pa.googleapis.com"},
+	}
 
-	oldBaseURLs := append([]string(nil), antigravity.BaseURLs...)
-	defer func() {
-		antigravity.BaseURLs = oldBaseURLs
-	}()
-
-	prodURL := "https://prod.test"
-	dailyURL := "https://daily.test"
-	antigravity.BaseURLs = []string{dailyURL, prodURL}
-
-	resolved := resolveAntigravityForwardBaseURL()
-	require.Equal(t, dailyURL, resolved)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(antigravityForwardBaseURLEnv, tt.override)
+			account := &Account{Credentials: map[string]any{}}
+			if tt.paidTier != "" {
+				account.Credentials["paid_tier"] = tt.paidTier
+			}
+			require.Equal(t, tt.want, resolveAntigravityForwardBaseURL(account))
+		})
+	}
 }
 
 func TestAntigravityAccountSwitchError_Error(t *testing.T) {

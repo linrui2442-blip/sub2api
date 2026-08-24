@@ -377,7 +377,9 @@ const handleGenerateUrl = async () => {
     const projectId = geminiOAuthType.value === 'code_assist' ? oauthFlowRef.value?.projectId : undefined
     await geminiOAuth.generateAuthUrl(props.account.proxy_id, projectId, geminiOAuthType.value, tierId)
   } else if (isAntigravity.value) {
-    await antigravityOAuth.generateAuthUrl(props.account.proxy_id)
+    const confirmed = window.confirm(t('admin.accounts.oauth.antigravity.forceReauthWarning'))
+    if (!confirmed) return
+    await antigravityOAuth.generateAuthUrl(props.account.proxy_id, 'manual_force', props.account.id)
   } else if (isGrok.value) {
     await grokOAuth.generateAuthUrl(props.account.proxy_id)
   } else {

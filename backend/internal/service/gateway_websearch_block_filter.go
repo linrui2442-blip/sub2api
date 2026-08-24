@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	webSearchToolUseIDPrefix     = "srvtoolu_ws_"
 	blockTypeServerToolUse       = "server_tool_use"
 	blockTypeWebSearchToolResult = "web_search_tool_result"
 )
@@ -28,7 +29,7 @@ var (
 //
 //  1. Emulation-synthesized blocks — server_tool_use / web_search_tool_result
 //     whose tool-use ID carries webSearchToolUseIDPrefix — are fabricated
-//     locally by the web-search emulation (gateway_websearch_emulation.go).
+//     by a provider-native tool call.
 //     No upstream ever issued them, so clients replaying the conversation
 //     (e.g. Claude Code) poison every follow-up request. They are stripped
 //     for all upstreams.

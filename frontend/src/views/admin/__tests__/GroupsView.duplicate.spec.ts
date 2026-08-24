@@ -51,13 +51,6 @@ vi.mock('@/stores/app', () => ({
   useAppStore: () => ({ showSuccess, showError })
 }))
 
-vi.mock('@/stores/onboarding', () => ({
-  useOnboardingStore: () => ({
-    isCurrentStep: vi.fn(() => false),
-    nextStep: vi.fn()
-  })
-}))
-
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
   return {
@@ -71,33 +64,6 @@ const sourceGroup: AdminGroup = {
   name: 'Primary',
   description: null,
   platform: 'openai',
-  rate_multiplier: 1,
-  rpm_limit: 0,
-  is_exclusive: false,
-  status: 'active',
-  subscription_type: 'standard',
-  daily_limit_usd: null,
-  weekly_limit_usd: null,
-  monthly_limit_usd: null,
-  allow_image_generation: false,
-  allow_batch_image_generation: false,
-  image_rate_independent: false,
-  image_rate_multiplier: 1,
-  batch_image_discount_multiplier: 0.5,
-  batch_image_hold_multiplier: 0.6,
-  image_price_1k: null,
-  image_price_2k: null,
-  image_price_4k: null,
-  video_rate_independent: false,
-  video_rate_multiplier: 1,
-  video_price_480p: null,
-  video_price_720p: null,
-  video_price_1080p: null,
-  web_search_price_per_call: null,
-  peak_rate_enabled: false,
-  peak_start: '',
-  peak_end: '',
-  peak_rate_multiplier: 1,
   claude_code_only: false,
   fallback_group_id: null,
   fallback_group_id_on_invalid_request: null,
@@ -151,8 +117,6 @@ function mountView() {
         PlatformIcon: true,
         Icon: true,
         GroupCapacityBadge: true,
-        GroupRateMultipliersModal: true,
-        GroupRPMOverridesModal: true,
         VueDraggable: true
       }
     }

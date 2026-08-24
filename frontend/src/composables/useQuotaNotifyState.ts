@@ -1,5 +1,4 @@
 import { reactive, ref } from 'vue'
-import { adminAPI } from '@/api/admin'
 import { QUOTA_THRESHOLD_TYPE_FIXED, type QuotaThresholdType } from '@/constants/account'
 
 export const QUOTA_NOTIFY_DIMS = ['daily', 'weekly', 'total'] as const
@@ -20,14 +19,10 @@ export function useQuotaNotifyState() {
   })
 
   function loadGlobalState() {
-    adminAPI.settings
-      .getSettings()
-      .then((settings) => {
-        globalEnabled.value = settings.account_quota_notify_enabled === true
-      })
-      .catch(() => {
-        globalEnabled.value = false
-      })
+    // Personal Edition has no SaaS-wide notification dispatcher/settings API.
+    // Account quota remains visible in local health/usage views, while the
+    // legacy global notification switch is deliberately disabled.
+    globalEnabled.value = false
   }
 
   function loadFromExtra(extra: Record<string, unknown> | null | undefined) {

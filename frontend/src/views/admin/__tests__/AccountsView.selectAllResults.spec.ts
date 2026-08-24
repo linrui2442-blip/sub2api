@@ -116,7 +116,6 @@ const mountView = () => mount(AccountsView, {
       AccountTestModal: true,
       AccountStatsModal: true,
       ScheduledTestsPanel: true,
-      SyncFromCrsModal: true,
       TempUnschedStatusModal: true,
       ErrorPassthroughRulesModal: true,
       TLSFingerprintProfilesModal: true,

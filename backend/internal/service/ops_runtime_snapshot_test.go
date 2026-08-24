@@ -64,7 +64,7 @@ func waitForOpsRefresh(t *testing.T, timeout time.Duration, condition func() boo
 func TestOpsRuntimeSettingsSnapshotLoadsOnceAndServesHotPath(t *testing.T) {
 	repo := newRuntimeSettingRepoStub()
 	repo.values[SettingKeyOpsMonitoringEnabled] = "false"
-	repo.values[SettingKeyOpsAdvancedSettings] = `{"ignore_context_canceled":false,"auto_refresh_interval_seconds":45}`
+	repo.values[SettingKeyOpsAdvancedSettings] = `{"ignore_context_canceled":false}`
 
 	svc := &OpsService{settingRepo: repo}
 	svc.initRuntimeSettings(context.Background())
@@ -80,8 +80,8 @@ func TestOpsRuntimeSettingsSnapshotLoadsOnceAndServesHotPath(t *testing.T) {
 		if err != nil {
 			t.Fatalf("GetOpsAdvancedSettings() error = %v", err)
 		}
-		if cfg.AutoRefreshIntervalSec != 45 {
-			t.Fatalf("AutoRefreshIntervalSec = %d, want 45", cfg.AutoRefreshIntervalSec)
+		if cfg.IgnoreContextCanceled {
+			t.Fatal("IgnoreContextCanceled = true, want false")
 		}
 	}
 	if repo.getValueCalls != 0 || repo.getMultipleCalls != 1 {

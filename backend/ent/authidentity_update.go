@@ -12,8 +12,6 @@ import (
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
-	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
-	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 )
@@ -144,36 +142,6 @@ func (_u *AuthIdentityUpdate) SetUser(v *User) *AuthIdentityUpdate {
 	return _u.SetUserID(v.ID)
 }
 
-// AddChannelIDs adds the "channels" edge to the AuthIdentityChannel entity by IDs.
-func (_u *AuthIdentityUpdate) AddChannelIDs(ids ...int64) *AuthIdentityUpdate {
-	_u.mutation.AddChannelIDs(ids...)
-	return _u
-}
-
-// AddChannels adds the "channels" edges to the AuthIdentityChannel entity.
-func (_u *AuthIdentityUpdate) AddChannels(v ...*AuthIdentityChannel) *AuthIdentityUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddChannelIDs(ids...)
-}
-
-// AddAdoptionDecisionIDs adds the "adoption_decisions" edge to the IdentityAdoptionDecision entity by IDs.
-func (_u *AuthIdentityUpdate) AddAdoptionDecisionIDs(ids ...int64) *AuthIdentityUpdate {
-	_u.mutation.AddAdoptionDecisionIDs(ids...)
-	return _u
-}
-
-// AddAdoptionDecisions adds the "adoption_decisions" edges to the IdentityAdoptionDecision entity.
-func (_u *AuthIdentityUpdate) AddAdoptionDecisions(v ...*IdentityAdoptionDecision) *AuthIdentityUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddAdoptionDecisionIDs(ids...)
-}
-
 // Mutation returns the AuthIdentityMutation object of the builder.
 func (_u *AuthIdentityUpdate) Mutation() *AuthIdentityMutation {
 	return _u.mutation
@@ -183,48 +151,6 @@ func (_u *AuthIdentityUpdate) Mutation() *AuthIdentityMutation {
 func (_u *AuthIdentityUpdate) ClearUser() *AuthIdentityUpdate {
 	_u.mutation.ClearUser()
 	return _u
-}
-
-// ClearChannels clears all "channels" edges to the AuthIdentityChannel entity.
-func (_u *AuthIdentityUpdate) ClearChannels() *AuthIdentityUpdate {
-	_u.mutation.ClearChannels()
-	return _u
-}
-
-// RemoveChannelIDs removes the "channels" edge to AuthIdentityChannel entities by IDs.
-func (_u *AuthIdentityUpdate) RemoveChannelIDs(ids ...int64) *AuthIdentityUpdate {
-	_u.mutation.RemoveChannelIDs(ids...)
-	return _u
-}
-
-// RemoveChannels removes "channels" edges to AuthIdentityChannel entities.
-func (_u *AuthIdentityUpdate) RemoveChannels(v ...*AuthIdentityChannel) *AuthIdentityUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveChannelIDs(ids...)
-}
-
-// ClearAdoptionDecisions clears all "adoption_decisions" edges to the IdentityAdoptionDecision entity.
-func (_u *AuthIdentityUpdate) ClearAdoptionDecisions() *AuthIdentityUpdate {
-	_u.mutation.ClearAdoptionDecisions()
-	return _u
-}
-
-// RemoveAdoptionDecisionIDs removes the "adoption_decisions" edge to IdentityAdoptionDecision entities by IDs.
-func (_u *AuthIdentityUpdate) RemoveAdoptionDecisionIDs(ids ...int64) *AuthIdentityUpdate {
-	_u.mutation.RemoveAdoptionDecisionIDs(ids...)
-	return _u
-}
-
-// RemoveAdoptionDecisions removes "adoption_decisions" edges to IdentityAdoptionDecision entities.
-func (_u *AuthIdentityUpdate) RemoveAdoptionDecisions(v ...*IdentityAdoptionDecision) *AuthIdentityUpdate {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveAdoptionDecisionIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -347,96 +273,6 @@ func (_u *AuthIdentityUpdate) sqlSave(ctx context.Context) (_node int, err error
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.ChannelsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   authidentity.ChannelsTable,
-			Columns: []string{authidentity.ChannelsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(authidentitychannel.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedChannelsIDs(); len(nodes) > 0 && !_u.mutation.ChannelsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   authidentity.ChannelsTable,
-			Columns: []string{authidentity.ChannelsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(authidentitychannel.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.ChannelsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   authidentity.ChannelsTable,
-			Columns: []string{authidentity.ChannelsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(authidentitychannel.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.AdoptionDecisionsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   authidentity.AdoptionDecisionsTable,
-			Columns: []string{authidentity.AdoptionDecisionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(identityadoptiondecision.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedAdoptionDecisionsIDs(); len(nodes) > 0 && !_u.mutation.AdoptionDecisionsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   authidentity.AdoptionDecisionsTable,
-			Columns: []string{authidentity.AdoptionDecisionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(identityadoptiondecision.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.AdoptionDecisionsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   authidentity.AdoptionDecisionsTable,
-			Columns: []string{authidentity.AdoptionDecisionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(identityadoptiondecision.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {
@@ -577,36 +413,6 @@ func (_u *AuthIdentityUpdateOne) SetUser(v *User) *AuthIdentityUpdateOne {
 	return _u.SetUserID(v.ID)
 }
 
-// AddChannelIDs adds the "channels" edge to the AuthIdentityChannel entity by IDs.
-func (_u *AuthIdentityUpdateOne) AddChannelIDs(ids ...int64) *AuthIdentityUpdateOne {
-	_u.mutation.AddChannelIDs(ids...)
-	return _u
-}
-
-// AddChannels adds the "channels" edges to the AuthIdentityChannel entity.
-func (_u *AuthIdentityUpdateOne) AddChannels(v ...*AuthIdentityChannel) *AuthIdentityUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddChannelIDs(ids...)
-}
-
-// AddAdoptionDecisionIDs adds the "adoption_decisions" edge to the IdentityAdoptionDecision entity by IDs.
-func (_u *AuthIdentityUpdateOne) AddAdoptionDecisionIDs(ids ...int64) *AuthIdentityUpdateOne {
-	_u.mutation.AddAdoptionDecisionIDs(ids...)
-	return _u
-}
-
-// AddAdoptionDecisions adds the "adoption_decisions" edges to the IdentityAdoptionDecision entity.
-func (_u *AuthIdentityUpdateOne) AddAdoptionDecisions(v ...*IdentityAdoptionDecision) *AuthIdentityUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddAdoptionDecisionIDs(ids...)
-}
-
 // Mutation returns the AuthIdentityMutation object of the builder.
 func (_u *AuthIdentityUpdateOne) Mutation() *AuthIdentityMutation {
 	return _u.mutation
@@ -616,48 +422,6 @@ func (_u *AuthIdentityUpdateOne) Mutation() *AuthIdentityMutation {
 func (_u *AuthIdentityUpdateOne) ClearUser() *AuthIdentityUpdateOne {
 	_u.mutation.ClearUser()
 	return _u
-}
-
-// ClearChannels clears all "channels" edges to the AuthIdentityChannel entity.
-func (_u *AuthIdentityUpdateOne) ClearChannels() *AuthIdentityUpdateOne {
-	_u.mutation.ClearChannels()
-	return _u
-}
-
-// RemoveChannelIDs removes the "channels" edge to AuthIdentityChannel entities by IDs.
-func (_u *AuthIdentityUpdateOne) RemoveChannelIDs(ids ...int64) *AuthIdentityUpdateOne {
-	_u.mutation.RemoveChannelIDs(ids...)
-	return _u
-}
-
-// RemoveChannels removes "channels" edges to AuthIdentityChannel entities.
-func (_u *AuthIdentityUpdateOne) RemoveChannels(v ...*AuthIdentityChannel) *AuthIdentityUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveChannelIDs(ids...)
-}
-
-// ClearAdoptionDecisions clears all "adoption_decisions" edges to the IdentityAdoptionDecision entity.
-func (_u *AuthIdentityUpdateOne) ClearAdoptionDecisions() *AuthIdentityUpdateOne {
-	_u.mutation.ClearAdoptionDecisions()
-	return _u
-}
-
-// RemoveAdoptionDecisionIDs removes the "adoption_decisions" edge to IdentityAdoptionDecision entities by IDs.
-func (_u *AuthIdentityUpdateOne) RemoveAdoptionDecisionIDs(ids ...int64) *AuthIdentityUpdateOne {
-	_u.mutation.RemoveAdoptionDecisionIDs(ids...)
-	return _u
-}
-
-// RemoveAdoptionDecisions removes "adoption_decisions" edges to IdentityAdoptionDecision entities.
-func (_u *AuthIdentityUpdateOne) RemoveAdoptionDecisions(v ...*IdentityAdoptionDecision) *AuthIdentityUpdateOne {
-	ids := make([]int64, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveAdoptionDecisionIDs(ids...)
 }
 
 // Where appends a list predicates to the AuthIdentityUpdate builder.
@@ -810,96 +574,6 @@ func (_u *AuthIdentityUpdateOne) sqlSave(ctx context.Context) (_node *AuthIdenti
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.ChannelsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   authidentity.ChannelsTable,
-			Columns: []string{authidentity.ChannelsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(authidentitychannel.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedChannelsIDs(); len(nodes) > 0 && !_u.mutation.ChannelsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   authidentity.ChannelsTable,
-			Columns: []string{authidentity.ChannelsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(authidentitychannel.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.ChannelsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   authidentity.ChannelsTable,
-			Columns: []string{authidentity.ChannelsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(authidentitychannel.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.AdoptionDecisionsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   authidentity.AdoptionDecisionsTable,
-			Columns: []string{authidentity.AdoptionDecisionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(identityadoptiondecision.FieldID, field.TypeInt64),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedAdoptionDecisionsIDs(); len(nodes) > 0 && !_u.mutation.AdoptionDecisionsCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   authidentity.AdoptionDecisionsTable,
-			Columns: []string{authidentity.AdoptionDecisionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(identityadoptiondecision.FieldID, field.TypeInt64),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.AdoptionDecisionsIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: false,
-			Table:   authidentity.AdoptionDecisionsTable,
-			Columns: []string{authidentity.AdoptionDecisionsColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(identityadoptiondecision.FieldID, field.TypeInt64),
 			},
 		}
 		for _, k := range nodes {

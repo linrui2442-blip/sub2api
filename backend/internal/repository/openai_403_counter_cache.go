@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/redis/go-redis/v9"
 )
@@ -27,6 +28,9 @@ type openAI403CounterCache struct {
 }
 
 func NewOpenAI403CounterCache(rdb *redis.Client) service.OpenAI403CounterCache {
+	if personal.Enabled() {
+		return newPersonalAccountCounterCache()
+	}
 	return &openAI403CounterCache{rdb: rdb}
 }
 

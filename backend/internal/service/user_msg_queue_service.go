@@ -56,7 +56,7 @@ func NewUserMessageQueueService(cache UserMsgQueueCache, rpmCache RPMCache, cfg 
 }
 
 // IsRealUserMessage 检测是否为真实用户消息（非 tool_result）
-// 与 claude-relay-service 的检测逻辑一致：
+// 检测规则：
 // 1. messages 非空
 // 2. 最后一条消息 role == "user"
 // 3. 最后一条消息 content（如果是数组）中不含 type:"tool_result" / "tool_use_result"

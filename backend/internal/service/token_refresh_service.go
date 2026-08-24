@@ -35,7 +35,14 @@ const (
 	defaultTokenRefreshCycleTimeout             = 4 * time.Minute
 	maxTokenRefreshCycleTimeout                 = time.Hour
 	defaultTokenRefreshCleanupTimeout           = 2 * time.Second
+	antigravityBackgroundBackoffInitial         = 30 * time.Second
+	antigravityBackgroundBackoffMax             = 5 * time.Minute
 )
+
+type antigravityBackgroundBackoffState struct {
+	failures int
+	retryAt  time.Time
+}
 
 type tokenRefreshRegistration struct {
 	platform  string
@@ -80,6 +87,9 @@ type TokenRefreshService struct {
 	providerMu    sync.Mutex
 	providerGates map[string]*tokenRefreshRateGate
 	providerPools map[string]*tokenRefreshConcurrencyGate
+
+	antigravityBackoffMu sync.Mutex
+	antigravityBackoffs  map[int64]antigravityBackgroundBackoffState
 
 	// Test-only duration seam; production uses TokenRefreshConfig seconds.
 	attemptTimeoutOverride time.Duration
@@ -616,6 +626,10 @@ func (s *TokenRefreshService) processCandidatePage(
 			continue
 		}
 		stats.oauth++
+		if account.Platform == PlatformAntigravity && !s.antigravityBackgroundRetryReady(account.ID, time.Now()) {
+			stats.skipped++
+			continue
+		}
 		if !state.registration.refresher.NeedsRefresh(account, refreshWindow) {
 			continue
 		}
@@ -698,16 +712,60 @@ func (s *TokenRefreshService) processProviderAccounts(
 	for result := range results {
 		switch {
 		case result.err == nil:
+			if state.registration.platform == PlatformAntigravity {
+				s.resetAntigravityBackgroundBackoff(result.accountID)
+			}
 			refreshed++
 			slog.Info("token_refresh.account_refreshed", "account_id", result.accountID, "platform", state.registration.platform)
 		case errors.Is(result.err, errRefreshSkipped):
 			skipped++
 		default:
+			if state.registration.platform == PlatformAntigravity {
+				if class, ok := antigravityFailureClass(result.err); ok && class == antigravityAuthFailureTransient {
+					delay := s.recordAntigravityBackgroundTransientFailure(result.accountID, time.Now())
+					slog.Warn("antigravity.refresh_transient_failure",
+						"account_id", result.accountID,
+						"retry_in", delay,
+					)
+				}
+			}
 			failed++
 			slog.Warn("token_refresh.account_refresh_failed", "account_id", result.accountID, "platform", state.registration.platform, "error", logredact.RedactText(result.err.Error()))
 		}
 	}
 	return refreshed, skipped, failed
+}
+
+func (s *TokenRefreshService) antigravityBackgroundRetryReady(accountID int64, now time.Time) bool {
+	s.antigravityBackoffMu.Lock()
+	defer s.antigravityBackoffMu.Unlock()
+	state, ok := s.antigravityBackoffs[accountID]
+	return !ok || !now.Before(state.retryAt)
+}
+
+func (s *TokenRefreshService) recordAntigravityBackgroundTransientFailure(accountID int64, now time.Time) time.Duration {
+	s.antigravityBackoffMu.Lock()
+	defer s.antigravityBackoffMu.Unlock()
+	if s.antigravityBackoffs == nil {
+		s.antigravityBackoffs = make(map[int64]antigravityBackgroundBackoffState)
+	}
+	state := s.antigravityBackoffs[accountID]
+	state.failures++
+	shift := min(state.failures-1, 4)
+	base := min(antigravityBackgroundBackoffInitial*time.Duration(1<<shift), antigravityBackgroundBackoffMax)
+	// Stable 80-120% jitter avoids synchronized retries while remaining
+	// deterministic for a given account and failure number.
+	jitterPercent := int64(80) + (accountID+int64(state.failures*29))%41
+	delay := min(base*time.Duration(jitterPercent)/100, antigravityBackgroundBackoffMax)
+	state.retryAt = now.Add(delay)
+	s.antigravityBackoffs[accountID] = state
+	return delay
+}
+
+func (s *TokenRefreshService) resetAntigravityBackgroundBackoff(accountID int64) {
+	s.antigravityBackoffMu.Lock()
+	delete(s.antigravityBackoffs, accountID)
+	s.antigravityBackoffMu.Unlock()
 }
 
 func (s *TokenRefreshService) candidatePageSize() int {
@@ -974,6 +1032,21 @@ func (s *TokenRefreshService) refreshWithRetryWithRateGate(
 			// possible WAF or shared provider failure.
 			return &providerCycleContainmentRefreshError{err: err}
 		}
+		if account.Platform == PlatformAntigravity {
+			if class, ok := antigravityFailureClass(err); ok {
+				switch class {
+				case antigravityAuthFailureProviderConfig, antigravityAuthFailurePolicyBlocked:
+					return &providerConfigurationRefreshError{err: err}
+				case antigravityAuthFailureReauthRequired:
+					// The unified refresh API already re-read durable credentials and
+					// attempted race recovery. Only this final class may permanently
+					// block an Antigravity OAuth account below.
+				case antigravityAuthFailureAccessTokenRejected, antigravityAuthFailureTransient:
+					// Continue through the normal retry/cooldown path. Neither class
+					// is durable evidence that OAuth authorization was revoked.
+				}
+			}
+		}
 
 		// Provider-wide OAuth client/scope failures are not evidence that every
 		// account is invalid. Return a typed internal signal so the cycle contains
@@ -1071,6 +1144,15 @@ func (s *TokenRefreshService) refreshWithRetryWithRateGate(
 	}
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if account.Platform == PlatformAntigravity {
+		if class, ok := antigravityFailureClass(lastErr); ok && class == antigravityAuthFailureTransient {
+			// Antigravity background retries use a short per-account backoff in
+			// processProviderAccounts. Do not publish the generic ten-minute
+			// scheduling quarantine: request-path emergency refresh must remain
+			// available while Google or the network recovers.
+			return lastErr
+		}
 	}
 
 	// 可重试错误耗尽：临时标记账号不可调度，避免请求路径反复命中已知失败的账号

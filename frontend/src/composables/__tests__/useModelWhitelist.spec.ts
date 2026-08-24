@@ -28,6 +28,16 @@ describe('useModelWhitelist', () => {
     expect(models).not.toContain('gpt-5.2-codex')
   })
 
+  it('openai OAuth 默认候选列表不再暴露 GPT-5.2 plan-gated 或弃用模型', () => {
+    const models = getModelsByPlatform('openai')
+
+    expect(models).not.toContain('gpt-5.2')
+    expect(models).not.toContain('gpt-5.2-2025-12-11')
+    expect(models).not.toContain('gpt-5.2-chat-latest')
+    expect(models).not.toContain('gpt-5.2-pro')
+    expect(models).not.toContain('gpt-5.2-pro-2025-12-11')
+  })
+
   it('antigravity 模型列表包含图片模型兼容项', () => {
     const models = getModelsByPlatform('antigravity')
 

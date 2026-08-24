@@ -1,6 +1,6 @@
 /**
  * 格式化工具函数
- * 参考 CRS 项目的 format.js 实现
+ * 前端通用格式化实现
  */
 
 import { i18n, getLocale } from '@/i18n'

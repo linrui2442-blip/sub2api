@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func ptrTime(value time.Time) *time.Time { return &value }
+
 type inMemoryIdempotencyRepo struct {
 	mu     sync.Mutex
 	nextID int64

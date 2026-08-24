@@ -14,8 +14,6 @@ const {
   listAccounts,
   showError,
   showSuccess,
-  isCurrentStep,
-  nextStep,
 } = vi.hoisted(() => ({
   listGroups: vi.fn(),
   getAllGroups: vi.fn(),
@@ -26,8 +24,6 @@ const {
   listAccounts: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
-  isCurrentStep: vi.fn(),
-  nextStep: vi.fn(),
 }))
 
 const messages: Record<string, string> = {
@@ -35,8 +31,6 @@ const messages: Record<string, string> = {
   'admin.groups.columns.name': 'Name',
   'admin.groups.columns.id': 'ID',
   'admin.groups.columns.platform': 'Platform',
-  'admin.groups.columns.billingType': 'Billing Type',
-  'admin.groups.columns.rateMultiplier': 'Rate Multiplier',
   'admin.groups.columns.type': 'Type',
   'admin.groups.columns.accounts': 'Accounts',
   'admin.groups.columns.capacity': 'Capacity',
@@ -75,13 +69,6 @@ vi.mock('@/stores/app', () => ({
   }),
 }))
 
-vi.mock('@/stores/onboarding', () => ({
-  useOnboardingStore: () => ({
-    isCurrentStep,
-    nextStep,
-  }),
-}))
-
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
   return {
@@ -97,20 +84,6 @@ const createGroup = (overrides: Partial<AdminGroup> = {}): AdminGroup => ({
   name: 'Core Anthropic',
   description: null,
   platform: 'anthropic',
-  rate_multiplier: 1,
-  rpm_limit: 0,
-  is_exclusive: false,
-  status: 'active',
-  subscription_type: 'standard',
-  daily_limit_usd: null,
-  weekly_limit_usd: null,
-  monthly_limit_usd: null,
-  allow_image_generation: false,
-  image_rate_independent: false,
-  image_rate_multiplier: 1,
-  image_price_1k: null,
-  image_price_2k: null,
-  image_price_4k: null,
   claude_code_only: false,
   fallback_group_id: null,
   fallback_group_id_on_invalid_request: null,
@@ -201,8 +174,6 @@ const mountView = async () => {
         PlatformIcon: true,
         Icon: IconStub,
         GroupCapacityBadge: true,
-        GroupRateMultipliersModal: true,
-        GroupRPMOverridesModal: true,
         VueDraggable: { template: '<div><slot /></div>' },
       },
     },
@@ -239,8 +210,6 @@ describe('admin GroupsView column settings', () => {
     listAccounts.mockReset()
     showError.mockReset()
     showSuccess.mockReset()
-    isCurrentStep.mockReset()
-    nextStep.mockReset()
 
     listGroups.mockResolvedValue({
       items: [createGroup()],
@@ -255,7 +224,6 @@ describe('admin GroupsView column settings', () => {
     getCapacitySummary.mockResolvedValue([])
     getLiveCapability.mockResolvedValue({ supported: false })
     listAccounts.mockResolvedValue({ items: [], total: 0, page: 1, page_size: 20, pages: 0 })
-    isCurrentStep.mockReturnValue(false)
   })
 
   afterEach(() => {
@@ -268,8 +236,6 @@ describe('admin GroupsView column settings', () => {
     expect(columnKeys(wrapper)).toEqual([
       'name',
       'platform',
-      'billing_type',
-      'rate_multiplier',
       'is_exclusive',
       'account_count',
       'capacity',
@@ -294,8 +260,6 @@ describe('admin GroupsView column settings', () => {
       'name',
       'id',
       'platform',
-      'billing_type',
-      'rate_multiplier',
       'is_exclusive',
       'account_count',
       'status',
@@ -312,8 +276,6 @@ describe('admin GroupsView column settings', () => {
     expect(columnKeys(wrapper)).toEqual([
       'name',
       'platform',
-      'billing_type',
-      'rate_multiplier',
       'is_exclusive',
       'account_count',
       'capacity',
@@ -335,8 +297,6 @@ describe('admin GroupsView column settings', () => {
     expect(columnKeys(wrapper)).toEqual([
       'name',
       'platform',
-      'billing_type',
-      'rate_multiplier',
       'is_exclusive',
       'account_count',
       'capacity',
@@ -358,8 +318,6 @@ describe('admin GroupsView column settings', () => {
       'name',
       'id',
       'platform',
-      'billing_type',
-      'rate_multiplier',
       'is_exclusive',
       'account_count',
       'capacity',
@@ -373,8 +331,9 @@ describe('admin GroupsView column settings', () => {
   it('skips usage and capacity fetches until consuming columns are shown', async () => {
     localStorage.setItem(
       'group-hidden-columns',
-      JSON.stringify(['billing_type', 'usage', 'capacity']),
+      JSON.stringify(['usage', 'capacity']),
     )
+    localStorage.setItem('group-column-settings-version', '2')
 
     const wrapper = await mountView()
 
@@ -394,15 +353,15 @@ describe('admin GroupsView column settings', () => {
 
   it('renders yesterday usage between today and total', async () => {
     getUsageSummary.mockResolvedValue([
-      { group_id: 1, today_cost: 1.25, yesterday_cost: 2.5, total_cost: 9.75 },
+      { group_id: 1, today_requests: 1, today_tokens: 125, yesterday_requests: 2, yesterday_tokens: 250, total_requests: 9, total_tokens: 975 },
     ])
 
     const wrapper = await mountView()
     const text = wrapper.get('[data-test="usage-cell"]').text()
 
-    expect(text).toContain('Today$1.25')
-    expect(text).toContain('Yesterday$2.50')
-    expect(text).toContain('Total$9.75')
+    expect(text).toContain('Today1 req / 125 tok')
+    expect(text).toContain('Yesterday2 req / 250 tok')
+    expect(text).toContain('Total9 req / 975 tok')
     expect(text.indexOf('Today')).toBeLessThan(text.indexOf('Yesterday'))
     expect(text.indexOf('Yesterday')).toBeLessThan(text.indexOf('Total'))
   })

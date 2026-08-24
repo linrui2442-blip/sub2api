@@ -3,10 +3,8 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
@@ -16,11 +14,9 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/internal/service"
-	"github.com/lib/pq"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 
-	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
 )
 
@@ -152,13 +148,7 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				user.FieldUsername,
 				user.FieldStatus,
 				user.FieldRole,
-				user.FieldBalance,
 				user.FieldConcurrency,
-				user.FieldBalanceNotifyEnabled,
-				user.FieldBalanceNotifyThresholdType,
-				user.FieldBalanceNotifyThreshold,
-				user.FieldBalanceNotifyExtraEmails,
-				user.FieldTotalRecharged,
 				user.FieldSignupSource,
 				user.FieldLastLoginAt,
 				user.FieldLastActiveAt,
@@ -175,31 +165,6 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				group.FieldPlatform,
 				group.FieldIsExclusive,
 				group.FieldStatus,
-				group.FieldSubscriptionType,
-				group.FieldRateMultiplier,
-				group.FieldDailyLimitUsd,
-				group.FieldWeeklyLimitUsd,
-				group.FieldMonthlyLimitUsd,
-				group.FieldAllowImageGeneration,
-				group.FieldAllowBatchImageGeneration,
-				group.FieldImageRateIndependent,
-				group.FieldImageRateMultiplier,
-				group.FieldImagePrice1k,
-				group.FieldImagePrice2k,
-				group.FieldImagePrice4k,
-				group.FieldVideoRateIndependent,
-				group.FieldVideoRateMultiplier,
-				group.FieldVideoPrice480p,
-				group.FieldVideoPrice720p,
-				group.FieldVideoPrice1080p,
-				group.FieldVideoModelPrices,
-				group.FieldWebSearchPricePerCall,
-				group.FieldSearchPricePer1k,
-				group.FieldAudioRealtimePricePerMin,
-				group.FieldAudioTtsPricePerMillionChars,
-				group.FieldAudioSttPricePerHour,
-				group.FieldLongContextPricingEnabled,
-				group.FieldModelPricing,
 				group.FieldClaudeCodeOnly,
 				group.FieldFallbackGroupID,
 				group.FieldFallbackGroupIDOnInvalidRequest,
@@ -215,16 +180,6 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				group.FieldRpmLimit,
 				group.FieldMaxReasoningEffort,
 				group.FieldReasoningEffortMappings,
-				group.FieldPeakRateEnabled,
-				group.FieldPeakStart,
-				group.FieldPeakEnd,
-				group.FieldPeakRateMultiplier,
-				// 分组利润控制：认证快照是调度门 enable 判定的直接来源，
-				// 漏选会让门静默失效；新增快照分组字段时必须同步本投影，
-				// 集成测试对账兜底。
-				group.FieldProfitControlEnabled,
-				group.FieldProfitMinMargin,
-				group.FieldProfitSafetyBuffer,
 			)
 		}).
 		Only(ctx)
@@ -554,23 +509,7 @@ func (r *apiKeyRepository) latestUsageLogIPs(ctx context.Context, apiKeyIDs []in
 	return out, nil
 }
 
-func latestUsageLogIPsQuery(apiKeyIDs []int64, dialectName string) (string, []any) {
-	if dialectName == dialect.Postgres {
-		// Keep each key lookup bounded to one ordered index probe instead of ranking its full history.
-		return `
-		SELECT requested.api_key_id, latest.ip_address
-		FROM unnest($1::bigint[]) AS requested(api_key_id)
-		CROSS JOIN LATERAL (
-			SELECT ul.ip_address
-			FROM usage_logs AS ul
-			WHERE ul.api_key_id = requested.api_key_id
-				AND ul.ip_address IS NOT NULL
-				AND ul.ip_address <> ''
-			ORDER BY ul.created_at DESC, ul.id DESC
-			LIMIT 1
-		) AS latest`, []any{pq.Array(apiKeyIDs)}
-	}
-
+func latestUsageLogIPsQuery(apiKeyIDs []int64, _ string) (string, []any) {
 	placeholders := make([]string, len(apiKeyIDs))
 	args := make([]any, len(apiKeyIDs))
 	for i, id := range apiKeyIDs {
@@ -914,34 +853,24 @@ func userEntityToService(u *dbent.User) *service.User {
 		return nil
 	}
 	out := &service.User{
-		ID:                         u.ID,
-		Email:                      u.Email,
-		Username:                   u.Username,
-		Notes:                      u.Notes,
-		PasswordHash:               u.PasswordHash,
-		Role:                       u.Role,
-		Balance:                    u.Balance,
-		FrozenBalance:              u.FrozenBalance,
-		Concurrency:                u.Concurrency,
-		Status:                     u.Status,
-		SignupSource:               u.SignupSource,
-		LastLoginAt:                u.LastLoginAt,
-		LastActiveAt:               u.LastActiveAt,
-		TotpSecretEncrypted:        u.TotpSecretEncrypted,
-		TotpEnabled:                u.TotpEnabled,
-		TotpEnabledAt:              u.TotpEnabledAt,
-		BalanceNotifyEnabled:       u.BalanceNotifyEnabled,
-		BalanceNotifyThresholdType: u.BalanceNotifyThresholdType,
-		BalanceNotifyThreshold:     u.BalanceNotifyThreshold,
-		TotalRecharged:             u.TotalRecharged,
-		RPMLimit:                   u.RpmLimit,
-		CreatedAt:                  u.CreatedAt,
-		UpdatedAt:                  u.UpdatedAt,
-		DeletedAt:                  u.DeletedAt,
-	}
-	// Parse extra emails JSON (supports both old []string and new []NotifyEmailEntry format)
-	if u.BalanceNotifyExtraEmails != "" && u.BalanceNotifyExtraEmails != "[]" {
-		out.BalanceNotifyExtraEmails = service.ParseNotifyEmails(u.BalanceNotifyExtraEmails)
+		ID:                  u.ID,
+		Email:               u.Email,
+		Username:            u.Username,
+		Notes:               u.Notes,
+		PasswordHash:        u.PasswordHash,
+		Role:                u.Role,
+		Concurrency:         u.Concurrency,
+		Status:              u.Status,
+		SignupSource:        u.SignupSource,
+		LastLoginAt:         u.LastLoginAt,
+		LastActiveAt:        u.LastActiveAt,
+		TotpSecretEncrypted: u.TotpSecretEncrypted,
+		TotpEnabled:         u.TotpEnabled,
+		TotpEnabledAt:       u.TotpEnabledAt,
+		RPMLimit:            u.RpmLimit,
+		CreatedAt:           u.CreatedAt,
+		UpdatedAt:           u.UpdatedAt,
+		DeletedAt:           u.DeletedAt,
 	}
 	return out
 }
@@ -950,51 +879,15 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 	if g == nil {
 		return nil
 	}
-	var modelPricing []service.ChannelModelPricing
-	if len(g.ModelPricing) > 0 {
-		if err := json.Unmarshal(g.ModelPricing, &modelPricing); err != nil {
-			slog.Warn("group model_pricing unmarshal failed; falling back to channel/builtin pricing",
-				"group_id", g.ID, "error", err)
-			modelPricing = nil
-		}
-	}
 	return &service.Group{
 		ID:                              g.ID,
 		Name:                            g.Name,
 		Description:                     derefString(g.Description),
 		Platform:                        g.Platform,
-		RateMultiplier:                  g.RateMultiplier,
 		IsExclusive:                     g.IsExclusive,
 		Status:                          g.Status,
 		Hydrated:                        true,
 		DuplicateOperationID:            derefString(g.DuplicateOperationID),
-		SubscriptionType:                g.SubscriptionType,
-		DailyLimitUSD:                   g.DailyLimitUsd,
-		WeeklyLimitUSD:                  g.WeeklyLimitUsd,
-		MonthlyLimitUSD:                 g.MonthlyLimitUsd,
-		AllowImageGeneration:            g.AllowImageGeneration,
-		AllowBatchImageGeneration:       g.AllowBatchImageGeneration,
-		ImageRateIndependent:            g.ImageRateIndependent,
-		ImageRateMultiplier:             g.ImageRateMultiplier,
-		ImagePrice1K:                    g.ImagePrice1k,
-		ImagePrice2K:                    g.ImagePrice2k,
-		ImagePrice4K:                    g.ImagePrice4k,
-		BatchImageDiscountMultiplier:    g.BatchImageDiscountMultiplier,
-		BatchImageHoldMultiplier:        g.BatchImageHoldMultiplier,
-		VideoRateIndependent:            g.VideoRateIndependent,
-		VideoRateMultiplier:             g.VideoRateMultiplier,
-		VideoPrice480P:                  g.VideoPrice480p,
-		VideoPrice720P:                  g.VideoPrice720p,
-		VideoPrice1080P:                 g.VideoPrice1080p,
-		VideoModelPrices:                service.NormalizeVideoModelPrices(g.VideoModelPrices),
-		WebSearchPricePerCall:           g.WebSearchPricePerCall,
-		SearchPricePer1k:                g.SearchPricePer1k,
-		AudioRealtimePricePerMin:        g.AudioRealtimePricePerMin,
-		AudioTTSPricePerMillionChars:    g.AudioTtsPricePerMillionChars,
-		AudioSTTPricePerHour:            g.AudioSttPricePerHour,
-		LongContextPricingEnabled:       g.LongContextPricingEnabled,
-		ModelPricing:                    modelPricing,
-		DefaultValidityDays:             g.DefaultValidityDays,
 		ClaudeCodeOnly:                  g.ClaudeCodeOnly,
 		FallbackGroupID:                 g.FallbackGroupID,
 		FallbackGroupIDOnInvalidRequest: g.FallbackGroupIDOnInvalidRequest,
@@ -1013,13 +906,6 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		RPMLimit:                        g.RpmLimit,
 		MaxReasoningEffort:              g.MaxReasoningEffort,
 		ReasoningEffortMappings:         g.ReasoningEffortMappings,
-		PeakRateEnabled:                 g.PeakRateEnabled,
-		PeakStart:                       g.PeakStart,
-		PeakEnd:                         g.PeakEnd,
-		PeakRateMultiplier:              g.PeakRateMultiplier,
-		ProfitControlEnabled:            g.ProfitControlEnabled,
-		ProfitMinMargin:                 g.ProfitMinMargin,
-		ProfitSafetyBuffer:              g.ProfitSafetyBuffer,
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,
 	}

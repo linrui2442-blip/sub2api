@@ -23,6 +23,7 @@ vi.mock('@/api/admin', () => ({
 }))
 
 import { useAntigravityOAuth } from '@/composables/useAntigravityOAuth'
+import { adminAPI } from '@/api/admin'
 
 describe('useAntigravityOAuth.buildCredentials', () => {
   it('falls back to the submitted refresh token when the response omits it', () => {
@@ -52,5 +53,35 @@ describe('useAntigravityOAuth.buildCredentials', () => {
     )
 
     expect(credentials.refresh_token).toBe('rotated-refresh-token')
+  })
+})
+
+describe('useAntigravityOAuth.generateAuthUrl', () => {
+  it('sends an explicit first-add reason without an account id', async () => {
+    vi.mocked(adminAPI.antigravity.generateAuthUrl).mockResolvedValue({
+      auth_url: 'https://example.test',
+      session_id: 'session',
+      state: 'state'
+    })
+
+    await useAntigravityOAuth().generateAuthUrl(null, 'first_add')
+
+    expect(adminAPI.antigravity.generateAuthUrl).toHaveBeenCalledWith({ reason: 'first_add' })
+  })
+
+  it('sends manual-force only for a specific existing account', async () => {
+    vi.mocked(adminAPI.antigravity.generateAuthUrl).mockResolvedValue({
+      auth_url: 'https://example.test',
+      session_id: 'session',
+      state: 'state'
+    })
+
+    await useAntigravityOAuth().generateAuthUrl(7, 'manual_force', 42)
+
+    expect(adminAPI.antigravity.generateAuthUrl).toHaveBeenCalledWith({
+      reason: 'manual_force',
+      proxy_id: 7,
+      account_id: 42
+    })
   })
 })

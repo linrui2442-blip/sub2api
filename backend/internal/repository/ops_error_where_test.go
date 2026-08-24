@@ -26,8 +26,8 @@ func TestBuildOpsErrorLogsWhere_UserScopedFilters(t *testing.T) {
 		"e.api_key_id = $",
 		"COALESCE(e.requested_model, e.model, '') = $",
 		"COALESCE(e.is_count_tokens, false) = false",
-		"e.error_phase = ANY($",
-		"e.error_type = ANY($",
+		"e.error_phase IN (SELECT value FROM json_each($",
+		"e.error_type IN (SELECT value FROM json_each($",
 	} {
 		if !strings.Contains(where, want) {
 			t.Fatalf("where missing %q\nfull: %s", want, where)
@@ -46,11 +46,11 @@ func TestBuildOpsErrorLogsWhere_ModelFuzzy(t *testing.T) {
 		t.Fatalf("default should be exact match, got: %s", whereExact)
 	}
 
-	// ModelFuzzy=true → ILIKE
+	// ModelFuzzy=true → case-insensitive SQLite LIKE
 	fuzzy := &service.OpsErrorLogFilter{Model: "claude", ModelFuzzy: true}
 	whereFuzzy, args := buildOpsErrorLogsWhere(fuzzy)
-	if !strings.Contains(whereFuzzy, "COALESCE(e.requested_model, e.model, '') ILIKE $") {
-		t.Fatalf("ModelFuzzy should use ILIKE, got: %s", whereFuzzy)
+	if !strings.Contains(whereFuzzy, "LOWER(COALESCE(e.requested_model, e.model, '')) LIKE LOWER($") {
+		t.Fatalf("ModelFuzzy should use case-insensitive LIKE, got: %s", whereFuzzy)
 	}
 	if len(args) != 1 || args[0] != "%claude%" {
 		t.Fatalf("expected arg \"%%claude%%\", got %v", args)
@@ -119,7 +119,7 @@ func TestBuildOpsErrorLogsWhere_CyberPolicyStatusExemption(t *testing.T) {
 	if strings.Contains(whereProviderHealth, "status_code") {
 		t.Fatalf("provider-health ANY filter must expose recovered inference and credential rows\nfull: %s", whereProviderHealth)
 	}
-	if !strings.Contains(whereProviderHealth, "e.error_phase = ANY($") {
+	if !strings.Contains(whereProviderHealth, "e.error_phase IN (SELECT value FROM json_each($") {
 		t.Fatalf("provider-health filter must preserve distinct phase values\nfull: %s", whereProviderHealth)
 	}
 

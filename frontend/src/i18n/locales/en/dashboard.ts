@@ -22,15 +22,6 @@ export default {
     platformBreakdownEmpty: 'No platform usage yet',
     platformCount: '{count} platforms',
     platformOther: 'Other',
-    platformQuota: {
-      title: 'Quota Usage',
-      daily: 'Daily',
-      weekly: 'Weekly',
-      monthly: 'Monthly (30-day rolling)',
-      resetsAt: 'Resets {time}',
-      noLimit: 'unlimited',
-      disabled: 'Disabled',
-    },
     tokenUsageTrend: 'Token Usage Trend',
     noDataAvailable: 'No data available',
     model: 'Model',
@@ -43,6 +34,9 @@ export default {
     input: 'Input',
     output: 'Output',
     cache: 'Cache',
+    cacheCreation: 'Cache Creation',
+    cacheRead: 'Cache Read',
+    cacheHitRate: 'Cache Hit Rate',
     recentUsage: 'Recent Usage',
     last7Days: 'Last 7 days',
     noUsageRecords: 'No usage records',
@@ -51,12 +45,8 @@ export default {
     quickActions: 'Quick Actions',
     createApiKey: 'Create API Key',
     generateNewKey: 'Generate a new API key',
-    batchImageAgent: 'Batch Image Assistant',
-    batchImageAgentDesc: 'Copy instructions for an agent',
     viewUsage: 'View Usage',
     checkDetailedLogs: 'Check detailed usage logs',
-    redeemCode: 'Redeem Code',
-    addBalanceWithCode: 'Add balance with a code'
   },
 
   // Groups (shared)
@@ -102,6 +92,11 @@ export default {
     namePlaceholder: 'My API Key',
     groupLabel: 'Group',
     selectGroup: 'Select a group',
+    routingMode: 'API Key type',
+    unifiedGateway: 'Unified gateway',
+    unifiedGatewayHint: 'Route by provider namespace; recommended by default',
+    groupPinned: 'Pinned group',
+    groupPinnedHint: 'Keep the existing group, account pool, and scheduling rules',
     statusLabel: 'Status',
     selectStatus: 'Select status',
     saving: 'Saving...',
@@ -417,7 +412,6 @@ export default {
     },
   },
 
-  // Shared keys for channel monitor (admin + user views)
   monitorCommon: {
     status: {
       operational: 'Operational',
@@ -442,7 +436,6 @@ export default {
       quota: 'Quota',
       quota_probe: 'Probe + Quota'
     },
-    // Quota snapshot rendering (MonitorQuotaView, shared by admin + user views)
     quota: {
       unavailable: 'Quota unavailable',
       resetSoon: 'resetting',

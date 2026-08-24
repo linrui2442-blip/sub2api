@@ -18,16 +18,8 @@ const rawUsageLogModelColumn = "model"
 // Historical rows may contain upstream/billing model values, while newer rows store requested_model.
 // Requested/upstream/mapping analytics must use resolveModelDimensionExpression instead.
 
-// usageLogSuccessFilterUL 用于把"失败请求 usage log"（tokens=0、cost=0、不计费的占位记录）
-// 从统计性聚合中排除，避免污染 Dashboard / 用量拆分等指标。
-//
-// schema 中没有 success bool 列；新增列要做迁移，风险大；这里用 actual_cost > 0 作为代理：
-// 任何成功落账的请求都会产生 actual_cost（包括 token 计费、纯图片 token 计费、按次/按图计费），
-// 反之 failed-request usage log 的 actual_cost 为 0。
-// 早期版本用 4 项 token 和 > 0 判定会把"按次/按图计费"与"image_output_tokens 独立计费"的纯图片
-// 请求误判为失败，导致这部分请求从用量统计里消失，故改用 actual_cost。
-// 配合 `FROM usage_logs ul` JOIN 查询使用。
-const usageLogSuccessFilterUL = "ul.actual_cost > 0"
+// Personal runtime records completed gateway calls directly; no billing marker is needed.
+const usageLogSuccessFilterUL = "1 = 1"
 
 // usageLogEffectivePlatformExpr 用于按"有效平台"维度聚合 usage_logs：
 // 优先取请求实际走的分组 platform，若分组未设置 platform 再 fallback 到 account.platform。
@@ -142,6 +134,7 @@ type usageLogRepository struct {
 	client *dbent.Client
 	sql    sqlExecutor
 	db     *sql.DB
+	sqlite bool
 
 	createBatchOnce     sync.Once
 	createBatchCh       chan usageLogCreateRequest
@@ -159,6 +152,8 @@ func newUsageLogRepositoryWithSQL(client *dbent.Client, sqlq sqlExecutor) *usage
 	repo := &usageLogRepository{client: client, sql: sqlq}
 	if db, ok := sqlq.(*sql.DB); ok {
 		repo.db = db
+		driverType := strings.ToLower(fmt.Sprintf("%T", db.Driver()))
+		repo.sqlite = strings.Contains(driverType, "sqlite")
 	}
 	repo.bestEffortRecent = gocache.New(usageLogBestEffortRecentTTL, time.Minute)
 	return repo

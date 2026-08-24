@@ -27,6 +27,7 @@ import (
 	"golang.org/x/net/http2"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/providerproxy"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyurl"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyutil"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/servertiming"
@@ -205,6 +206,10 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 		profile = service.HTTPUpstreamProfileFromContext(req.Context())
 	}
 
+	proxyURL, err := resolveProviderUpstreamProxyURL(req, proxyURL)
+	if err != nil {
+		return nil, err
+	}
 	// 获取或创建对应的客户端，并标记请求占用
 	entry, err := s.acquireClientWithProfile(proxyURL, accountID, accountConcurrency, profile)
 	if err != nil {
@@ -255,6 +260,11 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 	if req != nil {
 		upstreamProfile = service.HTTPUpstreamProfileFromContext(req.Context())
 	}
+	var err error
+	proxyURL, err = resolveProviderUpstreamProxyURL(req, proxyURL)
+	if err != nil {
+		return nil, err
+	}
 
 	targetHost := ""
 	if req != nil && req.URL != nil {
@@ -294,6 +304,25 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 	})
 
 	return resp, nil
+}
+
+func resolveProviderUpstreamProxyURL(req *http.Request, explicitProxyURL string) (string, error) {
+	return resolveProviderUpstreamProxyURLWithResolver(req, explicitProxyURL, providerproxy.Resolve)
+}
+
+func resolveProviderUpstreamProxyURLWithResolver(req *http.Request, explicitProxyURL string, resolver func(*http.Request) (providerproxy.Decision, error)) (string, error) {
+	if trimmed := strings.TrimSpace(explicitProxyURL); trimmed != "" {
+		return trimmed, nil
+	}
+	decision, err := resolver(req)
+	if err != nil {
+		return "", err
+	}
+	if decision.URL == nil {
+		return "", nil
+	}
+	slog.Info("provider gateway proxy resolved", "proxy_source", decision.Source, "proxy_enabled", true)
+	return decision.URL.String(), nil
 }
 
 func httpClientForUpstreamRequest(client *http.Client, req *http.Request) *http.Client {

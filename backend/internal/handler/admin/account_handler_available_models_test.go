@@ -18,7 +18,16 @@ import (
 
 type availableModelsAdminService struct {
 	*stubAdminService
-	account service.Account
+	account      service.Account
+	extraUpdates map[string]any
+}
+
+func (s *availableModelsAdminService) UpdateAccountExtra(_ context.Context, id int64, updates map[string]any) error {
+	if s.account.ID == id {
+		s.extraUpdates = updates
+		return nil
+	}
+	return s.stubAdminService.UpdateAccountExtra(context.Background(), id, updates)
 }
 
 func (s *availableModelsAdminService) GetAccount(_ context.Context, id int64) (*service.Account, error) {
@@ -32,7 +41,7 @@ func (s *availableModelsAdminService) GetAccount(_ context.Context, id int64) (*
 func setupAvailableModelsRouter(adminSvc service.AdminService) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	handler := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	handler := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	router.GET("/api/v1/admin/accounts/:id/models", handler.GetAvailableModels)
 	return router
 }
@@ -66,7 +75,7 @@ func setupSyncUpstreamModelsRouter(adminSvc service.AdminService, upstream servi
 		&config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}}},
 		nil,
 	)
-	handler := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, accountTestSvc, nil, nil, nil, nil, nil)
+	handler := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, accountTestSvc, nil, nil, nil, nil)
 	router.POST("/api/v1/admin/accounts/:id/models/sync-upstream", handler.SyncUpstreamModels)
 	return router
 }
@@ -287,6 +296,33 @@ func TestAccountHandlerGetAvailableModels_OpenAISparkShadowReturnsMappingModels(
 	}, ids, "影子可用模型由 model_mapping 派生（非写死）")
 }
 
+func TestAccountHandlerGetAvailableModels_AntigravitySeparatesVerifiedAndUnavailable(t *testing.T) {
+	svc := &availableModelsAdminService{
+		stubAdminService: newStubAdminService(),
+		account: service.Account{
+			ID:       47,
+			Name:     "antigravity-oauth",
+			Platform: service.PlatformAntigravity,
+			Type:     service.AccountTypeOAuth,
+			Status:   service.StatusActive,
+		},
+	}
+	router := setupAvailableModelsRouter(svc)
+
+	verified := httptest.NewRecorder()
+	router.ServeHTTP(verified, httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/47/models", nil))
+	require.Equal(t, http.StatusOK, verified.Code)
+	require.Contains(t, verified.Body.String(), "gemini-3.1-pro-high")
+	require.NotContains(t, verified.Body.String(), "claude-fable-5")
+
+	catalog := httptest.NewRecorder()
+	router.ServeHTTP(catalog, httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/47/models?catalog=1", nil))
+	require.Equal(t, http.StatusOK, catalog.Code)
+	require.Contains(t, catalog.Body.String(), `"availability":"recommended"`)
+	require.Contains(t, catalog.Body.String(), `"availability":"currently_unavailable"`)
+	require.Contains(t, catalog.Body.String(), "claude-fable-5")
+}
+
 func TestAccountHandlerSyncUpstreamModels_ConfigErrorReturnsBadRequest(t *testing.T) {
 	svc := &availableModelsAdminService{
 		stubAdminService: newStubAdminService(),
@@ -340,4 +376,37 @@ func TestAccountHandlerSyncUpstreamModels_UpstreamErrorDoesNotExposeBody(t *test
 	require.Equal(t, http.StatusBadGateway, rec.Code)
 	require.Contains(t, rec.Body.String(), "Upstream model list request failed with HTTP 502")
 	require.NotContains(t, rec.Body.String(), "SECRET_TOKEN")
+}
+
+func TestAccountHandlerSyncUpstreamModels_DoesNotMixDiscoveryIntoCompatibility(t *testing.T) {
+	svc := &availableModelsAdminService{
+		stubAdminService: newStubAdminService(),
+		account: service.Account{
+			ID:       48,
+			Name:     "openai-apikey-model-sync",
+			Platform: service.PlatformOpenAI,
+			Type:     service.AccountTypeAPIKey,
+			Status:   service.StatusActive,
+			Credentials: map[string]any{
+				"api_key":       "openai-key",
+				"base_url":      "https://openai.example.com/v1",
+				"model_mapping": map[string]any{"legacy-name": "actual-name"},
+			},
+		},
+	}
+	upstream := &syncUpstreamHTTPUpstream{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"data":[{"id":"actual-name"}]}`)),
+	}}
+	router := setupSyncUpstreamModelsRouter(svc, upstream)
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/48/models/sync-upstream", nil))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "upstream_discovery")
+	require.Contains(t, rec.Body.String(), "actual-name")
+	require.Empty(t, svc.extraUpdates, "non-Antigravity discovery must not write Antigravity availability state")
+	require.Equal(t, map[string]any{"legacy-name": "actual-name"}, svc.account.Credentials["model_mapping"])
 }

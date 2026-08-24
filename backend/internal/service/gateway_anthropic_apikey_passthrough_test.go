@@ -148,7 +148,6 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_ForwardStreamPreservesBodyAnd
 		httpUpstream:         upstream,
 		rateLimitService:     &RateLimitService{},
 		deferredService:      &DeferredService{},
-		billingCacheService:  nil,
 	}
 
 	account := &Account{

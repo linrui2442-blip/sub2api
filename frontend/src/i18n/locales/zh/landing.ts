@@ -1,8 +1,4 @@
 export default {
-  batchImageGuide: {
-    title: '图片批量生成',
-    description: '一次提交多条提示词，任务完成后可统一下载图片结果'
-  },
   // Home Page
   home: {
     viewOnGithub: '在 GitHub 上查看',
@@ -117,7 +113,7 @@ export default {
   // Key Usage Query Page
   keyUsage: {
     title: 'API Key 用量查询',
-    subtitle: '输入您的 API Key 以查看实时消费金额与使用状态',
+    subtitle: '输入您的 API Key 以查看用量与访问状态',
     placeholder: 'sk-ant-mirror-xxxxxxxxxxxx',
     query: '查询',
     querying: '查询中...',
@@ -147,14 +143,12 @@ export default {
     cost: '费用',
     // Status
     quotaMode: 'Key 限额模式',
-    walletBalance: '钱包余额',
+    personalEdition: 'Personal Private Edition',
     // Ring card titles
     totalQuota: '总额度',
     limit5h: '5 小时限额',
     limitDaily: '日限额',
     limit7d: '7 天限额',
-    limitWeekly: '周限额',
-    limitMonthly: '月限额',
     // Detail rows
     remainingQuota: '剩余额度',
     expiresAt: '过期时间',
@@ -162,8 +156,8 @@ export default {
     daysLeft: '({days} 天)',
     usedQuota: '已用额度',
     resetNow: '即将重置',
-    subscriptionType: '订阅类型',
-    subscriptionExpires: '订阅到期',
+    accessMode: '访问模式',
+    group: '分组',
     // Usage stat cells
     todayRequests: '今日请求',
     todayInputTokens: '今日输入',
