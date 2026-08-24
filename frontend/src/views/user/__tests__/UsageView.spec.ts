@@ -207,6 +207,23 @@ describe('user UsageView', () => {
     expect(getAvailable).toHaveBeenCalled()
   })
 
+  it('uses one exact rolling 24 hour range for every dashboard request', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-24T05:03:04.000Z'))
+    mountUsageView()
+    await flushPromises()
+
+    const expectedRange = {
+      start_date: '2026-08-23T05:03:04.000Z',
+      end_date: '2026-08-24T05:03:04.000Z',
+    }
+    expect(query).toHaveBeenCalledWith(expect.objectContaining(expectedRange), expect.anything())
+    expect(getStats).toHaveBeenCalledWith(expect.objectContaining(expectedRange))
+    expect(getDashboardModels).toHaveBeenCalledWith(expect.objectContaining(expectedRange))
+    expect(getDashboardSnapshotV2).toHaveBeenCalledWith(expect.objectContaining(expectedRange))
+    vi.useRealTimers()
+  })
+
   it('exports csv with current filters and without admin-only fields', async () => {
     const wrapper = mountUsageView()
     await flushPromises()

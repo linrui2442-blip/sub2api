@@ -116,6 +116,95 @@ func TestPersonalSQLiteUsageBestEffortInsert(t *testing.T) {
 	require.Equal(t, *log.UpstreamModel, upstream)
 }
 
+func TestPersonalSQLiteUsageDashboardAggregatesAndExactRange(t *testing.T) {
+	repo, closeRepo := openUsageSQLiteTest(t, "usage-dashboard")
+	defer closeRepo()
+	ctx := context.Background()
+	start := time.Date(2026, 8, 23, 5, 0, 0, 0, time.UTC)
+	end := start.Add(24 * time.Hour)
+
+	logs := []*service.UsageLog{
+		personalUsageLog("before-range", false),
+		personalUsageLog("at-start", false),
+		personalUsageLog("before-end", true),
+		personalUsageLog("at-end", false),
+	}
+	logs[0].CreatedAt = start.Add(-time.Nanosecond)
+	logs[1].CreatedAt = start
+	logs[2].CreatedAt = end.Add(-time.Nanosecond)
+	logs[3].CreatedAt = end
+	duration1, duration2 := 100, 300
+	logs[1].DurationMs = &duration1
+	logs[2].DurationMs = &duration2
+	for _, log := range logs {
+		inserted, err := repo.Create(ctx, log)
+		require.NoError(t, err)
+		require.True(t, inserted)
+	}
+
+	stats, err := repo.GetStatsWithFilters(ctx, UsageLogFilters{StartTime: &start, EndTime: &end})
+	require.NoError(t, err)
+	require.Equal(t, int64(2), stats.TotalRequests)
+	require.Equal(t, int64(4), stats.TotalInputTokens)
+	require.Equal(t, int64(6), stats.TotalOutputTokens)
+	require.Equal(t, int64(10), stats.TotalTokens)
+	require.Equal(t, float64(200), stats.AverageDurationMs)
+	require.Equal(t, []EndpointStat{{Endpoint: "/v1/chat/completions", Requests: 2, TotalTokens: 10}}, stats.Endpoints)
+	require.Equal(t, []EndpointStat{{Endpoint: "/v1internal:streamGenerateContent", Requests: 2, TotalTokens: 10}}, stats.UpstreamEndpoints)
+
+	trend, err := repo.GetUsageTrendWithUsageFilters(ctx, start, end, "hour", UsageLogFilters{})
+	require.NoError(t, err)
+	require.Len(t, trend, 2)
+	require.Equal(t, int64(2), trend[0].Requests+trend[1].Requests)
+	require.Equal(t, int64(10), trend[0].TotalTokens+trend[1].TotalTokens)
+	dayTrend, err := repo.GetUsageTrendWithUsageFilters(ctx, start, end, "day", UsageLogFilters{})
+	require.NoError(t, err)
+	require.Equal(t, stats.TotalRequests, dayTrend[0].Requests+dayTrend[1].Requests)
+
+	models, err := repo.GetModelStatsWithUsageFiltersBySource(ctx, start, end, UsageLogFilters{}, "requested")
+	require.NoError(t, err)
+	require.Len(t, models, 1)
+	require.Equal(t, stats.TotalRequests, models[0].Requests)
+}
+
+func TestPersonalSQLiteGroupStatsExcludeUnifiedKeyUsage(t *testing.T) {
+	repo, closeRepo := openUsageSQLiteTest(t, "usage-unified-group")
+	defer closeRepo()
+	ctx := context.Background()
+	start := time.Now().UTC().Add(-time.Hour)
+	end := start.Add(2 * time.Hour)
+	for index := 1; index <= 7; index++ {
+		_, err := repo.client.Group.Create().
+			SetName(fmt.Sprintf("group-%d", index)).
+			SetPlatform(service.PlatformAntigravity).
+			Save(ctx)
+		require.NoError(t, err)
+	}
+	unified := personalUsageLog("unified-key", false)
+	unified.GroupID = nil
+	unified.CreatedAt = start.Add(time.Minute)
+	groupID := int64(7)
+	grouped1 := personalUsageLog("grouped-1", false)
+	grouped1.GroupID = &groupID
+	grouped1.CreatedAt = start.Add(2 * time.Minute)
+	grouped2 := personalUsageLog("grouped-2", false)
+	grouped2.GroupID = &groupID
+	grouped2.CreatedAt = start.Add(3 * time.Minute)
+	for _, log := range []*service.UsageLog{unified, grouped1, grouped2} {
+		inserted, err := repo.Create(ctx, log)
+		require.NoError(t, err)
+		require.True(t, inserted)
+	}
+
+	groups, err := repo.GetGroupStatsWithUsageFilters(ctx, start, end, UsageLogFilters{})
+	require.NoError(t, err)
+	require.Len(t, groups, 1)
+	require.Equal(t, int64(7), groups[0].GroupID)
+	require.Equal(t, "group-7", groups[0].GroupName)
+	require.Equal(t, int64(2), groups[0].Requests)
+	require.Equal(t, int64(10), groups[0].TotalTokens)
+}
+
 func TestPersonalSQLiteUsageSchemaUpgradeIsIdempotentAndPreservesRows(t *testing.T) {
 	drv, db, err := openPersonalSQLite("file:usage-upgrade?mode=memory&cache=shared")
 	require.NoError(t, err)

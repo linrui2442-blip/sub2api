@@ -40,6 +40,20 @@ type userGroupStat struct {
 	TotalTokens int64  `json:"total_tokens"`
 }
 
+func parseUsageRangeBoundary(value, userTZ string, endOfDate bool) (time.Time, error) {
+	if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+		return parsed, nil
+	}
+	parsed, err := timezone.ParseInUserLocation("2006-01-02", value, userTZ)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if endOfDate {
+		parsed = parsed.AddDate(0, 0, 1)
+	}
+	return parsed, nil
+}
+
 // UsageHandler handles usage-related requests
 type UsageHandler struct {
 	usageService   *service.UsageService
@@ -130,21 +144,21 @@ func (h *UsageHandler) parseUserUsageFilters(c *gin.Context, requireRange bool) 
 	endDateStr := strings.TrimSpace(c.Query("end_date"))
 
 	if startDateStr != "" {
-		t, err := timezone.ParseInUserLocation("2006-01-02", startDateStr, userTZ)
+		t, err := parseUsageRangeBoundary(startDateStr, userTZ, false)
 		if err != nil {
-			response.BadRequest(c, "Invalid start_date format, use YYYY-MM-DD")
+			response.BadRequest(c, "Invalid start_date format, use YYYY-MM-DD or RFC3339")
 			return nil, false
 		}
 		startTime = t
 		startPtr = &startTime
 	}
 	if endDateStr != "" {
-		t, err := timezone.ParseInUserLocation("2006-01-02", endDateStr, userTZ)
+		t, err := parseUsageRangeBoundary(endDateStr, userTZ, true)
 		if err != nil {
-			response.BadRequest(c, "Invalid end_date format, use YYYY-MM-DD")
+			response.BadRequest(c, "Invalid end_date format, use YYYY-MM-DD or RFC3339")
 			return nil, false
 		}
-		endTime = t.AddDate(0, 0, 1)
+		endTime = t
 		endPtr = &endTime
 	}
 

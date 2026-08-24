@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -268,6 +269,9 @@ func (r *usageLogRepository) GetUsageTrendWithUsageFilters(ctx context.Context, 
 }
 
 func (r *usageLogRepository) getUsageTrendWithFilters(ctx context.Context, startTime, endTime time.Time, granularity string, userID, apiKeyID, accountID, groupID int64, model string, modelSource string, requestType *int16, stream *bool, billingType *int8, billingMode string, upstreamModelMismatch *bool) (results []TrendDataPoint, err error) {
+	if r.sqlite {
+		return r.getUsageTrendWithFiltersSQLite(ctx, startTime, endTime, granularity, userID, apiKeyID, accountID, groupID, model, modelSource, requestType, stream, upstreamModelMismatch)
+	}
 	dateFormat := safeDateFormat(granularity)
 
 	query := fmt.Sprintf(`
@@ -323,6 +327,92 @@ func (r *usageLogRepository) getUsageTrendWithFilters(ctx context.Context, start
 	results, err = scanTrendRows(rows)
 	if err != nil {
 		return nil, err
+	}
+	return results, nil
+}
+
+func sqliteTrendBucket(value time.Time, granularity string, location *time.Location) string {
+	value = value.In(location)
+	switch granularity {
+	case "hour":
+		return value.Format("2006-01-02 15:00")
+	case "week":
+		year, week := value.ISOWeek()
+		return fmt.Sprintf("%04d-%02d", year, week)
+	case "month":
+		return value.Format("2006-01")
+	default:
+		return value.Format("2006-01-02")
+	}
+}
+
+func (r *usageLogRepository) getUsageTrendWithFiltersSQLite(ctx context.Context, startTime, endTime time.Time, granularity string, userID, apiKeyID, accountID, groupID int64, model, modelSource string, requestType *int16, stream *bool, upstreamModelMismatch *bool) ([]TrendDataPoint, error) {
+	query := `SELECT created_at, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens
+		FROM usage_logs WHERE created_at >= $1 AND created_at < $2`
+	args := []any{startTime, endTime}
+	if userID > 0 {
+		query += fmt.Sprintf(" AND user_id = $%d", len(args)+1)
+		args = append(args, userID)
+	}
+	if apiKeyID > 0 {
+		query += fmt.Sprintf(" AND api_key_id = $%d", len(args)+1)
+		args = append(args, apiKeyID)
+	}
+	if accountID > 0 {
+		query += fmt.Sprintf(" AND account_id = $%d", len(args)+1)
+		args = append(args, accountID)
+	}
+	if groupID > 0 {
+		query += fmt.Sprintf(" AND group_id = $%d", len(args)+1)
+		args = append(args, groupID)
+	}
+	query, args = appendUsageLogModelQueryFilter(query, args, model, modelSource)
+	query, args = appendRequestTypeOrStreamQueryFilter(query, args, requestType, stream)
+	if upstreamModelMismatch != nil {
+		query += " AND " + upstreamModelMismatchCondition("upstream_model_mismatch", *upstreamModelMismatch)
+	}
+	query += " ORDER BY created_at ASC"
+
+	rows, err := r.sql.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	location := startTime.Location()
+	if location == nil {
+		location = time.UTC
+	}
+	buckets := make(map[string]*TrendDataPoint)
+	for rows.Next() {
+		var createdAt time.Time
+		var input, output, cacheCreation, cacheRead int64
+		if err := rows.Scan(&createdAt, &input, &output, &cacheCreation, &cacheRead); err != nil {
+			return nil, err
+		}
+		key := sqliteTrendBucket(createdAt, granularity, location)
+		point := buckets[key]
+		if point == nil {
+			point = &TrendDataPoint{Date: key}
+			buckets[key] = point
+		}
+		point.Requests++
+		point.InputTokens += input
+		point.OutputTokens += output
+		point.CacheCreationTokens += cacheCreation
+		point.CacheReadTokens += cacheRead
+		point.TotalTokens += input + output + cacheCreation + cacheRead
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	keys := make([]string, 0, len(buckets))
+	for key := range buckets {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	results := make([]TrendDataPoint, 0, len(keys))
+	for _, key := range keys {
+		results = append(results, *buckets[key])
 	}
 	return results, nil
 }
@@ -498,6 +588,7 @@ func (r *usageLogRepository) getGroupStatsWithFilters(ctx context.Context, start
 		FROM usage_logs ul
 		LEFT JOIN groups g ON g.id = ul.group_id
 		WHERE ul.created_at >= $1 AND ul.created_at < $2
+		  AND ul.group_id IS NOT NULL
 	`
 
 	args := []any{startTime, endTime}

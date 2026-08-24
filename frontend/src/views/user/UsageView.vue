@@ -324,6 +324,11 @@ const getLast24HoursRangeDates = () => {
   return { start: formatLocalDate(start), end: formatLocalDate(end) }
 }
 
+const getRolling24HourRequestRange = (now = new Date()) => ({
+  start: new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString(),
+  end: now.toISOString(),
+})
+
 const getGranularityForRange = (start: string, end: string): 'day' | 'hour' => {
   const startTime = new Date(`${start}T00:00:00`).getTime()
   const endTime = new Date(`${end}T00:00:00`).getTime()
@@ -333,6 +338,10 @@ const getGranularityForRange = (start: string, end: string): 'day' | 'hour' => {
 const defaultRange = getLast24HoursRangeDates()
 const startDate = ref(defaultRange.start)
 const endDate = ref(defaultRange.end)
+const activeRangePreset = ref<string | null>('last24Hours')
+const initialRequestRange = getRolling24HourRequestRange()
+const requestStartDate = ref(initialRequestRange.start)
+const requestEndDate = ref(initialRequestRange.end)
 const granularity = ref<'day' | 'hour'>(getGranularityForRange(startDate.value, endDate.value))
 
 const modelDistributionMetric = ref<DistributionMetric>('tokens')
@@ -392,11 +401,18 @@ const normalizedFilters = computed<UsageQueryParams>(() => {
   const legacyStream = requestType ? requestTypeToLegacyStream(requestType) : filters.value.stream
   return {
     ...filters.value,
-    start_date: startDate.value,
-    end_date: endDate.value,
+    start_date: requestStartDate.value,
+    end_date: requestEndDate.value,
     stream: legacyStream === null ? undefined : legacyStream,
   }
 })
+
+const refreshRollingRequestRange = () => {
+  if (activeRangePreset.value !== 'last24Hours') return
+  const range = getRolling24HourRequestRange()
+  requestStartDate.value = range.start
+  requestEndDate.value = range.end
+}
 
 const buildUsageListParams = (page: number, pageSize: number): UsageQueryParams => ({
   page,
@@ -504,6 +520,7 @@ const refreshModelOptions = (models: ModelStat[]) => {
 }
 
 const applyFilters = () => {
+  refreshRollingRequestRange()
   pagination.page = 1
   void loadLogs()
   void loadStats()
@@ -513,6 +530,7 @@ const applyFilters = () => {
 }
 
 const refreshData = () => {
+  refreshRollingRequestRange()
   void loadLogs()
   void loadStats()
   void loadModelStats()
@@ -524,6 +542,8 @@ const resetFilters = () => {
   const range = getLast24HoursRangeDates()
   startDate.value = range.start
   endDate.value = range.end
+  activeRangePreset.value = 'last24Hours'
+  refreshRollingRequestRange()
   filters.value = {
     start_date: range.start,
     end_date: range.end,
@@ -540,6 +560,13 @@ const resetFilters = () => {
 const onDateRangeChange = (range: { startDate: string; endDate: string; preset: string | null }) => {
   startDate.value = range.startDate
   endDate.value = range.endDate
+  activeRangePreset.value = range.preset
+  if (range.preset === 'last24Hours') {
+    refreshRollingRequestRange()
+  } else {
+    requestStartDate.value = range.startDate
+    requestEndDate.value = range.endDate
+  }
   filters.value.start_date = range.startDate
   filters.value.end_date = range.endDate
   granularity.value = getGranularityForRange(range.startDate, range.endDate)

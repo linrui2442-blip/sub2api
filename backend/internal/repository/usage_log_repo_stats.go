@@ -572,6 +572,9 @@ func (r *usageLogRepository) GetStatsWithFilters(ctx context.Context, filters Us
 		conditions = append(conditions, fmt.Sprintf("created_at < $%d", len(args)+1))
 		args = append(args, *filters.EndTime)
 	}
+	if r.sqlite {
+		return r.getStatsWithFiltersSQLite(ctx, conditions, args)
+	}
 
 	query := fmt.Sprintf(`
 		WITH scoped AS (
@@ -678,6 +681,86 @@ func (r *usageLogRepository) GetStatsWithFilters(ctx context.Context, filters Us
 
 	stats.TotalTokens = stats.TotalInputTokens + stats.TotalOutputTokens + stats.TotalCacheTokens
 
+	return stats, nil
+}
+
+func (r *usageLogRepository) getStatsWithFiltersSQLite(ctx context.Context, conditions []string, args []any) (*UsageStats, error) {
+	where := buildWhere(conditions)
+	stats := &UsageStats{}
+	totalQuery := fmt.Sprintf(`
+		SELECT COUNT(*),
+			COALESCE(SUM(input_tokens), 0),
+			COALESCE(SUM(output_tokens), 0),
+			COALESCE(SUM(cache_creation_tokens), 0),
+			COALESCE(SUM(cache_read_tokens), 0),
+			COALESCE(AVG(duration_ms), 0)
+		FROM usage_logs %s`, where)
+	totalRows, err := r.sql.QueryContext(ctx, totalQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+	if !totalRows.Next() {
+		if err := totalRows.Err(); err != nil {
+			_ = totalRows.Close()
+			return nil, err
+		}
+		_ = totalRows.Close()
+		return nil, sql.ErrNoRows
+	}
+	if err := totalRows.Scan(
+		&stats.TotalRequests,
+		&stats.TotalInputTokens,
+		&stats.TotalOutputTokens,
+		&stats.TotalCacheCreationTokens,
+		&stats.TotalCacheReadTokens,
+		&stats.AverageDurationMs,
+	); err != nil {
+		_ = totalRows.Close()
+		return nil, err
+	}
+	if err := totalRows.Close(); err != nil {
+		return nil, err
+	}
+	stats.TotalCacheTokens = stats.TotalCacheCreationTokens + stats.TotalCacheReadTokens
+	stats.TotalTokens = stats.TotalInputTokens + stats.TotalOutputTokens + stats.TotalCacheTokens
+
+	type endpointDimension struct {
+		expression string
+		target     *[]EndpointStat
+	}
+	dimensions := []endpointDimension{
+		{expression: "COALESCE(NULLIF(TRIM(inbound_endpoint), ''), 'unknown')", target: &stats.Endpoints},
+		{expression: "COALESCE(NULLIF(TRIM(upstream_endpoint), ''), 'unknown')", target: &stats.UpstreamEndpoints},
+		{expression: "COALESCE(NULLIF(TRIM(inbound_endpoint), ''), 'unknown') || ' -> ' || COALESCE(NULLIF(TRIM(upstream_endpoint), ''), 'unknown')", target: &stats.EndpointPaths},
+	}
+	for _, dimension := range dimensions {
+		query := fmt.Sprintf(`
+			SELECT %s AS endpoint,
+				COUNT(*) AS requests,
+				COALESCE(SUM(input_tokens + output_tokens + cache_creation_tokens + cache_read_tokens), 0) AS total_tokens
+			FROM usage_logs %s
+			GROUP BY %s
+			ORDER BY requests DESC, endpoint ASC`, dimension.expression, where, dimension.expression)
+		rows, err := r.sql.QueryContext(ctx, query, args...)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var item EndpointStat
+			if err := rows.Scan(&item.Endpoint, &item.Requests, &item.TotalTokens); err != nil {
+				_ = rows.Close()
+				return nil, err
+			}
+			*dimension.target = append(*dimension.target, item)
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return nil, err
+		}
+		if err := rows.Close(); err != nil {
+			return nil, err
+		}
+	}
 	return stats, nil
 }
 
