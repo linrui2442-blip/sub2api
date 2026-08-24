@@ -167,6 +167,32 @@ func TestPersonalSQLiteUsageDashboardAggregatesAndExactRange(t *testing.T) {
 	require.Equal(t, stats.TotalRequests, models[0].Requests)
 }
 
+func TestSQLiteTrendBucketUsesDashboardTimezone(t *testing.T) {
+	shanghai, err := time.LoadLocation("Asia/Shanghai")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		value       string
+		granularity string
+		location    *time.Location
+		want        string
+	}{
+		{name: "hour in Shanghai", value: "2026-08-23T01:30:00Z", granularity: "hour", location: shanghai, want: "2026-08-23 09:00"},
+		{name: "hour crosses local day", value: "2026-08-23T17:30:00Z", granularity: "hour", location: shanghai, want: "2026-08-24 01:00"},
+		{name: "day crosses local day", value: "2026-08-23T17:30:00Z", granularity: "day", location: shanghai, want: "2026-08-24"},
+		{name: "UTC remains UTC", value: "2026-08-23T01:30:00Z", granularity: "hour", location: time.UTC, want: "2026-08-23 01:00"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			value, parseErr := time.Parse(time.RFC3339, tt.value)
+			require.NoError(t, parseErr)
+			require.Equal(t, tt.want, sqliteTrendBucket(value, tt.granularity, tt.location))
+		})
+	}
+}
+
 func TestPersonalSQLiteGroupStatsExcludeUnifiedKeyUsage(t *testing.T) {
 	repo, closeRepo := openUsageSQLiteTest(t, "usage-unified-group")
 	defer closeRepo()

@@ -42,7 +42,9 @@ type userGroupStat struct {
 
 func parseUsageRangeBoundary(value, userTZ string, endOfDate bool) (time.Time, error) {
 	if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
-		return parsed, nil
+		// Keep the exact instant supplied by the client, but attach the resolved
+		// dashboard timezone so SQLite trend buckets use the same local labels.
+		return parsed.In(timezone.NowInUserLocation(userTZ).Location()), nil
 	}
 	parsed, err := timezone.ParseInUserLocation("2006-01-02", value, userTZ)
 	if err != nil {

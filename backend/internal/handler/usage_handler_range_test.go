@@ -20,5 +20,6 @@ func TestParseUsageRangeBoundaryRFC3339RemainsExact(t *testing.T) {
 	value := "2026-08-24T05:03:04.123456789Z"
 	parsed, err := parseUsageRangeBoundary(value, "Asia/Shanghai", true)
 	require.NoError(t, err)
-	require.Equal(t, value, parsed.Format(time.RFC3339Nano))
+	require.Equal(t, value, parsed.UTC().Format(time.RFC3339Nano))
+	require.Equal(t, "2026-08-24T13:03:04.123456789+08:00", parsed.Format(time.RFC3339Nano))
 }
