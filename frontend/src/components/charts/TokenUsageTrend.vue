@@ -1,7 +1,7 @@
 <template>
   <div class="card p-4">
     <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
-      {{ t('admin.dashboard.tokenUsageTrend') }}
+      {{ t('dashboard.tokenUsageTrend') }}
     </h3>
     <div v-if="loading" class="flex h-48 items-center justify-center">
       <LoadingSpinner />
@@ -13,7 +13,7 @@
       v-else
       class="flex h-48 items-center justify-center text-sm text-gray-500 dark:text-gray-400"
     >
-      {{ t('admin.dashboard.noDataAvailable') }}
+      {{ t('dashboard.noDataAvailable') }}
     </div>
   </div>
 </template>
@@ -75,7 +75,7 @@ const chartData = computed(() => {
     labels: props.trendData.map((d) => d.date),
     datasets: [
       {
-        label: t('admin.dashboard.input'),
+        label: t('dashboard.input'),
         data: props.trendData.map((d) => d.input_tokens),
         borderColor: chartColors.value.input,
         backgroundColor: `${chartColors.value.input}20`,
@@ -83,7 +83,7 @@ const chartData = computed(() => {
         tension: 0.3
       },
       {
-        label: t('admin.dashboard.output'),
+        label: t('dashboard.output'),
         data: props.trendData.map((d) => d.output_tokens),
         borderColor: chartColors.value.output,
         backgroundColor: `${chartColors.value.output}20`,
@@ -91,7 +91,7 @@ const chartData = computed(() => {
         tension: 0.3
       },
       {
-        label: t('admin.dashboard.cacheCreation'),
+        label: t('dashboard.cacheCreation'),
         data: props.trendData.map((d) => d.cache_creation_tokens),
         borderColor: chartColors.value.cacheCreation,
         backgroundColor: `${chartColors.value.cacheCreation}20`,
@@ -99,7 +99,7 @@ const chartData = computed(() => {
         tension: 0.3
       },
       {
-        label: t('admin.dashboard.cacheRead'),
+        label: t('dashboard.cacheRead'),
         data: props.trendData.map((d) => d.cache_read_tokens),
         borderColor: chartColors.value.cacheRead,
         backgroundColor: `${chartColors.value.cacheRead}20`,
@@ -107,7 +107,7 @@ const chartData = computed(() => {
         tension: 0.3
       },
       {
-        label: t('admin.dashboard.cacheHitRate'),
+        label: t('dashboard.cacheHitRate'),
         data: props.trendData.map((d) => {
           const totalPromptTokens = d.input_tokens + d.cache_read_tokens + d.cache_creation_tokens
           return totalPromptTokens > 0 ? (d.cache_read_tokens / totalPromptTokens) * 100 : 0

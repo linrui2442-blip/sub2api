@@ -7,22 +7,22 @@ import TokenUsageTrend from '../TokenUsageTrend.vue'
 let currentLocale: 'zh' | 'en' = 'en'
 const messages = {
   zh: {
-    'admin.dashboard.tokenUsageTrend': 'Token 使用趋势',
-    'admin.dashboard.noDataAvailable': '暂无数据',
-    'admin.dashboard.input': '输入',
-    'admin.dashboard.output': '输出',
-    'admin.dashboard.cacheCreation': '缓存创建',
-    'admin.dashboard.cacheRead': '缓存读取',
-    'admin.dashboard.cacheHitRate': '缓存命中率'
+    'dashboard.tokenUsageTrend': 'Token 使用趋势',
+    'dashboard.noDataAvailable': '暂无数据',
+    'dashboard.input': '输入',
+    'dashboard.output': '输出',
+    'dashboard.cacheCreation': '缓存创建',
+    'dashboard.cacheRead': '缓存读取',
+    'dashboard.cacheHitRate': '缓存命中率'
   },
   en: {
-    'admin.dashboard.tokenUsageTrend': 'Token Usage Trend',
-    'admin.dashboard.noDataAvailable': 'No data available',
-    'admin.dashboard.input': 'Input',
-    'admin.dashboard.output': 'Output',
-    'admin.dashboard.cacheCreation': 'Cache Creation',
-    'admin.dashboard.cacheRead': 'Cache Read',
-    'admin.dashboard.cacheHitRate': 'Cache Hit Rate'
+    'dashboard.tokenUsageTrend': 'Token Usage Trend',
+    'dashboard.noDataAvailable': 'No data available',
+    'dashboard.input': 'Input',
+    'dashboard.output': 'Output',
+    'dashboard.cacheCreation': 'Cache Creation',
+    'dashboard.cacheRead': 'Cache Read',
+    'dashboard.cacheHitRate': 'Cache Hit Rate'
   }
 }
 
