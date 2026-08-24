@@ -46,6 +46,34 @@ func (r *usageBatchLogRepoStub) ListByModelAndTimeRange(context.Context, string,
 func (r *usageBatchLogRepoStub) GetAccountWindowStats(context.Context, int64, time.Time) (*usagestats.AccountStats, error) {
 	return &usagestats.AccountStats{}, nil
 }
+
+func TestAttachOpenAIUsageWindowStatsDoesNotManufactureMissingQuotaWindows(t *testing.T) {
+	t.Parallel()
+	now := time.Date(2026, 8, 25, 3, 0, 0, 0, time.UTC)
+	repo := &usageBatchLogRepoStub{}
+
+	t.Run("only 5h upstream window", func(t *testing.T) {
+		usage := &UsageInfo{FiveHour: &UsageProgress{Utilization: 73}}
+		attachOpenAIUsageWindowStats(context.Background(), repo, 42, usage, now)
+		if usage.FiveHour.WindowStats == nil {
+			t.Fatal("expected local stats on the reported 5h window")
+		}
+		if usage.SevenDay != nil {
+			t.Fatalf("missing upstream 7d window was manufactured: %#v", usage.SevenDay)
+		}
+	})
+
+	t.Run("5h and 7d upstream windows", func(t *testing.T) {
+		usage := &UsageInfo{
+			FiveHour: &UsageProgress{Utilization: 73},
+			SevenDay: &UsageProgress{Utilization: 21},
+		}
+		attachOpenAIUsageWindowStats(context.Background(), repo, 42, usage, now)
+		if usage.FiveHour.WindowStats == nil || usage.SevenDay.WindowStats == nil {
+			t.Fatalf("expected stats on both reported windows: %#v", usage)
+		}
+	})
+}
 func (r *usageBatchLogRepoStub) GetAccountTodayStats(context.Context, int64) (*usagestats.AccountStats, error) {
 	return &usagestats.AccountStats{}, nil
 }

@@ -742,21 +742,29 @@ func (s *AccountUsageService) getOpenAIUsage(ctx context.Context, account *Accou
 		return usage, nil
 	}
 
-	if stats, err := s.usageLogRepo.GetAccountWindowStats(ctx, account.ID, codexWindowStatsStart(usage.FiveHour, 5*time.Hour, now)); err == nil {
-		if usage.FiveHour == nil {
-			usage.FiveHour = &UsageProgress{Utilization: 0}
-		}
-		usage.FiveHour.WindowStats = windowStatsFromAccountStats(stats)
-	}
-
-	if stats, err := s.usageLogRepo.GetAccountWindowStats(ctx, account.ID, codexWindowStatsStart(usage.SevenDay, 7*24*time.Hour, now)); err == nil {
-		if usage.SevenDay == nil {
-			usage.SevenDay = &UsageProgress{Utilization: 0}
-		}
-		usage.SevenDay.WindowStats = windowStatsFromAccountStats(stats)
-	}
+	attachOpenAIUsageWindowStats(ctx, s.usageLogRepo, account.ID, usage, now)
 
 	return usage, nil
+}
+
+// attachOpenAIUsageWindowStats enriches quota windows that the upstream
+// actually reported. Local usage statistics must not manufacture a missing
+// 5-hour or 7-day quota window, because the UI would render that synthetic
+// window as "0% now".
+func attachOpenAIUsageWindowStats(ctx context.Context, repo UsageLogRepository, accountID int64, usage *UsageInfo, now time.Time) {
+	if repo == nil || usage == nil {
+		return
+	}
+	if usage.FiveHour != nil {
+		if stats, err := repo.GetAccountWindowStats(ctx, accountID, codexWindowStatsStart(usage.FiveHour, 5*time.Hour, now)); err == nil {
+			usage.FiveHour.WindowStats = windowStatsFromAccountStats(stats)
+		}
+	}
+	if usage.SevenDay != nil {
+		if stats, err := repo.GetAccountWindowStats(ctx, accountID, codexWindowStatsStart(usage.SevenDay, 7*24*time.Hour, now)); err == nil {
+			usage.SevenDay.WindowStats = windowStatsFromAccountStats(stats)
+		}
+	}
 }
 
 func shouldRefreshOpenAICodexSnapshot(account *Account, usage *UsageInfo, now time.Time) bool {
