@@ -60,6 +60,7 @@ func TestInit_DualOutput(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Init() error: %v", err)
 	}
+	t.Cleanup(Close)
 
 	L().Info("dual-output-info")
 	L().Warn("dual-output-warn")
@@ -88,6 +89,29 @@ func TestInit_DualOutput(t *testing.T) {
 	fileText := string(fileBytes)
 	if !strings.Contains(fileText, "dual-output-info") || !strings.Contains(fileText, "dual-output-warn") {
 		t.Fatalf("file missing logs: %s", fileText)
+	}
+}
+
+func TestClose_ReleasesFileForRemoval(t *testing.T) {
+	tmpDir := t.TempDir()
+	logPath := filepath.Join(tmpDir, "logs", "sub2api.log")
+	if err := Init(InitOptions{
+		Level:  "info",
+		Format: "json",
+		Output: OutputOptions{ToFile: true, FilePath: logPath},
+		Rotation: RotationOptions{
+			MaxSizeMB:  10,
+			MaxBackups: 1,
+			MaxAgeDays: 1,
+		},
+	}); err != nil {
+		t.Fatalf("Init() error: %v", err)
+	}
+	L().Info("close-file-handle")
+	Close()
+
+	if err := os.Remove(logPath); err != nil {
+		t.Fatalf("log file should be removable after Close(): %v", err)
 	}
 }
 

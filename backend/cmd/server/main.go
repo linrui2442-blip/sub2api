@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -17,10 +18,8 @@ import (
 
 	_ "github.com/Wei-Shaw/sub2api/ent/runtime"
 	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/Wei-Shaw/sub2api/internal/handler"
 	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
-	"github.com/Wei-Shaw/sub2api/internal/repository"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/setup"
 	"github.com/Wei-Shaw/sub2api/internal/web"
@@ -58,6 +57,7 @@ func main() {
 
 	setupMode := flag.Bool("setup", false, "Run setup wizard in CLI mode")
 	showVersion := flag.Bool("version", false, "Show version information")
+	consoleMode := flag.Bool("console", false, "Run Personal Edition in the foreground console")
 	flag.Parse()
 
 	if *showVersion {
@@ -67,22 +67,24 @@ func main() {
 
 	log.Println("Personal Edition runtime enabled: private routes + upstream SIMPLE semantics")
 
-	if *setupMode {
+	setupCompleted := false
+	if *setupMode || setup.NeedsSetup() {
 		log.Println("Personal Edition setup uses the local owner-only browser wizard")
-		runSetupServer()
-		return
+		if err := runSetupServer(); err != nil {
+			log.Printf("Setup server failed: %v", err)
+			return
+		}
+		setupCompleted = true
 	}
 
-	if setup.NeedsSetup() {
-		log.Println("Personal Edition first run detected; starting owner setup wizard...")
-		runSetupServer()
+	if BuildType == "personal" && personal.DesktopSupported() && !*consoleMode {
+		runDesktopServer(!setupCompleted)
 		return
 	}
-
 	runMainServer(true)
 }
 
-func runSetupServer() {
+func runSetupServer() error {
 	r := gin.New()
 	r.Use(middleware.Recovery())
 	r.Use(middleware.CORS(config.CORSConfig{}))
@@ -125,9 +127,9 @@ func runSetupServer() {
 	select {
 	case err := <-serverErr:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("Failed to start setup server: %v", err)
+			return fmt.Errorf("start setup server: %w", err)
 		}
-		return
+		return nil
 	case <-personalInstalled:
 		log.Println("Personal Edition setup completed; switching to main gateway...")
 	}
@@ -149,50 +151,14 @@ func runSetupServer() {
 		log.Println("Setup server shutdown wait timed out; continuing to main gateway")
 	}
 
-	// The setup browser tab polls the main API and redirects itself to /login,
-	// so do not open a second browser tab during this transition.
-	runMainServer(false)
+	return nil
 }
 
 func runMainServer(openBrowser bool) {
-	cfg, err := config.LoadForBootstrap()
-	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
-	}
-	if err := logger.Init(logger.OptionsFromConfig(cfg.Log)); err != nil {
-		log.Fatalf("Failed to initialize logger: %v", err)
-	}
-	log.Println("Personal Edition: public registration/payment/model-plaza routes are disabled")
-
-	buildInfo := handler.BuildInfo{
-		Version:   Version,
-		BuildType: BuildType,
-	}
-
-	app, err := initializePersonalApplication(buildInfo)
-	if err != nil {
-		log.Fatalf("Failed to initialize application: %v", err)
-	}
-	// Keep the embedded Redis listener alive until all application services have
-	// stopped and their Redis clients are closed. Defers execute LIFO, so app
-	// cleanup runs first and the embedded server closes last.
-	defer repository.ClosePersonalEmbeddedRedis()
-	defer app.Cleanup()
-	if app.PromptAudit != nil {
-		if err := app.PromptAudit.Start(context.Background()); err != nil {
-			log.Printf("Prompt Audit started in degraded state: %v", err)
-		}
-	}
-
-	go func() {
-		if err := app.Server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("Failed to start server: %v", err)
-		}
-	}()
-
-	log.Printf("Server started on %s", app.Server.Addr)
-	if openBrowser && personal.Enabled() {
-		personal.OpenLocalBrowser(app.Server.Addr, "/login")
+	controller := &gatewayController{}
+	if err := controller.Start(openBrowser); err != nil {
+		log.Printf("Failed to start Gateway: %v", err)
+		return
 	}
 
 	quit := make(chan os.Signal, 1)
@@ -201,11 +167,29 @@ func runMainServer(openBrowser bool) {
 
 	log.Println("Shutting down server...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := app.Server.Shutdown(ctx); err != nil {
+	if err := controller.Stop(); err != nil {
 		log.Printf("Server forced to shutdown: %v", err)
 	}
 
 	log.Println("Server exited")
+}
+
+func runDesktopServer(openBrowser bool) {
+	controller := &gatewayController{}
+	if err := controller.Start(openBrowser); err != nil {
+		log.Printf("Failed to start Gateway: %v", err)
+	}
+	callbacks := personal.DesktopCallbacks{
+		Running: controller.Running,
+		StartGateway: func() error {
+			return controller.Start(false)
+		},
+		StopGateway:    controller.Stop,
+		OpenManagement: controller.OpenManagement,
+		OpenLogs:       personal.OpenPersonalLogs,
+	}
+	if err := personal.RunDesktop(callbacks); err != nil {
+		log.Printf("Windows tray stopped with error: %v", err)
+	}
+	_ = controller.Stop()
 }

@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - personal-v1
+      - personal-v1.1-desktop
   pull_request:
     branches:
       - main
@@ -119,7 +120,7 @@ jobs:
           GOOS: windows
           GOARCH: amd64
           CGO_ENABLED: "0"
-        run: go build -tags=embed -ldflags='-X main.BuildType=personal' -o ../sub2api-personal.exe ./cmd/server
+        run: go build -tags=embed -ldflags='-H=windowsgui -X main.BuildType=personal' -o ../sub2api-personal.exe ./cmd/server
       - name: Upload Windows Personal Edition
         uses: actions/upload-artifact@v7
         with:

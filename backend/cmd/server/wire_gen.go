@@ -12,6 +12,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
 	"github.com/Wei-Shaw/sub2api/internal/handler/admin"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/repository"
 	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
 	"github.com/Wei-Shaw/sub2api/internal/server"
@@ -202,7 +203,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	engine := server.ProvidePersonalRouter(configConfig, handlers, jwtAuthMiddleware, adminAuthMiddleware, apiKeyAuthMiddleware, auditLogMiddleware, stepUpAuthMiddleware, apiKeyService, opsService, settingService, compositeRouteResolver)
 	httpServer := server.ProvideHTTPServer(configConfig, engine)
 	tokenRefreshService := service.ProvideTokenRefreshService(accountRepository, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, grokOAuthService, compositeTokenCacheInvalidator, schedulerCache, configConfig, tempUnschedCache, privacyClientFactory, proxyRepository, oAuthRefreshAPI, openAIGatewayService)
-	v := providePersonalCleanup(client, redisClient, apiKeyService, opsService, schedulerSnapshotService, tokenRefreshService, usageRecordWorkerPool, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, openAIGatewayService, auditLogService, promptService)
+	v := providePersonalCleanup(client, redisClient, apiKeyService, authCacheInvalidationWorker, opsService, opsSystemLogSink, schedulerSnapshotService, tokenRefreshService, usageRecordWorkerPool, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, openAIGatewayService, auditLogService, promptService)
 	application := &Application{
 		Server:      httpServer,
 		Handlers:    handlers,
@@ -234,7 +235,9 @@ func providePersonalCleanup(
 	entClient *ent.Client,
 	rdb *redis.Client,
 	apiKeyService *service.APIKeyService,
+	authCacheInvalidationWorker *service.AuthCacheInvalidationWorker,
 	opsService *service.OpsService,
+	opsSystemLogSink *service.OpsSystemLogSink,
 	schedulerSnapshot *service.SchedulerSnapshotService,
 	tokenRefresh *service.TokenRefreshService,
 	usageRecordWorkerPool *service.UsageRecordWorkerPool,
@@ -256,6 +259,12 @@ func providePersonalCleanup(
 		}
 
 		parallelSteps := []cleanupStep{
+			{"AuthCacheInvalidationWorker", func() error {
+				if authCacheInvalidationWorker != nil {
+					authCacheInvalidationWorker.Stop()
+				}
+				return nil
+			}},
 			{"AuthCacheInvalidationSubscriber", func() error {
 				if apiKeyService != nil {
 					apiKeyService.StopAuthCacheInvalidationSubscriber()
@@ -265,6 +274,13 @@ func providePersonalCleanup(
 			{"OpsRuntimeSettingsRefresh", func() error {
 				if opsService != nil {
 					opsService.StopRuntimeSettingsRefresh()
+				}
+				return nil
+			}},
+			{"OpsSystemLogSink", func() error {
+				if opsSystemLogSink != nil {
+					logger.SetSink(nil)
+					opsSystemLogSink.Stop()
 				}
 				return nil
 			}},

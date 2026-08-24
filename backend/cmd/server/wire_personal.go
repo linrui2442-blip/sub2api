@@ -13,6 +13,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/repository"
 	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
 	"github.com/Wei-Shaw/sub2api/internal/server"
@@ -72,7 +73,9 @@ func providePersonalCleanup(
 	entClient *ent.Client,
 	rdb *redis.Client,
 	apiKeyService *service.APIKeyService,
+	authCacheInvalidationWorker *service.AuthCacheInvalidationWorker,
 	opsService *service.OpsService,
+	opsSystemLogSink *service.OpsSystemLogSink,
 	schedulerSnapshot *service.SchedulerSnapshotService,
 	tokenRefresh *service.TokenRefreshService,
 	usageRecordWorkerPool *service.UsageRecordWorkerPool,
@@ -94,6 +97,12 @@ func providePersonalCleanup(
 		}
 
 		parallelSteps := []cleanupStep{
+			{"AuthCacheInvalidationWorker", func() error {
+				if authCacheInvalidationWorker != nil {
+					authCacheInvalidationWorker.Stop()
+				}
+				return nil
+			}},
 			{"AuthCacheInvalidationSubscriber", func() error {
 				if apiKeyService != nil {
 					apiKeyService.StopAuthCacheInvalidationSubscriber()
@@ -103,6 +112,13 @@ func providePersonalCleanup(
 			{"OpsRuntimeSettingsRefresh", func() error {
 				if opsService != nil {
 					opsService.StopRuntimeSettingsRefresh()
+				}
+				return nil
+			}},
+			{"OpsSystemLogSink", func() error {
+				if opsSystemLogSink != nil {
+					logger.SetSink(nil)
+					opsSystemLogSink.Stop()
 				}
 				return nil
 			}},
