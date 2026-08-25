@@ -8,17 +8,22 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
 	"github.com/gogpu/systray"
+	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 )
 
 const (
 	startupRegistryPath = `Software\Microsoft\Windows\CurrentVersion\Run`
 	startupValueName    = "Sub2API Personal"
+	wmQuit              = 0x0012
 )
+
+var postThreadMessageW = windows.NewLazySystemDLL("user32.dll").NewProc("PostThreadMessageW")
 
 const trayIconBase64 = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAKuSURBVFhH7VehjttAEA05yZJ1chU7lx65lpzUFhUW9hMKDxYeLCw8dvBgYECza6nkSJVdI8PAwsDCgwcDt5r12tl5u7aTtFJJnzRSFM/Mzsy+mbEnk/84EbNq9T5X5cdWputvH1Dnr+JVvUxmavU517LMldwVWpqY5EqoXK1us3r5An2cjFyLT4UWv/CwEXnO1+IrBY7+DgZlUVTyMeL8cFFyO1fla/Q9CjIi48BhJ7YidSeDuvKZeIJn9MJmHnFId59X4oEIiDYECjpX4o4ORFsbhBZv0CaKnrJvZj++v0TdGEiv0HIZ+FByO8qJYi1uAkMtl6OGERAJ0RdVEPU60CG5Fk+YefTw9Mpk83cg1yZNJsZXK3S5YAEoueslJfUvKsfKnkzfRg7fy3mWdkFQ8CGfygX36EBDhClW8h514pmj8Eo0c8RLTIsn7tQxHydcjLV+9n6m+CybFrwK0BnB6KY/WPZKbpmCw/6QK5NM+H1PkktzPnfPLy7NmfccO4vGOrMNyqSEYgoOZ9m1V+pIED1w88H3fwcKnIDUekyhQ2HSNksQvBIfo/6x/2nrMQUffqljAuUnYAUCgtOshgg3TCGK1KQXPYEgB4J5sLplrtz49AMwR+90VhneirjOiXPc2BJR/oQgvjAF/wCvzXz4JE3TJgBaXjx7uYtOV7wnGhhckRMwIB1wow0gMuAemV2LZp3CMIJ24W04JE2LIrldYmH5W9C2QgNystcYIF4nzf03L65BQtH50oHIGNmIQSV6d4Ljhh1sio9fu9x6XmYYaCxj5E42Y69WTdZw59FKjoCUe4Jw74PlgqpCmVryVvI+XLt7CSp4CGwlItdxjNiy4+I5Bg0nZImOD5Q6WLunoqnG8FdRK/braKjV/hTtvbvBVdP9299rcXP0+P7X+A0dH/RHYs58YgAAAABJRU5ErkJggg=="
 
@@ -27,6 +32,10 @@ func DesktopSupported() bool { return true }
 // RunDesktop hosts the native Windows tray. Starting and stopping the Gateway
 // delegates to the same application graph used by foreground mode.
 func RunDesktop(callbacks DesktopCallbacks) error {
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	trayThreadID := windows.GetCurrentThreadId()
+
 	icon, err := base64.StdEncoding.DecodeString(trayIconBase64)
 	if err != nil {
 		return fmt.Errorf("decode tray icon: %w", err)
@@ -36,7 +45,11 @@ func RunDesktop(callbacks DesktopCallbacks) error {
 	tray.SetIcon(icon)
 
 	var actionMu sync.Mutex
-	var exiting bool
+	exitHandler := newDesktopExitHandler(callbacks.StopGateway, func() {
+		if posted, _, postErr := postThreadMessageW.Call(uintptr(trayThreadID), wmQuit, 0, 0); posted == 0 {
+			tray.ShowNotification("Sub2API Personal", "退出失败："+postErr.Error())
+		}
+	})
 	var rebuild func()
 	rebuild = func() {
 		running := callbacks.Running != nil && callbacks.Running()
@@ -91,14 +104,7 @@ func RunDesktop(callbacks DesktopCallbacks) error {
 			go func() {
 				actionMu.Lock()
 				defer actionMu.Unlock()
-				if exiting {
-					return
-				}
-				exiting = true
-				if callbacks.StopGateway != nil {
-					_ = callbacks.StopGateway()
-				}
-				tray.Remove()
+				exitHandler.Exit()
 			}()
 		})
 		tray.SetMenu(menu)
@@ -111,7 +117,9 @@ func RunDesktop(callbacks DesktopCallbacks) error {
 		}
 	})
 	tray.Show()
-	return tray.Run()
+	err = tray.Run()
+	tray.Remove()
+	return err
 }
 
 func personalStartupEnabled() (bool, error) {
