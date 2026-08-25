@@ -7,6 +7,7 @@ type DesktopCallbacks struct {
 	Running        func() bool
 	StartGateway   func() error
 	StopGateway    func() error
+	RestartGateway func() error
 	OpenManagement func()
 	OpenLogs       func() error
 }

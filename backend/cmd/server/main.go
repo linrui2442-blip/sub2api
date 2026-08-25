@@ -199,7 +199,13 @@ func runDesktopServer(openBrowser bool) {
 		StartGateway: func() error {
 			return controller.Start(false)
 		},
-		StopGateway:    controller.Stop,
+		StopGateway: controller.Stop,
+		RestartGateway: func() error {
+			if err := controller.Stop(); err != nil {
+				return err
+			}
+			return controller.Start(false)
+		},
 		OpenManagement: controller.OpenManagement,
 		OpenLogs:       personal.OpenPersonalLogs,
 	}
