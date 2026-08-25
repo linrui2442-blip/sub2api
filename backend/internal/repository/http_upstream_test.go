@@ -198,10 +198,12 @@ func TestHTTPUpstreamDoAppliesGrokCLIIdentityBeforeOAuthRoundTrip(t *testing.T) 
 			require.True(t, ok)
 
 			const accountID int64 = 4084
+			const testProxyURL = "http://127.0.0.1:1"
 			isolation := svc.getIsolationMode()
 			profile := service.HTTPUpstreamProfileDefault
-			proxyKey := directProxyKey
-			protocolMode := svc.resolveProtocolMode(profile, proxyKey, nil)
+			proxyKey, parsedProxy, err := normalizeProxyURL(testProxyURL)
+			require.NoError(t, err)
+			protocolMode := svc.resolveProtocolMode(profile, proxyKey, parsedProxy)
 			settings := svc.resolvePoolSettings(isolation, 1)
 			settings = svc.applyProfilePoolSettings(settings, profile)
 			cacheKey := buildCacheKey(isolation, proxyKey, accountID, protocolMode)
@@ -230,7 +232,7 @@ func TestHTTPUpstreamDoAppliesGrokCLIIdentityBeforeOAuthRoundTrip(t *testing.T) 
 			require.NoError(t, err)
 			req.Header.Set("User-Agent", "sub2api-grok/1.0")
 
-			resp, err := svc.Do(req, "", accountID, 1)
+			resp, err := svc.Do(req, testProxyURL, accountID, 1)
 			require.NoError(t, err)
 			require.Equal(t, http.StatusOK, resp.StatusCode)
 			require.NoError(t, resp.Body.Close())
@@ -248,10 +250,12 @@ func TestHTTPUpstreamDoFallsBackToOfficialGrokAPIOnCLIAccessDenied(t *testing.T)
 	require.True(t, ok)
 
 	const accountID int64 = 4421
+	const testProxyURL = "http://127.0.0.1:1"
 	isolation := svc.getIsolationMode()
 	profile := service.HTTPUpstreamProfileDefault
-	proxyKey := directProxyKey
-	protocolMode := svc.resolveProtocolMode(profile, proxyKey, nil)
+	proxyKey, parsedProxy, err := normalizeProxyURL(testProxyURL)
+	require.NoError(t, err)
+	protocolMode := svc.resolveProtocolMode(profile, proxyKey, parsedProxy)
 	settings := svc.resolvePoolSettings(isolation, 1)
 	settings = svc.applyProfilePoolSettings(settings, profile)
 	cacheKey := buildCacheKey(isolation, proxyKey, accountID, protocolMode)
@@ -296,7 +300,7 @@ func TestHTTPUpstreamDoFallsBackToOfficialGrokAPIOnCLIAccessDenied(t *testing.T)
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer oauth-token")
 
-	resp, err := svc.Do(req, "", accountID, 1)
+	resp, err := svc.Do(req, testProxyURL, accountID, 1)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 	responseBody, err := io.ReadAll(resp.Body)
