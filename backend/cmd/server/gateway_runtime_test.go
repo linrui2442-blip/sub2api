@@ -71,8 +71,11 @@ func reserveLocalPort(t *testing.T) string {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
-	defer listener.Close()
-	return strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
+	tcpAddress, ok := listener.Addr().(*net.TCPAddr)
+	require.True(t, ok)
+	port := strconv.Itoa(tcpAddress.Port)
+	require.NoError(t, listener.Close())
+	return port
 }
 
 func requireGatewayReachable(t *testing.T, port string) {
@@ -83,8 +86,11 @@ func requireGatewayReachable(t *testing.T, port string) {
 		if err != nil {
 			return false
 		}
-		defer response.Body.Close()
-		return response.StatusCode >= http.StatusOK
+		statusCode := response.StatusCode
+		if err := response.Body.Close(); err != nil {
+			return false
+		}
+		return statusCode >= http.StatusOK
 	}, 5*time.Second, 50*time.Millisecond)
 }
 
