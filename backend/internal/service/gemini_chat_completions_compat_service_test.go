@@ -7,6 +7,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCountChatCompletionInputImages(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want int
+	}{
+		{name: "mixed multimodal content", body: `{"messages":[{"role":"user","content":[{"type":"text","text":"inspect"},{"type":"image_url","image_url":{"url":"data:image/png;base64,AQID"}},{"type":"image_url","image_url":{"url":"https://example.test/image.jpg"}}]}]}`, want: 2},
+		{name: "text only", body: `{"messages":[{"role":"user","content":"hello"}]}`, want: 0},
+		{name: "empty image URL", body: `{"messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"  "}}]}]}`, want: 0},
+		{name: "malformed request", body: `{`, want: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, countChatCompletionInputImages([]byte(tt.body)))
+		})
+	}
+}
+
 func TestGeminiResponseToChatCompletionsPreservesInlineData(t *testing.T) {
 	tests := []struct {
 		name  string

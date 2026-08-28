@@ -281,10 +281,10 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 		usage = &ClaudeUsage{}
 	}
 
-	imageCount := 0
+	imageCount := countChatCompletionInputImages(originalChatBody)
 	imageInputSize := s.extractImageInputSize(claudeBody)
 	imageSize := normalizeOpenAIImageSizeTier(imageInputSize)
-	if isImageGenerationModel(originalModel) {
+	if imageCount == 0 && isImageGenerationModel(originalModel) {
 		imageCount = 1
 	}
 
@@ -302,6 +302,35 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 		ImageInputSize:   imageInputSize,
 		ClientDisconnect: false,
 	}, nil
+}
+
+func countChatCompletionInputImages(body []byte) int {
+	var req struct {
+		Messages []struct {
+			Content json.RawMessage `json:"content"`
+		} `json:"messages"`
+	}
+	if json.Unmarshal(body, &req) != nil {
+		return 0
+	}
+	count := 0
+	for _, message := range req.Messages {
+		var parts []struct {
+			Type     string `json:"type"`
+			ImageURL *struct {
+				URL string `json:"url"`
+			} `json:"image_url"`
+		}
+		if json.Unmarshal(message.Content, &parts) != nil {
+			continue
+		}
+		for _, part := range parts {
+			if part.Type == "image_url" && part.ImageURL != nil && strings.TrimSpace(part.ImageURL.URL) != "" {
+				count++
+			}
+		}
+	}
+	return count
 }
 
 func (s *GeminiMessagesCompatService) buildGeminiChatCompletionsUpstreamRequestFunc(
