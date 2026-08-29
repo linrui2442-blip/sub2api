@@ -116,6 +116,26 @@ func TestPersonalSQLiteUsageBestEffortInsert(t *testing.T) {
 	require.Equal(t, *log.UpstreamModel, upstream)
 }
 
+func TestPersonalSQLiteUsagePersistsImageCount(t *testing.T) {
+	repo, closeRepo := openUsageSQLiteTest(t, "usage-image-count")
+	defer closeRepo()
+	ctx := context.Background()
+	log := personalUsageLog("req-antigravity-images", false)
+	log.ImageCount = 2
+
+	inserted, err := repo.Create(ctx, log)
+	require.NoError(t, err)
+	require.True(t, inserted)
+
+	var imageCount int
+	require.NoError(t, repo.db.QueryRow(
+		"SELECT image_count FROM usage_logs WHERE request_id=? AND api_key_id=?",
+		log.RequestID,
+		log.APIKeyID,
+	).Scan(&imageCount))
+	require.Equal(t, 2, imageCount)
+}
+
 func TestPersonalSQLiteUsageDashboardAggregatesAndExactRange(t *testing.T) {
 	repo, closeRepo := openUsageSQLiteTest(t, "usage-dashboard")
 	defer closeRepo()

@@ -34,6 +34,7 @@ type antigravityCompatRequest struct {
 	originalBody    []byte
 	claudeBody      []byte
 	originalModel   string
+	inputImageCount int
 	clientStream    bool
 	includeUsage    bool
 	startTime       time.Time
@@ -89,6 +90,7 @@ func (s *AntigravityGatewayService) ForwardAsChatCompletions(
 		originalBody:    body,
 		claudeBody:      claudeBody,
 		originalModel:   request.Model,
+		inputImageCount: countChatCompletionInputImages(body),
 		clientStream:    request.Stream,
 		includeUsage:    request.StreamOptions != nil && request.StreamOptions.IncludeUsage,
 		startTime:       time.Now(),
@@ -372,6 +374,7 @@ func (s *AntigravityGatewayService) consumeAntigravityCompatResponse(
 		FirstTokenMs:                  streamResult.firstTokenMs,
 		ReasoningEffort:               call.request.reasoningEffort,
 		ClientDisconnect:              streamResult.clientDisconnect,
+		ImageCount:                    call.request.inputImageCount,
 	}, nil
 }
 

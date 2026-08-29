@@ -182,6 +182,103 @@ func TestAntigravityCompatOAuthUsesNativeTokenAndRoute(t *testing.T) {
 	}
 }
 
+func TestAntigravityCompatChatCompletionsPropagatesInputImageCount(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	tests := []struct {
+		name string
+		body string
+		want int
+	}{
+		{
+			name: "text only",
+			body: `{"model":"gemini-3.1-pro-high","messages":[{"role":"user","content":"hello"}]}`,
+			want: 0,
+		},
+		{
+			name: "one image URL",
+			body: `{"model":"gemini-3.1-pro-high","messages":[{"role":"user","content":[{"type":"text","text":"inspect"},{"type":"image_url","image_url":{"url":"data:image/png;base64,AQID"}}]}]}`,
+			want: 1,
+		},
+		{
+			name: "two image URLs",
+			body: `{"model":"gemini-3.1-pro-high","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"data:image/png;base64,AQID"}},{"type":"image_url","image_url":{"url":"data:image/jpeg;base64,BAUG"}}]}]}`,
+			want: 2,
+		},
+		{
+			name: "empty and missing image URL",
+			body: `{"model":"gemini-3.1-pro-high","messages":[{"role":"user","content":[{"type":"text","text":"inspect"},{"type":"image_url","image_url":{"url":"  "}},{"type":"image_url"}]}]}`,
+			want: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			upstream := &queuedHTTPUpstreamStub{responses: []*http.Response{antigravityCompatSuccessResponse()}}
+			svc := newAntigravityCompatService(config.GatewayConfig{MaxLineSize: defaultMaxLineSize}, upstream)
+			body := []byte(tt.body)
+			c, _ := newAntigravityCompatContext(http.MethodPost, "/v1/chat/completions", body)
+
+			result, err := svc.ForwardAsChatCompletions(
+				context.Background(),
+				c,
+				newAntigravityCompatAccount(AccountTypeOAuth),
+				body,
+				nil,
+			)
+
+			require.NoError(t, err)
+			require.NotNil(t, result)
+			require.Equal(t, tt.want, result.ImageCount)
+		})
+	}
+}
+
+type antigravityCompatUsageCaptureRepo struct {
+	*usageBatchLogRepoStub
+	lastLog *UsageLog
+}
+
+func (r *antigravityCompatUsageCaptureRepo) Create(_ context.Context, log *UsageLog) (bool, error) {
+	r.lastLog = log
+	return true, nil
+}
+
+func TestAntigravityCompatChatCompletionsPersistsInputImageCount(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	body := []byte(`{"model":"gemini-3.1-pro-high","messages":[{"role":"user","content":[{"type":"text","text":"compare"},{"type":"image_url","image_url":{"url":"data:image/png;base64,AQID"}},{"type":"image_url","image_url":{"url":"data:image/jpeg;base64,BAUG"}}]}]}`)
+	upstream := &queuedHTTPUpstreamStub{responses: []*http.Response{antigravityCompatSuccessResponse()}}
+	antigravityService := newAntigravityCompatService(config.GatewayConfig{MaxLineSize: defaultMaxLineSize}, upstream)
+	c, _ := newAntigravityCompatContext(http.MethodPost, "/v1/chat/completions", body)
+	account := newAntigravityCompatAccount(AccountTypeOAuth)
+
+	result, err := antigravityService.ForwardAsChatCompletions(
+		context.Background(),
+		c,
+		account,
+		body,
+		nil,
+	)
+	require.NoError(t, err)
+	require.Equal(t, 2, result.ImageCount)
+
+	usageRepo := &antigravityCompatUsageCaptureRepo{usageBatchLogRepoStub: &usageBatchLogRepoStub{}}
+	usageService := &GatewayService{usageLogRepo: usageRepo}
+	user := &User{ID: 11}
+	apiKey := &APIKey{ID: 22, UserID: user.ID, User: user}
+	require.NoError(t, usageService.RecordUsage(context.Background(), &RecordUsageInput{
+		Result:           result,
+		APIKey:           apiKey,
+		User:             user,
+		Account:          account,
+		InboundEndpoint:  "/v1/chat/completions",
+		UpstreamEndpoint: "/v1internal:streamGenerateContent",
+	}))
+
+	require.NotNil(t, usageRepo.lastLog)
+	require.Equal(t, 2, usageRepo.lastLog.ImageCount)
+}
+
 func TestAntigravityCompatRejectsUnsupportedAccountType(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
