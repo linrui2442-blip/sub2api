@@ -324,7 +324,11 @@ func validateJSONSchemaValue(value any, schema map[string]any, path string) erro
 				}
 				continue
 			}
-			if err := validateJSONSchemaValue(childValue, child.(map[string]any), path+"."+name); err != nil {
+			childSchema, ok := child.(map[string]any)
+			if !ok {
+				return fmt.Errorf("invalid property schema at %s", path)
+			}
+			if err := validateJSONSchemaValue(childValue, childSchema, path+"."+name); err != nil {
 				return err
 			}
 		}

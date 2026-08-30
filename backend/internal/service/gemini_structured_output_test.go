@@ -56,18 +56,21 @@ func TestParseAndTranslateGeminiStrictJSONSchema(t *testing.T) {
 
 	var request map[string]any
 	require.NoError(t, json.Unmarshal(translated, &request))
-	config := request["generationConfig"].(map[string]any)
+	config := mustMapValue(t, request["generationConfig"])
 	require.Equal(t, "application/json", config["responseMimeType"])
-	schema := config["responseJsonSchema"].(map[string]any)
-	properties := schema["properties"].(map[string]any)
+	schema := mustMapValue(t, config["responseJsonSchema"])
+	properties := mustMapValue(t, schema["properties"])
 	require.Contains(t, properties, "alphaNode")
 	require.Contains(t, properties, "betaRef")
 	require.Contains(t, properties, "gammaItems")
 	require.Contains(t, properties, "nestedNode")
 	require.Equal(t, []any{"alphaNode", "betaRef", "gammaItems", "nestedNode"}, schema["required"])
-	require.Equal(t, []any{"x", "y"}, properties["alphaNode"].(map[string]any)["enum"])
-	require.Equal(t, "string", properties["gammaItems"].(map[string]any)["items"].(map[string]any)["type"])
-	require.Equal(t, []any{"string", "null"}, properties["betaRef"].(map[string]any)["type"])
+	alphaNode := mustMapValue(t, properties["alphaNode"])
+	require.Equal(t, []any{"x", "y"}, alphaNode["enum"])
+	gammaItems := mustMapValue(t, properties["gammaItems"])
+	itemSchema := mustMapValue(t, gammaItems["items"])
+	require.Equal(t, "string", itemSchema["type"])
+	require.Equal(t, []any{"string", "null"}, mustMapValue(t, properties["betaRef"])["type"])
 
 	// Structured-output injection must not alter system, text, or multimodal parts.
 	require.Equal(t, request["systemInstruction"], mustObject(t, original)["systemInstruction"])
@@ -92,25 +95,26 @@ func TestGeminiStrictJSONSchemaSurvivesActualUpstreamRequestBuilder(t *testing.T
 	require.NoError(t, err)
 	require.NotContains(t, string(body), "must-not-leak")
 
-	config := mustObject(t, body)["generationConfig"].(map[string]any)
+	config := mustMapValue(t, mustObject(t, body)["generationConfig"])
 	require.Equal(t, "application/json", config["responseMimeType"])
-	schema := config["responseJsonSchema"].(map[string]any)
+	schema := mustMapValue(t, config["responseJsonSchema"])
 	require.Equal(t, false, schema["additionalProperties"])
 	require.Equal(t, []any{"alphaNode", "betaRef", "gammaItems", "nestedNode"}, schema["required"])
-	properties := schema["properties"].(map[string]any)
+	properties := mustMapValue(t, schema["properties"])
 	for _, name := range []string{"alphaNode", "betaRef", "gammaItems", "nestedNode"} {
 		require.Contains(t, properties, name)
 	}
-	require.Equal(t, []any{"x", "y"}, properties["alphaNode"].(map[string]any)["enum"])
-	require.Equal(t, []any{"string", "null"}, properties["betaRef"].(map[string]any)["type"])
-	gammaItems := properties["gammaItems"].(map[string]any)
+	require.Equal(t, []any{"x", "y"}, mustMapValue(t, properties["alphaNode"])["enum"])
+	require.Equal(t, []any{"string", "null"}, mustMapValue(t, properties["betaRef"])["type"])
+	gammaItems := mustMapValue(t, properties["gammaItems"])
 	require.Equal(t, "array", gammaItems["type"])
-	require.Equal(t, "string", gammaItems["items"].(map[string]any)["type"])
-	nested := properties["nestedNode"].(map[string]any)
+	require.Equal(t, "string", mustMapValue(t, gammaItems["items"])["type"])
+	nested := mustMapValue(t, properties["nestedNode"])
 	require.Equal(t, "object", nested["type"])
 	require.Equal(t, false, nested["additionalProperties"])
 	require.Equal(t, []any{"deltaFlag"}, nested["required"])
-	require.Equal(t, "boolean", nested["properties"].(map[string]any)["deltaFlag"].(map[string]any)["type"])
+	nestedProperties := mustMapValue(t, nested["properties"])
+	require.Equal(t, "boolean", mustMapValue(t, nestedProperties["deltaFlag"])["type"])
 }
 
 func TestValidateJSONSchemaCombinatorSemantics(t *testing.T) {
@@ -219,12 +223,14 @@ func TestGeminiStrictJSONSchemaHandlesCallerMetadataAndLocalLengthConstraints(t 
 	require.NoError(t, err)
 	translated, err := applyGeminiStructuredOutput([]byte(`{"contents":[]}`), output)
 	require.NoError(t, err)
-	schema := mustObject(t, translated)["generationConfig"].(map[string]any)["responseJsonSchema"].(map[string]any)
+	config := mustMapValue(t, mustObject(t, translated)["generationConfig"])
+	schema := mustMapValue(t, config["responseJsonSchema"])
 	require.NotContains(t, schema, "$schema")
-	properties := schema["properties"].(map[string]any)
-	require.NotContains(t, properties["label"].(map[string]any), "minLength")
-	require.NotContains(t, properties["label"].(map[string]any), "maxLength")
-	require.Equal(t, "string", properties["kind"].(map[string]any)["type"])
+	properties := mustMapValue(t, schema["properties"])
+	label := mustMapValue(t, properties["label"])
+	require.NotContains(t, label, "minLength")
+	require.NotContains(t, label, "maxLength")
+	require.Equal(t, "string", mustMapValue(t, properties["kind"])["type"])
 
 	require.NoError(t, validateStrictStructuredChatResponse(chatResponseWithText(t, `{"label":"good","kind":"A","nullable":null}`), output))
 	require.ErrorContains(t, validateStrictStructuredChatResponse(chatResponseWithText(t, `{"label":"x","kind":"A","nullable":null}`), output), "minLength")
@@ -306,6 +312,13 @@ func mustObject(t *testing.T, raw []byte) map[string]any {
 	var value map[string]any
 	require.NoError(t, json.Unmarshal(raw, &value))
 	return value
+}
+
+func mustMapValue(t *testing.T, value any) map[string]any {
+	t.Helper()
+	result, ok := value.(map[string]any)
+	require.True(t, ok)
+	return result
 }
 
 func geminiHTTPResponse(text string) *http.Response {
