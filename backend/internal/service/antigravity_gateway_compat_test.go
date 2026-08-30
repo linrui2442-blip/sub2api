@@ -115,6 +115,165 @@ func antigravityCompatSuccessResponse() *http.Response {
 	}
 }
 
+func antigravityCompatSuccessResponseWithText(t *testing.T, text string) *http.Response {
+	t.Helper()
+	payload, err := json.Marshal(map[string]any{
+		"response": map[string]any{
+			"responseId": "resp_3757",
+			"candidates": []any{map[string]any{
+				"content":      map[string]any{"parts": []any{map[string]any{"text": text}}},
+				"finishReason": "STOP",
+			}},
+			"usageMetadata": map[string]any{"promptTokenCount": 8, "candidatesTokenCount": 3},
+		},
+	})
+	require.NoError(t, err)
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body:       io.NopCloser(strings.NewReader("data: " + string(payload) + "\n\n")),
+	}
+}
+
+func antigravityStrictChatBody(responseFormat string, stream bool) []byte {
+	body, _ := json.Marshal(map[string]any{
+		"model":           "gemini-3.1-pro-high",
+		"messages":        []any{map[string]any{"role": "user", "content": "Return the requested JSON."}},
+		"response_format": json.RawMessage(responseFormat),
+		"stream":          stream,
+	})
+	return body
+}
+
+func TestAntigravityCompatStrictJSONSchemaPropagatesAndValidates(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	validJSON := `{"alphaNode":"x","betaRef":null,"gammaItems":["item"],"nestedNode":{"deltaFlag":true}}`
+	upstream := &queuedHTTPUpstreamStub{responses: []*http.Response{antigravityCompatSuccessResponseWithText(t, validJSON)}}
+	svc := newAntigravityCompatService(config.GatewayConfig{MaxLineSize: defaultMaxLineSize}, upstream)
+	body := antigravityStrictChatBody(schemaProbeResponseFormat, false)
+	c, recorder := newAntigravityCompatContext(http.MethodPost, "/v1/chat/completions", body)
+
+	result, err := svc.ForwardAsChatCompletions(context.Background(), c, newAntigravityCompatAccount(AccountTypeOAuth), body, nil)
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Len(t, upstream.requestBodies, 1)
+	config := mustMapValue(t, mustMapValue(t, mustObject(t, upstream.requestBodies[0])["request"])["generationConfig"])
+	require.Equal(t, "application/json", config["responseMimeType"])
+	schema := mustMapValue(t, config["responseJsonSchema"])
+	require.Equal(t, false, schema["additionalProperties"])
+	require.Equal(t, []any{"alphaNode", "betaRef", "gammaItems", "nestedNode"}, schema["required"])
+	properties := mustMapValue(t, schema["properties"])
+	require.Equal(t, []any{"x", "y"}, mustMapValue(t, properties["alphaNode"])["enum"])
+	require.Equal(t, []any{"string", "null"}, mustMapValue(t, properties["betaRef"])["type"])
+	require.Equal(t, "array", mustMapValue(t, properties["gammaItems"])["type"])
+	nested := mustMapValue(t, properties["nestedNode"])
+	require.Equal(t, false, nested["additionalProperties"])
+	require.Equal(t, []any{"deltaFlag"}, nested["required"])
+}
+
+func TestAntigravityCompatStrictJSONSchemaSanitizesUpstreamAndEnforcesLocalBounds(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	responseFormat := `{"type":"json_schema","json_schema":{"name":"Bounds","strict":true,"schema":{"type":"object","additionalProperties":false,"properties":{"label":{"type":"string","minLength":2,"maxLength":4},"choice":{"anyOf":[{"type":"string"},{"type":"null"}]}},"required":["label","choice"]}}}`
+	upstream := &queuedHTTPUpstreamStub{responses: []*http.Response{antigravityCompatSuccessResponseWithText(t, `{"label":"x","choice":null}`)}}
+	svc := newAntigravityCompatService(config.GatewayConfig{MaxLineSize: defaultMaxLineSize}, upstream)
+	body := antigravityStrictChatBody(responseFormat, false)
+	c, recorder := newAntigravityCompatContext(http.MethodPost, "/v1/chat/completions", body)
+
+	result, err := svc.ForwardAsChatCompletions(context.Background(), c, newAntigravityCompatAccount(AccountTypeOAuth), body, nil)
+
+	require.Error(t, err)
+	require.Nil(t, result)
+	require.Equal(t, http.StatusBadGateway, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "structured_output_validation_error")
+	require.Len(t, upstream.requestBodies, 1)
+	config := mustMapValue(t, mustMapValue(t, mustObject(t, upstream.requestBodies[0])["request"])["generationConfig"])
+	properties := mustMapValue(t, mustMapValue(t, config["responseJsonSchema"])["properties"])
+	label := mustMapValue(t, properties["label"])
+	require.NotContains(t, label, "minLength")
+	require.NotContains(t, label, "maxLength")
+	require.Contains(t, mustMapValue(t, properties["choice"]), "anyOf")
+}
+
+func TestAntigravityCompatStrictJSONSchemaEnforcesOneOfExactlyOnce(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	responseFormat := `{"type":"json_schema","json_schema":{"name":"OneOf","strict":true,"schema":{"type":"object","additionalProperties":false,"properties":{"value":{"oneOf":[{"type":"string"},{"type":"string","minLength":1}]}},"required":["value"]}}}`
+	upstream := &queuedHTTPUpstreamStub{responses: []*http.Response{antigravityCompatSuccessResponseWithText(t, `{"value":"alpha"}`)}}
+	svc := newAntigravityCompatService(config.GatewayConfig{MaxLineSize: defaultMaxLineSize}, upstream)
+	body := antigravityStrictChatBody(responseFormat, false)
+	c, recorder := newAntigravityCompatContext(http.MethodPost, "/v1/chat/completions", body)
+
+	result, err := svc.ForwardAsChatCompletions(context.Background(), c, newAntigravityCompatAccount(AccountTypeOAuth), body, nil)
+
+	require.Error(t, err)
+	require.Nil(t, result)
+	require.Equal(t, http.StatusBadGateway, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "structured_output_validation_error")
+	require.Len(t, upstream.requestBodies, 1)
+	config := mustMapValue(t, mustMapValue(t, mustObject(t, upstream.requestBodies[0])["request"])["generationConfig"])
+	valueSchema := mustMapValue(t, mustMapValue(t, mustMapValue(t, config["responseJsonSchema"])["properties"])["value"])
+	require.Len(t, valueSchema["oneOf"], 2)
+}
+
+func TestAntigravityCompatStrictJSONSchemaEnforcesAnyOf(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	responseFormat := `{"type":"json_schema","json_schema":{"name":"AnyOf","strict":true,"schema":{"type":"object","additionalProperties":false,"properties":{"value":{"anyOf":[{"type":"string"},{"type":"null"}]}},"required":["value"]}}}`
+	upstream := &queuedHTTPUpstreamStub{responses: []*http.Response{antigravityCompatSuccessResponseWithText(t, `{"value":7}`)}}
+	svc := newAntigravityCompatService(config.GatewayConfig{MaxLineSize: defaultMaxLineSize}, upstream)
+	body := antigravityStrictChatBody(responseFormat, false)
+	c, recorder := newAntigravityCompatContext(http.MethodPost, "/v1/chat/completions", body)
+
+	result, err := svc.ForwardAsChatCompletions(context.Background(), c, newAntigravityCompatAccount(AccountTypeOAuth), body, nil)
+
+	require.Error(t, err)
+	require.Nil(t, result)
+	require.Equal(t, http.StatusBadGateway, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "structured_output_validation_error")
+	require.Len(t, upstream.requestBodies, 1)
+	config := mustMapValue(t, mustMapValue(t, mustObject(t, upstream.requestBodies[0])["request"])["generationConfig"])
+	valueSchema := mustMapValue(t, mustMapValue(t, mustMapValue(t, config["responseJsonSchema"])["properties"])["value"])
+	require.Len(t, valueSchema["anyOf"], 2)
+}
+
+func TestAntigravityCompatStrictJSONSchemaRejectsUnsupportedAndStreaming(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	tests := []struct {
+		name           string
+		responseFormat string
+		stream         bool
+		wantError      string
+	}{
+		{
+			name:           "unsupported keyword",
+			responseFormat: strings.Replace(schemaProbeResponseFormat, `"type":"string","enum":["x","y"]`, `"type":"string","pattern":"secret-value"`, 1),
+			wantError:      `structured_output_not_supported: unsupported schema keyword \"pattern\"`,
+		},
+		{
+			name:           "strict streaming",
+			responseFormat: schemaProbeResponseFormat,
+			stream:         true,
+			wantError:      "structured_output_not_supported: strict json_schema with stream=true",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			upstream := &queuedHTTPUpstreamStub{}
+			svc := newAntigravityCompatService(config.GatewayConfig{MaxLineSize: defaultMaxLineSize}, upstream)
+			body := antigravityStrictChatBody(tt.responseFormat, tt.stream)
+			c, recorder := newAntigravityCompatContext(http.MethodPost, "/v1/chat/completions", body)
+
+			result, err := svc.ForwardAsChatCompletions(context.Background(), c, newAntigravityCompatAccount(AccountTypeOAuth), body, nil)
+
+			require.Error(t, err)
+			require.Nil(t, result)
+			require.Equal(t, http.StatusBadRequest, recorder.Code)
+			require.Contains(t, recorder.Body.String(), tt.wantError)
+			require.Empty(t, upstream.requestBodies)
+		})
+	}
+}
+
 func TestAntigravityCompatOAuthUsesNativeTokenAndRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -347,7 +506,7 @@ func TestBuildAntigravityCompatGeminiBody_ConfiguresMixedToolInvocations(t *test
 		t.Run(tt.name, func(t *testing.T) {
 			claudeBody := []byte(`{"messages":[{"role":"user","content":"hello"}],"tools":` + tt.tools + `}`)
 			claudeBody = bytes.ReplaceAll(claudeBody, []byte{92}, nil)
-			body, err := svc.buildAntigravityCompatGeminiBody(context.Background(), claudeBody, nil, "project-1", "gemini-2.5-flash")
+			body, err := svc.buildAntigravityCompatGeminiBody(context.Background(), claudeBody, nil, "project-1", "gemini-2.5-flash", nil)
 			require.NoError(t, err)
 
 			var wrapped map[string]any

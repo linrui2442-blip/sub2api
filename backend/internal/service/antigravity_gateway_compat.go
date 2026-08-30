@@ -30,15 +30,16 @@ const (
 )
 
 type antigravityCompatRequest struct {
-	protocol        antigravityCompatProtocol
-	originalBody    []byte
-	claudeBody      []byte
-	originalModel   string
-	inputImageCount int
-	clientStream    bool
-	includeUsage    bool
-	startTime       time.Time
-	reasoningEffort *string
+	protocol         antigravityCompatProtocol
+	originalBody     []byte
+	claudeBody       []byte
+	originalModel    string
+	inputImageCount  int
+	clientStream     bool
+	includeUsage     bool
+	startTime        time.Time
+	reasoningEffort  *string
+	structuredOutput *geminiStructuredOutput
 }
 
 type antigravityCompatUpstreamCall struct {
@@ -69,6 +70,10 @@ func (s *AntigravityGatewayService) ForwardAsChatCompletions(
 	if strings.TrimSpace(request.Model) == "" {
 		return nil, s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", "model is required")
 	}
+	structuredOutput, err := parseGeminiStructuredOutput(request.ResponseFormat, request.Stream)
+	if err != nil {
+		return nil, s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+	}
 
 	responsesRequest, err := apicompat.ChatCompletionsToResponses(&request)
 	if err != nil {
@@ -86,15 +91,16 @@ func (s *AntigravityGatewayService) ForwardAsChatCompletions(
 	}
 
 	return s.forwardAntigravityCompat(ctx, c, account, antigravityCompatRequest{
-		protocol:        antigravityCompatChatCompletions,
-		originalBody:    body,
-		claudeBody:      claudeBody,
-		originalModel:   request.Model,
-		inputImageCount: countChatCompletionInputImages(body),
-		clientStream:    request.Stream,
-		includeUsage:    request.StreamOptions != nil && request.StreamOptions.IncludeUsage,
-		startTime:       time.Now(),
-		reasoningEffort: extractCCReasoningEffortFromBody(body),
+		protocol:         antigravityCompatChatCompletions,
+		originalBody:     body,
+		claudeBody:       claudeBody,
+		originalModel:    request.Model,
+		inputImageCount:  countChatCompletionInputImages(body),
+		clientStream:     request.Stream,
+		includeUsage:     request.StreamOptions != nil && request.StreamOptions.IncludeUsage,
+		startTime:        time.Now(),
+		reasoningEffort:  extractCCReasoningEffortFromBody(body),
+		structuredOutput: structuredOutput,
 	})
 }
 
@@ -238,7 +244,7 @@ func (s *AntigravityGatewayService) prepareAntigravityCompatCall(
 		_ = s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err
 	}
-	geminiBody, err := s.buildAntigravityCompatGeminiBody(ctx, request.claudeBody, &claudeRequest, projectID, mappedModel)
+	geminiBody, err := s.buildAntigravityCompatGeminiBody(ctx, request.claudeBody, &claudeRequest, projectID, mappedModel, request.structuredOutput)
 	if err != nil {
 		return nil, s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", "Invalid request")
 	}
@@ -260,7 +266,11 @@ func (s *AntigravityGatewayService) buildAntigravityCompatGeminiBody(
 	claudeRequest *antigravity.ClaudeRequest,
 	projectID string,
 	mappedModel string,
+	structuredOutput *geminiStructuredOutput,
 ) ([]byte, error) {
+	if structuredOutput != nil && !strings.HasPrefix(strings.ToLower(mappedModel), "gemini-") {
+		return nil, errors.New("structured output requires a Gemini model")
+	}
 	if strings.HasPrefix(strings.ToLower(mappedModel), "gemini-") {
 		body, err := convertClaudeMessagesToGeminiGenerateContent(claudeBody)
 		if err != nil {
@@ -271,6 +281,10 @@ func (s *AntigravityGatewayService) buildAntigravityCompatGeminiBody(
 			return nil, err
 		}
 		body = ensureGeminiFunctionCallThoughtSignatures(body)
+		body, err = applyGeminiStructuredOutput(body, structuredOutput)
+		if err != nil {
+			return nil, err
+		}
 		body, err = injectIdentityPatchToGeminiRequest(body)
 		if err != nil {
 			return nil, err
@@ -397,7 +411,7 @@ func (s *AntigravityGatewayService) consumeAntigravityCompatSuccess(
 	}
 
 	if call.request.protocol == antigravityCompatChatCompletions {
-		return s.handleChatCompletionsNonStreamingFromAntigravity(c, resp, call.request.startTime, call.request.originalModel)
+		return s.handleChatCompletionsNonStreamingFromAntigravity(c, resp, call.request.startTime, call.request.originalModel, call.request.structuredOutput)
 	}
 	return s.handleResponsesNonStreamingFromAntigravity(c, resp, call.request.startTime, call.request.originalModel)
 }
@@ -518,6 +532,7 @@ func (s *AntigravityGatewayService) handleChatCompletionsNonStreamingFromAntigra
 	resp *http.Response,
 	startTime time.Time,
 	originalModel string,
+	structuredOutput *geminiStructuredOutput,
 ) (*antigravityStreamResult, error) {
 	claudeResponse, result, err := s.collectClaudeStreamResponse(c, resp, startTime, originalModel)
 	if err != nil {
@@ -528,7 +543,11 @@ func (s *AntigravityGatewayService) handleChatCompletionsNonStreamingFromAntigra
 		return nil, s.writeAntigravityCompatError(c, http.StatusBadGateway, "upstream_error", "Failed to parse upstream response")
 	}
 	responsesResponse := apicompat.AnthropicToResponsesResponse(&anthropicResponse)
-	c.JSON(http.StatusOK, apicompat.ResponsesToChatCompletions(responsesResponse, originalModel))
+	chatResponse := apicompat.ResponsesToChatCompletions(responsesResponse, originalModel)
+	if err := validateStrictStructuredChatResponse(chatResponse, structuredOutput); err != nil {
+		return nil, s.writeAntigravityCompatError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")
+	}
+	c.JSON(http.StatusOK, chatResponse)
 	return result, nil
 }
 
