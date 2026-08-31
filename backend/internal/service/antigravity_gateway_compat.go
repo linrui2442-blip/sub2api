@@ -183,6 +183,7 @@ func (s *AntigravityGatewayService) forwardAntigravityCompat(
 	}
 
 	var aggregate ClaudeUsage
+	generationBody := call.geminiBody
 	for generation := 0; generation < maxStrictStructuredOutputGenerations; generation++ {
 		result, err := s.antigravityRetryLoop(antigravityRetryLoopParams{
 			ctx:             ctx,
@@ -191,7 +192,7 @@ func (s *AntigravityGatewayService) forwardAntigravityCompat(
 			proxyURL:        call.proxyURL,
 			accessToken:     call.accessToken,
 			action:          "streamGenerateContent",
-			body:            call.geminiBody,
+			body:            generationBody,
 			c:               c,
 			httpUpstream:    s.httpUpstream,
 			settingService:  s.settingService,
@@ -216,6 +217,10 @@ func (s *AntigravityGatewayService) forwardAntigravityCompat(
 			return forwardResult, consumeErr
 		}
 		if strictErr.retryable && generation+1 < maxStrictStructuredOutputGenerations {
+			generationBody, err = applyGeminiStrictCorrectiveInstruction(call.geminiBody, strictErr.diagnostic)
+			if err != nil {
+				return nil, s.writeAntigravityCompatError(c, http.StatusInternalServerError, "api_error", "Failed to prepare strict structured output regeneration")
+			}
 			continue
 		}
 		publicErr := s.writeAntigravityCompatError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")

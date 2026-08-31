@@ -47,10 +47,35 @@ func antigravityRegenerationResponse(t *testing.T, text, finish string, inputTok
 	}
 }
 
+func geminiRequestObject(t *testing.T, body []byte) map[string]any {
+	t.Helper()
+	var root map[string]any
+	require.NoError(t, json.Unmarshal(body, &root))
+	if request, ok := root["request"].(map[string]any); ok {
+		return request
+	}
+	return root
+}
+
+func geminiSystemInstructionText(t *testing.T, body []byte) string {
+	t.Helper()
+	request := geminiRequestObject(t, body)
+	system, _ := request["systemInstruction"].(map[string]any)
+	parts, _ := system["parts"].([]any)
+	var texts []string
+	for _, part := range parts {
+		partMap, _ := part.(map[string]any)
+		if text, ok := partMap["text"].(string); ok {
+			texts = append(texts, text)
+		}
+	}
+	return strings.Join(texts, "\n")
+}
+
 func TestAntigravityStrictRegenerationPolicy(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	const firstSecret = "SUPER_SECRET_MALFORMED_VALUE_91"
-	const secondSecret = "PRIVATE_SECOND_ATTEMPT_VALUE_73"
+	const firstSecret = "SUPER_SECRET_FIRST_OUTPUT_551"
+	const secondSecret = "PRIVATE_BAD_JSON_VALUE_229"
 	valid := `{"kind":"alpha","label":"valid","choice":"left"}`
 	tests := []struct {
 		name           string
@@ -61,14 +86,16 @@ func TestAntigravityStrictRegenerationPolicy(t *testing.T) {
 		wantOutput     int
 		wantErr        bool
 		wantPublicText string
+		wantCorrective string
 	}{
 		{
 			name: "first malformed second valid",
 			responses: []*http.Response{
-				antigravityRegenerationResponse(t, firstSecret, "STOP", 5, 2),
+				antigravityRegenerationResponse(t, firstSecret+secondSecret, "STOP", 5, 2),
 				antigravityRegenerationResponse(t, valid, "STOP", 7, 3),
 			},
 			wantStatus: http.StatusOK, wantCalls: 2, wantInput: 12, wantOutput: 5,
+			wantCorrective: strictJSONParsingCorrectiveInstruction,
 		},
 		{
 			name: "first malformed second malformed",
@@ -78,6 +105,7 @@ func TestAntigravityStrictRegenerationPolicy(t *testing.T) {
 			},
 			wantStatus: http.StatusBadGateway, wantCalls: 2, wantInput: 12, wantOutput: 5, wantErr: true,
 			wantPublicText: "structured_output_validation_error",
+			wantCorrective: strictJSONParsingCorrectiveInstruction,
 		},
 		{
 			name: "first valid",
@@ -93,6 +121,17 @@ func TestAntigravityStrictRegenerationPolicy(t *testing.T) {
 				antigravityRegenerationResponse(t, valid, "STOP", 7, 3),
 			},
 			wantStatus: http.StatusOK, wantCalls: 2, wantInput: 12, wantOutput: 5,
+			wantCorrective: strictJSONValidationCorrectiveInstruction,
+		},
+		{
+			name: "enum invalid second invalid",
+			responses: []*http.Response{
+				antigravityRegenerationResponse(t, `{"kind":"other","label":"valid","choice":"left"}`, "STOP", 5, 2),
+				antigravityRegenerationResponse(t, `{"kind":"other","label":"valid","choice":"left"}`, "STOP", 7, 3),
+			},
+			wantStatus: http.StatusBadGateway, wantCalls: 2, wantInput: 12, wantOutput: 5, wantErr: true,
+			wantPublicText: "structured_output_validation_error",
+			wantCorrective: strictJSONValidationCorrectiveInstruction,
 		},
 		{
 			name: "minLength invalid second valid",
@@ -101,6 +140,7 @@ func TestAntigravityStrictRegenerationPolicy(t *testing.T) {
 				antigravityRegenerationResponse(t, valid, "STOP", 7, 3),
 			},
 			wantStatus: http.StatusOK, wantCalls: 2, wantInput: 12, wantOutput: 5,
+			wantCorrective: strictJSONValidationCorrectiveInstruction,
 		},
 		{
 			name: "oneOf invalid second valid",
@@ -109,6 +149,7 @@ func TestAntigravityStrictRegenerationPolicy(t *testing.T) {
 				antigravityRegenerationResponse(t, valid, "STOP", 7, 3),
 			},
 			wantStatus: http.StatusOK, wantCalls: 2, wantInput: 12, wantOutput: 5,
+			wantCorrective: strictJSONValidationCorrectiveInstruction,
 		},
 		{
 			name: "max tokens does not regenerate",
@@ -142,6 +183,16 @@ func TestAntigravityStrictRegenerationPolicy(t *testing.T) {
 			require.Contains(t, recorder.Body.String(), tt.wantPublicText)
 			require.NotContains(t, recorder.Body.String(), firstSecret)
 			require.NotContains(t, recorder.Body.String(), secondSecret)
+			require.NotContains(t, geminiSystemInstructionText(t, upstream.requestBodies[0]), "previous generation")
+			if tt.wantCalls == 2 {
+				secondRequest := string(upstream.requestBodies[1])
+				require.Contains(t, geminiSystemInstructionText(t, upstream.requestBodies[1]), tt.wantCorrective)
+				require.NotContains(t, secondRequest, firstSecret)
+				require.NotContains(t, secondRequest, secondSecret)
+				for _, forbidden := range []string{"Path", "Keyword", "Expected", "ActualType", "raw parser error"} {
+					require.NotContains(t, secondRequest, forbidden)
+				}
+			}
 			if err != nil {
 				require.NotContains(t, err.Error(), firstSecret)
 				require.NotContains(t, err.Error(), secondSecret)
@@ -186,7 +237,7 @@ func TestNativeGeminiStrictRegenerationAggregatesUsage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	valid := `{"kind":"alpha","label":"valid","choice":"left"}`
 	stub := &geminiCompatHTTPUpstreamStub{responses: []*http.Response{
-		nativeRegenerationResponse(t, "SUPER_SECRET_MALFORMED_VALUE_91", "STOP", 11, 4),
+		nativeRegenerationResponse(t, "SUPER_SECRET_FIRST_OUTPUT_551", "STOP", 11, 4),
 		nativeRegenerationResponse(t, valid, "STOP", 13, 6),
 	}}
 	svc := &GeminiMessagesCompatService{httpUpstream: stub, cfg: &config.Config{}}
@@ -204,14 +255,17 @@ func TestNativeGeminiStrictRegenerationAggregatesUsage(t *testing.T) {
 	require.Equal(t, 2, stub.calls)
 	require.Equal(t, 24, result.Usage.InputTokens)
 	require.Equal(t, 10, result.Usage.OutputTokens)
-	require.NotContains(t, recorder.Body.String(), "SUPER_SECRET_MALFORMED_VALUE_91")
+	require.NotContains(t, recorder.Body.String(), "SUPER_SECRET_FIRST_OUTPUT_551")
+	require.Len(t, stub.requestBodies, 2)
+	require.Contains(t, geminiSystemInstructionText(t, stub.requestBodies[1]), strictJSONParsingCorrectiveInstruction)
+	require.NotContains(t, string(stub.requestBodies[1]), "SUPER_SECRET_FIRST_OUTPUT_551")
 }
 
 func TestNativeGeminiStrictSecondFailureWritesOneSanitizedError(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	stub := &geminiCompatHTTPUpstreamStub{responses: []*http.Response{
-		nativeRegenerationResponse(t, "SUPER_SECRET_MALFORMED_VALUE_91", "STOP", 11, 4),
-		nativeRegenerationResponse(t, "PRIVATE_SECOND_ATTEMPT_VALUE_73", "STOP", 13, 6),
+		nativeRegenerationResponse(t, "SUPER_SECRET_FIRST_OUTPUT_551", "STOP", 11, 4),
+		nativeRegenerationResponse(t, "PRIVATE_BAD_JSON_VALUE_229", "STOP", 13, 6),
 	}}
 	svc := &GeminiMessagesCompatService{httpUpstream: stub, cfg: &config.Config{}}
 	account := &Account{ID: 101, Platform: PlatformGemini, Type: AccountTypeAPIKey, Concurrency: 1, Credentials: map[string]any{"api_key": "test-key"}}
@@ -230,15 +284,19 @@ func TestNativeGeminiStrictSecondFailureWritesOneSanitizedError(t *testing.T) {
 	require.Equal(t, 10, result.Usage.OutputTokens)
 	require.Equal(t, 1, strings.Count(recorder.Body.String(), `"error"`))
 	require.Contains(t, recorder.Body.String(), "structured_output_validation_error")
-	require.NotContains(t, recorder.Body.String(), "SUPER_SECRET_MALFORMED_VALUE_91")
-	require.NotContains(t, recorder.Body.String(), "PRIVATE_SECOND_ATTEMPT_VALUE_73")
+	require.NotContains(t, recorder.Body.String(), "SUPER_SECRET_FIRST_OUTPUT_551")
+	require.NotContains(t, recorder.Body.String(), "PRIVATE_BAD_JSON_VALUE_229")
+	require.Len(t, stub.requestBodies, 2)
+	require.Contains(t, geminiSystemInstructionText(t, stub.requestBodies[1]), strictJSONParsingCorrectiveInstruction)
+	require.NotContains(t, string(stub.requestBodies[1]), "SUPER_SECRET_FIRST_OUTPUT_551")
+	require.NotContains(t, string(stub.requestBodies[1]), "PRIVATE_BAD_JSON_VALUE_229")
 }
 
 func TestNativeGeminiOAuthStrictRegenerationKeepsAccountAndImageCount(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	valid := `{"kind":"alpha","label":"valid","choice":"left"}`
 	stub := &geminiCompatHTTPUpstreamStub{responses: []*http.Response{
-		nativeOAuthRegenerationResponse(t, "SUPER_SECRET_MALFORMED_VALUE_91", "STOP", 3, 2),
+		nativeOAuthRegenerationResponse(t, "SUPER_SECRET_FIRST_OUTPUT_551", "STOP", 3, 2),
 		nativeOAuthRegenerationResponse(t, valid, "STOP", 5, 4),
 	}}
 	svc := &GeminiMessagesCompatService{tokenProvider: &GeminiTokenProvider{}, httpUpstream: stub, cfg: &config.Config{}}
@@ -276,5 +334,11 @@ func TestNativeGeminiOAuthStrictRegenerationKeepsAccountAndImageCount(t *testing
 	postedBody, readErr := io.ReadAll(stub.lastReq.Body)
 	require.NoError(t, readErr)
 	require.Contains(t, string(postedBody), "test-project")
-	require.NotContains(t, recorder.Body.String(), "SUPER_SECRET_MALFORMED_VALUE_91")
+	require.NotContains(t, recorder.Body.String(), "SUPER_SECRET_FIRST_OUTPUT_551")
+	require.Len(t, stub.requestBodies, 2)
+	firstRequest := geminiRequestObject(t, stub.requestBodies[0])
+	secondRequest := geminiRequestObject(t, stub.requestBodies[1])
+	require.Equal(t, firstRequest["contents"], secondRequest["contents"])
+	require.Contains(t, geminiSystemInstructionText(t, stub.requestBodies[1]), strictJSONParsingCorrectiveInstruction)
+	require.NotContains(t, string(stub.requestBodies[1]), "SUPER_SECRET_FIRST_OUTPUT_551")
 }

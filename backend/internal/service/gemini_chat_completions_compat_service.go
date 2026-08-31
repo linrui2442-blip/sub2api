@@ -77,7 +77,7 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 	originalChatBody []byte,
 	structuredOutput *geminiStructuredOutput,
 ) (*ForwardResult, error) {
-	return s.forwardClaudeBodyAsChatCompletionsAttempt(ctx, c, account, claudeBody, originalModel, clientStream, includeUsage, startTime, originalChatBody, structuredOutput, 0, ClaudeUsage{})
+	return s.forwardClaudeBodyAsChatCompletionsAttempt(ctx, c, account, claudeBody, originalModel, clientStream, includeUsage, startTime, originalChatBody, structuredOutput, 0, ClaudeUsage{}, nil)
 }
 
 func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletionsAttempt(
@@ -93,6 +93,7 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletionsAttempt(
 	structuredOutput *geminiStructuredOutput,
 	generation int,
 	carriedUsage ClaudeUsage,
+	correctiveCause error,
 ) (*ForwardResult, error) {
 	var req struct {
 		Model  string `json:"model"`
@@ -118,6 +119,12 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletionsAttempt(
 	geminiReq, err = applyGeminiStructuredOutput(geminiReq, structuredOutput)
 	if err != nil {
 		return nil, s.writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", "Failed to translate structured output schema")
+	}
+	if generation > 0 {
+		geminiReq, err = applyGeminiStrictCorrectiveInstruction(geminiReq, correctiveCause)
+		if err != nil {
+			return nil, s.writeChatCompletionsError(c, http.StatusInternalServerError, "api_error", "Failed to prepare strict structured output regeneration")
+		}
 	}
 
 	proxyURL := ""
@@ -297,7 +304,7 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletionsAttempt(
 			attemptErr := newStrictStructuredOutputAttemptError(err, chatResp, *usageObj2)
 			addClaudeUsage(&carriedUsage, *usageObj2)
 			if attemptErr.retryable && generation+1 < maxStrictStructuredOutputGenerations {
-				return s.forwardClaudeBodyAsChatCompletionsAttempt(ctx, c, account, claudeBody, originalModel, clientStream, includeUsage, startTime, originalChatBody, structuredOutput, generation+1, carriedUsage)
+				return s.forwardClaudeBodyAsChatCompletionsAttempt(ctx, c, account, claudeBody, originalModel, clientStream, includeUsage, startTime, originalChatBody, structuredOutput, generation+1, carriedUsage, attemptErr.diagnostic)
 			}
 			publicErr := s.writeChatCompletionsError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")
 			return &ForwardResult{Usage: carriedUsage, Model: originalModel, UpstreamModel: mappedModel, Duration: time.Since(startTime), ImageCount: countChatCompletionInputImages(originalChatBody)}, preserveStrictJSONValidationDiagnostic(publicErr, attemptErr)
@@ -313,7 +320,7 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletionsAttempt(
 			}
 			addClaudeUsage(&carriedUsage, strictErr.usage)
 			if strictErr.retryable && generation+1 < maxStrictStructuredOutputGenerations {
-				return s.forwardClaudeBodyAsChatCompletionsAttempt(ctx, c, account, claudeBody, originalModel, clientStream, includeUsage, startTime, originalChatBody, structuredOutput, generation+1, carriedUsage)
+				return s.forwardClaudeBodyAsChatCompletionsAttempt(ctx, c, account, claudeBody, originalModel, clientStream, includeUsage, startTime, originalChatBody, structuredOutput, generation+1, carriedUsage, strictErr.diagnostic)
 			}
 			publicErr := s.writeChatCompletionsError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")
 			return &ForwardResult{Usage: carriedUsage, Model: originalModel, UpstreamModel: mappedModel, Duration: time.Since(startTime), ImageCount: countChatCompletionInputImages(originalChatBody)}, preserveStrictJSONValidationDiagnostic(publicErr, strictErr)

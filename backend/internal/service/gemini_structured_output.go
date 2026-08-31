@@ -30,6 +30,11 @@ type StrictJSONValidationError struct {
 
 const maxStrictStructuredOutputGenerations = 2
 
+const (
+	strictJSONParsingCorrectiveInstruction    = "The previous generation did not produce syntactically valid JSON. Return exactly one JSON value that conforms to the provided JSON Schema. Return JSON only. Do not include prose, explanations, Markdown, or code fences."
+	strictJSONValidationCorrectiveInstruction = "The previous generation did not satisfy the requested strict JSON Schema. Regenerate the response as exactly one JSON value that fully conforms to the provided schema. Return JSON only. Do not include prose, explanations, Markdown, or code fences."
+)
+
 type strictStructuredOutputAttemptError struct {
 	diagnostic error
 	usage      ClaudeUsage
@@ -63,6 +68,46 @@ func addClaudeUsage(total *ClaudeUsage, usage ClaudeUsage) {
 	total.CacheCreation5mTokens += usage.CacheCreation5mTokens
 	total.CacheCreation1hTokens += usage.CacheCreation1hTokens
 	total.ImageOutputTokens += usage.ImageOutputTokens
+}
+
+func strictJSONCorrectiveInstruction(validationErr error) (string, bool) {
+	var diagnostic *StrictJSONValidationError
+	if !errors.As(validationErr, &diagnostic) {
+		return "", false
+	}
+	switch diagnostic.Stage {
+	case "parsing":
+		return strictJSONParsingCorrectiveInstruction, true
+	case "validation":
+		return strictJSONValidationCorrectiveInstruction, true
+	default:
+		return "", false
+	}
+}
+
+func applyGeminiStrictCorrectiveInstruction(body []byte, validationErr error) ([]byte, error) {
+	instruction, ok := strictJSONCorrectiveInstruction(validationErr)
+	if !ok {
+		return body, nil
+	}
+
+	var root map[string]any
+	if err := json.Unmarshal(body, &root); err != nil {
+		return nil, err
+	}
+	target := root
+	if request, ok := root["request"].(map[string]any); ok {
+		target = request
+	}
+
+	systemInstruction, _ := target["systemInstruction"].(map[string]any)
+	if systemInstruction == nil {
+		systemInstruction = make(map[string]any)
+		target["systemInstruction"] = systemInstruction
+	}
+	parts, _ := systemInstruction["parts"].([]any)
+	systemInstruction["parts"] = append(parts, map[string]any{"text": instruction})
+	return json.Marshal(root)
 }
 
 func (e *StrictJSONValidationError) Error() string {

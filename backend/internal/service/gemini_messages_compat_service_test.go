@@ -19,16 +19,25 @@ import (
 )
 
 type geminiCompatHTTPUpstreamStub struct {
-	response  *http.Response
-	responses []*http.Response
-	err       error
-	calls     int
-	lastReq   *http.Request
+	response      *http.Response
+	responses     []*http.Response
+	err           error
+	calls         int
+	lastReq       *http.Request
+	requestBodies [][]byte
 }
 
 func (s *geminiCompatHTTPUpstreamStub) Do(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error) {
 	s.calls++
 	s.lastReq = req
+	if req.Body != nil {
+		body, readErr := io.ReadAll(req.Body)
+		if readErr != nil {
+			return nil, readErr
+		}
+		s.requestBodies = append(s.requestBodies, body)
+		req.Body = io.NopCloser(bytes.NewReader(body))
+	}
 	if s.err != nil {
 		return nil, s.err
 	}
