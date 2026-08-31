@@ -77,6 +77,23 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 	originalChatBody []byte,
 	structuredOutput *geminiStructuredOutput,
 ) (*ForwardResult, error) {
+	return s.forwardClaudeBodyAsChatCompletionsAttempt(ctx, c, account, claudeBody, originalModel, clientStream, includeUsage, startTime, originalChatBody, structuredOutput, 0, ClaudeUsage{})
+}
+
+func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletionsAttempt(
+	ctx context.Context,
+	c *gin.Context,
+	account *Account,
+	claudeBody []byte,
+	originalModel string,
+	clientStream bool,
+	includeUsage bool,
+	startTime time.Time,
+	originalChatBody []byte,
+	structuredOutput *geminiStructuredOutput,
+	generation int,
+	carriedUsage ClaudeUsage,
+) (*ForwardResult, error) {
 	var req struct {
 		Model  string `json:"model"`
 		Stream bool   `json:"stream"`
@@ -277,15 +294,29 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 			return nil, s.writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", "Failed to parse upstream response")
 		}
 		if err := validateStrictStructuredChatResponse(chatResp, structuredOutput); err != nil {
+			attemptErr := newStrictStructuredOutputAttemptError(err, chatResp, *usageObj2)
+			addClaudeUsage(&carriedUsage, *usageObj2)
+			if attemptErr.retryable && generation+1 < maxStrictStructuredOutputGenerations {
+				return s.forwardClaudeBodyAsChatCompletionsAttempt(ctx, c, account, claudeBody, originalModel, clientStream, includeUsage, startTime, originalChatBody, structuredOutput, generation+1, carriedUsage)
+			}
 			publicErr := s.writeChatCompletionsError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")
-			return nil, preserveStrictJSONValidationDiagnostic(publicErr, err)
+			return &ForwardResult{Usage: carriedUsage, Model: originalModel, UpstreamModel: mappedModel, Duration: time.Since(startTime), ImageCount: countChatCompletionInputImages(originalChatBody)}, preserveStrictJSONValidationDiagnostic(publicErr, attemptErr)
 		}
 		c.JSON(http.StatusOK, chatResp)
 		usage = usageObj2
 	} else {
 		usageResp, err := s.handleChatCompletionsNonStreamingResponseFromGemini(c, resp, originalModel, account.Type == AccountTypeOAuth, structuredOutput)
 		if err != nil {
-			return nil, err
+			var strictErr *strictStructuredOutputAttemptError
+			if !errors.As(err, &strictErr) {
+				return nil, err
+			}
+			addClaudeUsage(&carriedUsage, strictErr.usage)
+			if strictErr.retryable && generation+1 < maxStrictStructuredOutputGenerations {
+				return s.forwardClaudeBodyAsChatCompletionsAttempt(ctx, c, account, claudeBody, originalModel, clientStream, includeUsage, startTime, originalChatBody, structuredOutput, generation+1, carriedUsage)
+			}
+			publicErr := s.writeChatCompletionsError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")
+			return &ForwardResult{Usage: carriedUsage, Model: originalModel, UpstreamModel: mappedModel, Duration: time.Since(startTime), ImageCount: countChatCompletionInputImages(originalChatBody)}, preserveStrictJSONValidationDiagnostic(publicErr, strictErr)
 		}
 		usage = usageResp
 	}
@@ -293,6 +324,7 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 	if usage == nil {
 		usage = &ClaudeUsage{}
 	}
+	addClaudeUsage(usage, carriedUsage)
 
 	imageCount := countChatCompletionInputImages(originalChatBody)
 	imageInputSize := s.extractImageInputSize(claudeBody)
@@ -516,8 +548,7 @@ func (s *GeminiMessagesCompatService) handleChatCompletionsNonStreamingResponseF
 		return nil, s.writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", "Failed to parse upstream response")
 	}
 	if err := validateStrictStructuredChatResponse(chatResp, structuredOutput); err != nil {
-		publicErr := s.writeChatCompletionsError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")
-		return nil, preserveStrictJSONValidationDiagnostic(publicErr, err)
+		return nil, newStrictStructuredOutputAttemptError(err, chatResp, *usage)
 	}
 
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)

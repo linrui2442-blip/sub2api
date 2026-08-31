@@ -341,14 +341,13 @@ func TestGeminiStrictResponseValidationIsWiredBeforeHTTP200(t *testing.T) {
 		require.Equal(t, http.StatusOK, recorder.Code)
 	})
 
-	t.Run("invalid response is a safe gateway error", func(t *testing.T) {
+	t.Run("invalid response is deferred to the regeneration boundary", func(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		context, _ := gin.CreateTestContext(recorder)
 		upstream := geminiHTTPResponse(`{"alphaNode":"x","betaRef":null,"gammaItems":[],"nestedNode":{"deltaFlag":true},"AUTHORIZATION_SECRET":"must-not-leak"}`)
 		_, err := service.handleChatCompletionsNonStreamingResponseFromGemini(context, upstream, "gemini-3.1-pro", false, output)
 		require.Error(t, err)
-		require.Equal(t, http.StatusBadGateway, recorder.Code)
-		require.Contains(t, recorder.Body.String(), "structured_output_validation_error")
+		require.Empty(t, recorder.Body.String())
 		require.NotContains(t, recorder.Body.String(), "AUTHORIZATION_SECRET")
 		require.NotContains(t, recorder.Body.String(), "must-not-leak")
 	})
@@ -365,13 +364,13 @@ func TestGeminiStrictValidationDiagnosticStaysInternal(t *testing.T) {
 
 	_, err = service.handleChatCompletionsNonStreamingResponseFromGemini(context, upstream, "gemini-3.1-pro", false, output)
 
-	require.EqualError(t, err, "Upstream response did not satisfy requested strict JSON schema")
+	require.EqualError(t, err, "upstream response did not satisfy requested strict JSON schema")
 	var diagnostic *StrictJSONValidationError
 	require.True(t, errors.As(err, &diagnostic))
 	require.Equal(t, "$.alphaNode", diagnostic.Path)
 	require.Equal(t, "enum", diagnostic.Keyword)
 	require.NotContains(t, diagnostic.Error(), sentinel)
-	require.Equal(t, http.StatusBadGateway, recorder.Code)
+	require.Empty(t, recorder.Body.String())
 	require.NotContains(t, recorder.Body.String(), sentinel)
 	require.NotContains(t, recorder.Body.String(), diagnostic.Path)
 	require.NotContains(t, recorder.Body.String(), diagnostic.Keyword)

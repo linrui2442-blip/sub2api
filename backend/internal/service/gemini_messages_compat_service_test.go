@@ -19,10 +19,11 @@ import (
 )
 
 type geminiCompatHTTPUpstreamStub struct {
-	response *http.Response
-	err      error
-	calls    int
-	lastReq  *http.Request
+	response  *http.Response
+	responses []*http.Response
+	err       error
+	calls     int
+	lastReq   *http.Request
 }
 
 func (s *geminiCompatHTTPUpstreamStub) Do(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error) {
@@ -30,6 +31,11 @@ func (s *geminiCompatHTTPUpstreamStub) Do(req *http.Request, proxyURL string, ac
 	s.lastReq = req
 	if s.err != nil {
 		return nil, s.err
+	}
+	if len(s.responses) > 0 {
+		resp := s.responses[0]
+		s.responses = s.responses[1:]
+		return resp, nil
 	}
 	if s.response == nil {
 		return nil, fmt.Errorf("missing stub response")

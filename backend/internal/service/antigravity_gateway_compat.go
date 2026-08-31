@@ -182,29 +182,46 @@ func (s *AntigravityGatewayService) forwardAntigravityCompat(
 		return nil, err
 	}
 
-	result, err := s.antigravityRetryLoop(antigravityRetryLoopParams{
-		ctx:             ctx,
-		prefix:          call.prefix,
-		account:         account,
-		proxyURL:        call.proxyURL,
-		accessToken:     call.accessToken,
-		action:          "streamGenerateContent",
-		body:            call.geminiBody,
-		c:               c,
-		httpUpstream:    s.httpUpstream,
-		settingService:  s.settingService,
-		accountRepo:     s.accountRepo,
-		handleError:     s.handleUpstreamError,
-		requestedModel:  request.originalModel,
-		isStickySession: false,
-		groupID:         0,
-		sessionHash:     "",
-	})
-	if err != nil {
-		return nil, s.handleAntigravityCompatTransportError(c, err)
-	}
+	var aggregate ClaudeUsage
+	for generation := 0; generation < maxStrictStructuredOutputGenerations; generation++ {
+		result, err := s.antigravityRetryLoop(antigravityRetryLoopParams{
+			ctx:             ctx,
+			prefix:          call.prefix,
+			account:         account,
+			proxyURL:        call.proxyURL,
+			accessToken:     call.accessToken,
+			action:          "streamGenerateContent",
+			body:            call.geminiBody,
+			c:               c,
+			httpUpstream:    s.httpUpstream,
+			settingService:  s.settingService,
+			accountRepo:     s.accountRepo,
+			handleError:     s.handleUpstreamError,
+			requestedModel:  request.originalModel,
+			isStickySession: false,
+			groupID:         0,
+			sessionHash:     "",
+		})
+		if err != nil {
+			return nil, s.handleAntigravityCompatTransportError(c, err)
+		}
 
-	return s.consumeAntigravityCompatResponse(ctx, c, account, call, result.resp)
+		forwardResult, consumeErr := s.consumeAntigravityCompatResponse(ctx, c, account, call, result.resp)
+		if forwardResult != nil {
+			addClaudeUsage(&aggregate, forwardResult.Usage)
+			forwardResult.Usage = aggregate
+		}
+		var strictErr *strictStructuredOutputAttemptError
+		if !errors.As(consumeErr, &strictErr) {
+			return forwardResult, consumeErr
+		}
+		if strictErr.retryable && generation+1 < maxStrictStructuredOutputGenerations {
+			continue
+		}
+		publicErr := s.writeAntigravityCompatError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")
+		return forwardResult, preserveStrictJSONValidationDiagnostic(publicErr, strictErr)
+	}
+	return nil, errors.New("strict structured output generation exhausted")
 }
 
 func (s *AntigravityGatewayService) prepareAntigravityCompatCall(
@@ -370,13 +387,15 @@ func (s *AntigravityGatewayService) consumeAntigravityCompatResponse(
 	}
 	streamResult, err := s.consumeAntigravityCompatSuccess(c, call, resp)
 	if err != nil {
-		return nil, err
+		if streamResult == nil {
+			return nil, err
+		}
 	}
 	if streamResult.usage == nil {
 		streamResult.usage = &ClaudeUsage{}
 	}
 
-	return &ForwardResult{
+	forwardResult := &ForwardResult{
 		RequestID:                     requestID,
 		Usage:                         *streamResult.usage,
 		Model:                         call.request.originalModel,
@@ -389,7 +408,8 @@ func (s *AntigravityGatewayService) consumeAntigravityCompatResponse(
 		ReasoningEffort:               call.request.reasoningEffort,
 		ClientDisconnect:              streamResult.clientDisconnect,
 		ImageCount:                    call.request.inputImageCount,
-	}, nil
+	}
+	return forwardResult, err
 }
 
 func (s *AntigravityGatewayService) consumeAntigravityCompatSuccess(
@@ -545,8 +565,7 @@ func (s *AntigravityGatewayService) handleChatCompletionsNonStreamingFromAntigra
 	responsesResponse := apicompat.AnthropicToResponsesResponse(&anthropicResponse)
 	chatResponse := apicompat.ResponsesToChatCompletions(responsesResponse, originalModel)
 	if err := validateStrictStructuredChatResponse(chatResponse, structuredOutput); err != nil {
-		publicErr := s.writeAntigravityCompatError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")
-		return nil, preserveStrictJSONValidationDiagnostic(publicErr, err)
+		return result, newStrictStructuredOutputAttemptError(err, chatResponse, *result.usage)
 	}
 	c.JSON(http.StatusOK, chatResponse)
 	return result, nil

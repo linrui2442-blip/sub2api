@@ -28,6 +28,43 @@ type StrictJSONValidationError struct {
 	Stage      string
 }
 
+const maxStrictStructuredOutputGenerations = 2
+
+type strictStructuredOutputAttemptError struct {
+	diagnostic error
+	usage      ClaudeUsage
+	retryable  bool
+}
+
+func (e *strictStructuredOutputAttemptError) Error() string {
+	return "upstream response did not satisfy requested strict JSON schema"
+}
+
+func (e *strictStructuredOutputAttemptError) Unwrap() error { return e.diagnostic }
+
+func newStrictStructuredOutputAttemptError(validationErr error, response *apicompat.ChatCompletionsResponse, usage ClaudeUsage) *strictStructuredOutputAttemptError {
+	var diagnostic *StrictJSONValidationError
+	retryable := errors.As(validationErr, &diagnostic) &&
+		(diagnostic.Stage == "parsing" || diagnostic.Stage == "validation")
+	if response != nil && len(response.Choices) > 0 && response.Choices[0].FinishReason == "length" {
+		retryable = false
+	}
+	return &strictStructuredOutputAttemptError{diagnostic: validationErr, usage: usage, retryable: retryable}
+}
+
+func addClaudeUsage(total *ClaudeUsage, usage ClaudeUsage) {
+	if total == nil {
+		return
+	}
+	total.InputTokens += usage.InputTokens
+	total.OutputTokens += usage.OutputTokens
+	total.CacheCreationInputTokens += usage.CacheCreationInputTokens
+	total.CacheReadInputTokens += usage.CacheReadInputTokens
+	total.CacheCreation5mTokens += usage.CacheCreation5mTokens
+	total.CacheCreation1hTokens += usage.CacheCreation1hTokens
+	total.ImageOutputTokens += usage.ImageOutputTokens
+}
+
 func (e *StrictJSONValidationError) Error() string {
 	if e == nil {
 		return "strict JSON validation failed"
