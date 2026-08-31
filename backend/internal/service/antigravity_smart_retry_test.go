@@ -92,8 +92,10 @@ func (m *mockSmartRetryUpstream) DoWithTLS(req *http.Request, proxyURL string, a
 	return m.Do(req, proxyURL, accountID, accountConcurrency)
 }
 
-// TestHandleSmartRetry_URLLevelRateLimit 测试 URL 级别限流切换
-func TestHandleSmartRetry_URLLevelRateLimit(t *testing.T) {
+// TestHandleSmartRetry_URLLevelRateLimit_DoesNotFailOver verifies that an HTTP
+// 429 response remains in the existing rate-limit policy instead of being
+// treated as a fresh endpoint quota.
+func TestHandleSmartRetry_URLLevelRateLimit_DoesNotFailOver(t *testing.T) {
 	account := &Account{
 		ID:       1,
 		Name:     "acc-1",
@@ -126,7 +128,7 @@ func TestHandleSmartRetry_URLLevelRateLimit(t *testing.T) {
 	result := svc.handleSmartRetry(params, resp, respBody, "https://ag-1.test", 0, availableURLs)
 
 	require.NotNil(t, result)
-	require.Equal(t, smartRetryActionContinueURL, result.action)
+	require.Equal(t, smartRetryActionContinue, result.action)
 	require.Nil(t, result.resp)
 	require.Nil(t, result.err)
 	require.Nil(t, result.switchError)

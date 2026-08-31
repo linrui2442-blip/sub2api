@@ -46,17 +46,28 @@ type antigravityRetryLoopResult struct {
 	resp *http.Response
 }
 
-// resolveAntigravityForwardBaseURL 解析转发用 base URL。
-//
-// 显式环境变量用于诊断并具有最高优先级；未覆盖时，Google AI Pro/Ultra
-// 账号使用 daily，其余账号（含没有 paid_tier 的旧账号）使用 prod。
-func resolveAntigravityForwardBaseURL(account *Account) string {
+const (
+	antigravityDailyBaseURL   = "https://daily-cloudcode-pa.googleapis.com"
+	antigravitySandboxBaseURL = "https://daily-cloudcode-pa.sandbox.googleapis.com"
+	antigravityProdBaseURL    = "https://cloudcode-pa.googleapis.com"
+)
+
+var errAntigravityNilResponse = errors.New("upstream returned nil response")
+
+// resolveAntigravityGenerationEndpoints returns the ordered, deduplicated set
+// of generation endpoints allowed by the current account/override policy.
+// Explicit diagnostic overrides remain single-endpoint by design. Paid
+// Antigravity tiers may fail over daily -> sandbox -> production; free and
+// legacy accounts retain their existing production-only policy.
+func resolveAntigravityGenerationEndpoints(account *Account) []string {
 	mode := strings.ToLower(strings.TrimSpace(os.Getenv(antigravityForwardBaseURLEnv)))
-	if mode == "daily" || mode == "sandbox" {
-		return "https://daily-cloudcode-pa.googleapis.com"
-	}
-	if mode == "prod" || mode == "production" {
-		return "https://cloudcode-pa.googleapis.com"
+	switch mode {
+	case "daily":
+		return []string{antigravityDailyBaseURL}
+	case "sandbox":
+		return []string{antigravitySandboxBaseURL}
+	case "prod", "production":
+		return []string{antigravityProdBaseURL}
 	}
 
 	paidTier := ""
@@ -64,9 +75,9 @@ func resolveAntigravityForwardBaseURL(account *Account) string {
 		paidTier = strings.ToLower(strings.TrimSpace(account.GetCredential("paid_tier")))
 	}
 	if paidTier == "g1-pro-tier" || paidTier == "g1-ultra-tier" {
-		return "https://daily-cloudcode-pa.googleapis.com"
+		return []string{antigravityDailyBaseURL, antigravitySandboxBaseURL, antigravityProdBaseURL}
 	}
-	return "https://cloudcode-pa.googleapis.com"
+	return []string{antigravityProdBaseURL}
 }
 
 // smartRetryAction 智能重试的处理结果
@@ -75,7 +86,6 @@ type smartRetryAction int
 const (
 	smartRetryActionContinue      smartRetryAction = iota // 继续默认重试逻辑
 	smartRetryActionBreakWithResp                         // 结束循环并返回 resp
-	smartRetryActionContinueURL                           // 继续 URL fallback 循环
 )
 
 // smartRetryResult 智能重试的结果
@@ -88,13 +98,7 @@ type smartRetryResult struct {
 
 // handleSmartRetry 处理 OAuth 账号的智能重试逻辑
 // 将 429/503 限流处理逻辑抽取为独立函数，减少 antigravityRetryLoop 的复杂度
-func (s *AntigravityGatewayService) handleSmartRetry(p antigravityRetryLoopParams, resp *http.Response, respBody []byte, baseURL string, urlIdx int, availableURLs []string) *smartRetryResult {
-	// "Resource has been exhausted" 是 URL 级别限流，切换 URL（仅 429）
-	if resp.StatusCode == http.StatusTooManyRequests && isURLLevelRateLimit(respBody) && urlIdx < len(availableURLs)-1 {
-		logger.LegacyPrintf("service.antigravity_gateway", "%s URL fallback (429): %s -> %s", p.prefix, baseURL, availableURLs[urlIdx+1])
-		return &smartRetryResult{action: smartRetryActionContinueURL}
-	}
-
+func (s *AntigravityGatewayService) handleSmartRetry(p antigravityRetryLoopParams, resp *http.Response, respBody []byte, baseURL string, _ int, _ []string) *smartRetryResult {
 	category := antigravity429Unknown
 	if resp.StatusCode == http.StatusTooManyRequests {
 		category = classifyAntigravity429(respBody)
@@ -487,11 +491,10 @@ func (s *AntigravityGatewayService) antigravityRetryLoop(p antigravityRetryLoopP
 		}
 	}
 
-	baseURL := resolveAntigravityForwardBaseURL(p.account)
-	if baseURL == "" {
+	availableURLs := resolveAntigravityGenerationEndpoints(p.account)
+	if len(availableURLs) == 0 {
 		return nil, errors.New("no antigravity forward base url configured")
 	}
-	availableURLs := []string{baseURL}
 
 	var resp *http.Response
 	var usedBaseURL string
@@ -527,7 +530,7 @@ urlFallbackLoop:
 
 			resp, err = p.httpUpstream.Do(upstreamReq, p.proxyURL, p.account.ID, p.account.Concurrency)
 			if err == nil && resp == nil {
-				err = errors.New("upstream returned nil response")
+				err = errAntigravityNilResponse
 			}
 			if err != nil {
 				safeErr := sanitizeUpstreamErrorMessage(err.Error())
@@ -540,9 +543,14 @@ urlFallbackLoop:
 					Kind:               "request_error",
 					Message:            safeErr,
 				})
-				if shouldAntigravityFallbackToNextURL(err, 0) && urlIdx < len(availableURLs)-1 {
-					logger.LegacyPrintf("service.antigravity_gateway", "%s URL fallback (connection error): %s -> %s", p.prefix, baseURL, availableURLs[urlIdx+1])
-					continue urlFallbackLoop
+				if isAntigravityPreResponseEndpointFailoverError(err) {
+					if urlIdx < len(availableURLs)-1 {
+						logger.LegacyPrintf("service.antigravity_gateway", "%s endpoint failover (pre-response transport error): %s -> %s", p.prefix, baseURL, availableURLs[urlIdx+1])
+						continue urlFallbackLoop
+					}
+					logger.LegacyPrintf("service.antigravity_gateway", "%s status=request_failed endpoints_exhausted attempts=%d error=%v", p.prefix, len(availableURLs), err)
+					setOpsUpstreamError(p.c, 0, safeErr, "")
+					return nil, fmt.Errorf("upstream request failed after endpoint failover: %w", err)
 				}
 				if attempt < antigravityMaxRetries {
 					logger.LegacyPrintf("service.antigravity_gateway", "%s status=request_failed retry=%d/%d error=%v", p.prefix, attempt, antigravityMaxRetries, err)
@@ -610,8 +618,6 @@ urlFallbackLoop:
 					// 尝试智能重试处理（OAuth 账号专用）
 					smartResult := s.handleSmartRetry(p, resp, respBody, baseURL, urlIdx, availableURLs)
 					switch smartResult.action {
-					case smartRetryActionContinueURL:
-						continue urlFallbackLoop
 					case smartRetryActionBreakWithResp:
 						if smartResult.err != nil {
 							return nil, smartResult.err
@@ -729,16 +735,6 @@ func shouldRetryAntigravityError(statusCode int) bool {
 	}
 }
 
-// isURLLevelRateLimit 判断是否为 URL 级别的限流（应切换 URL 重试）
-// "Resource has been exhausted" 是 URL/节点级别限流，切换 URL 可能成功
-// "exhausted your capacity on this model" 是账户/模型配额限流，切换 URL 无效
-func isURLLevelRateLimit(body []byte) bool {
-	// 快速检查：包含 "Resource has been exhausted" 且不包含 "capacity on this model"
-	bodyStr := string(body)
-	return strings.Contains(bodyStr, "Resource has been exhausted") &&
-		!strings.Contains(bodyStr, "capacity on this model")
-}
-
 // isAntigravityConnectionError 判断是否为连接错误（网络超时、DNS 失败、连接拒绝）
 func isAntigravityConnectionError(err error) bool {
 	if err == nil {
@@ -756,13 +752,17 @@ func isAntigravityConnectionError(err error) bool {
 	return errors.As(err, &opErr)
 }
 
-// shouldAntigravityFallbackToNextURL 判断是否应切换到下一个 URL
-// 仅连接错误和 HTTP 429 触发 URL 降级
-func shouldAntigravityFallbackToNextURL(err error, statusCode int) bool {
-	if isAntigravityConnectionError(err) {
+// isAntigravityPreResponseEndpointFailoverError narrowly classifies failures
+// where no usable HTTP response exists. HTTP/provider/application failures are
+// deliberately excluded so endpoint changes cannot bypass their policy.
+func isAntigravityPreResponseEndpointFailoverError(err error) bool {
+	if err == nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, errAntigravityNilResponse) {
 		return true
 	}
-	return statusCode == http.StatusTooManyRequests
+	return isAntigravityConnectionError(err)
 }
 
 // getSessionID 从 gin.Context 获取 session_id（用于日志追踪）

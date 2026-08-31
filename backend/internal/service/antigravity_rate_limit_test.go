@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"github.com/stretchr/testify/require"
 )
@@ -104,20 +103,11 @@ func (s *stubAntigravityAccountRepo) UpdateExtra(ctx context.Context, id int64, 
 	return nil
 }
 
-func TestAntigravityRetryLoop_NoURLFallback_UsesConfiguredBaseURL(t *testing.T) {
+func TestAntigravityRetryLoop_HTTP429DoesNotEndpointFailover(t *testing.T) {
 	t.Setenv(antigravityForwardBaseURLEnv, "")
 
-	oldBaseURLs := append([]string(nil), antigravity.BaseURLs...)
-	oldAvailability := antigravity.DefaultURLAvailability
-	defer func() {
-		antigravity.BaseURLs = oldBaseURLs
-		antigravity.DefaultURLAvailability = oldAvailability
-	}()
-
-	base1 := "https://ag-1.test"
-	base2 := "https://ag-2.test"
-	antigravity.BaseURLs = []string{base1, base2}
-	antigravity.DefaultURLAvailability = antigravity.NewURLAvailability(time.Minute)
+	base1 := antigravityProdBaseURL
+	base2 := antigravitySandboxBaseURL
 
 	upstream := &stubAntigravityUpstream{firstBase: base1, secondBase: base2}
 	account := &Account{
@@ -158,9 +148,6 @@ func TestAntigravityRetryLoop_NoURLFallback_UsesConfiguredBaseURL(t *testing.T) 
 		require.True(t, strings.HasPrefix(callURL, base1))
 	}
 
-	available := antigravity.DefaultURLAvailability.GetAvailableURLs()
-	require.NotEmpty(t, available)
-	require.Equal(t, base1, available[0])
 }
 
 // TestHandleUpstreamError_429_ModelRateLimit 测试 429 模型限流场景
@@ -1024,19 +1011,19 @@ func TestIsAntigravityAccountSwitchError(t *testing.T) {
 	}
 }
 
-func TestResolveAntigravityForwardBaseURL(t *testing.T) {
+func TestResolveAntigravityGenerationEndpointsExistingPolicy(t *testing.T) {
 	tests := []struct {
 		name     string
 		override string
 		paidTier string
-		want     string
+		want     []string
 	}{
-		{name: "pro tier", paidTier: "g1-pro-tier", want: "https://daily-cloudcode-pa.googleapis.com"},
-		{name: "ultra tier", paidTier: "g1-ultra-tier", want: "https://daily-cloudcode-pa.googleapis.com"},
-		{name: "free tier", paidTier: "free-tier", want: "https://cloudcode-pa.googleapis.com"},
-		{name: "missing paid tier", want: "https://cloudcode-pa.googleapis.com"},
-		{name: "daily override", override: "daily", want: "https://daily-cloudcode-pa.googleapis.com"},
-		{name: "empty override remains tier aware", override: "", paidTier: "g1-pro-tier", want: "https://daily-cloudcode-pa.googleapis.com"},
+		{name: "pro tier", paidTier: "g1-pro-tier", want: []string{antigravityDailyBaseURL, antigravitySandboxBaseURL, antigravityProdBaseURL}},
+		{name: "ultra tier", paidTier: "g1-ultra-tier", want: []string{antigravityDailyBaseURL, antigravitySandboxBaseURL, antigravityProdBaseURL}},
+		{name: "free tier", paidTier: "free-tier", want: []string{antigravityProdBaseURL}},
+		{name: "missing paid tier", want: []string{antigravityProdBaseURL}},
+		{name: "daily override", override: "daily", want: []string{antigravityDailyBaseURL}},
+		{name: "empty override remains tier aware", override: "", paidTier: "g1-pro-tier", want: []string{antigravityDailyBaseURL, antigravitySandboxBaseURL, antigravityProdBaseURL}},
 	}
 
 	for _, tt := range tests {
@@ -1046,7 +1033,7 @@ func TestResolveAntigravityForwardBaseURL(t *testing.T) {
 			if tt.paidTier != "" {
 				account.Credentials["paid_tier"] = tt.paidTier
 			}
-			require.Equal(t, tt.want, resolveAntigravityForwardBaseURL(account))
+			require.Equal(t, tt.want, resolveAntigravityGenerationEndpoints(account))
 		})
 	}
 }
