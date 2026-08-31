@@ -90,9 +90,10 @@ type GeminiToolDeclaration struct {
 
 // GeminiFunctionDecl Gemini 函数声明
 type GeminiFunctionDecl struct {
-	Name        string         `json:"name"`
-	Description string         `json:"description,omitempty"`
-	Parameters  map[string]any `json:"parameters,omitempty"`
+	Name                 string         `json:"name"`
+	Description          string         `json:"description,omitempty"`
+	Parameters           map[string]any `json:"parameters,omitempty"`
+	ParametersJSONSchema map[string]any `json:"parametersJsonSchema,omitempty"`
 }
 
 // GeminiGoogleSearch Gemini Google 搜索工具
@@ -118,7 +119,8 @@ type GeminiToolConfig struct {
 
 // GeminiFunctionCallingConfig 函数调用配置
 type GeminiFunctionCallingConfig struct {
-	Mode string `json:"mode,omitempty"` // VALIDATED, AUTO, NONE
+	Mode                 string   `json:"mode,omitempty"` // ANY, VALIDATED, AUTO, NONE
+	AllowedFunctionNames []string `json:"allowedFunctionNames,omitempty"`
 }
 
 // GeminiSafetySetting Gemini 安全设置

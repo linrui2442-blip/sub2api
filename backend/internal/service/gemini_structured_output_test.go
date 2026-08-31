@@ -327,57 +327,6 @@ func TestStrictJSONValidationDiagnosticsCoverExtractionAndParsing(t *testing.T) 
 	})
 }
 
-func TestStrictCorrectiveInstructionEligibilityIsValueFree(t *testing.T) {
-	tests := []struct {
-		name      string
-		stage     string
-		wantRetry bool
-		wantText  string
-	}{
-		{name: "parsing", stage: "parsing", wantRetry: true, wantText: strictJSONParsingCorrectiveInstruction},
-		{name: "validation", stage: "validation", wantRetry: true, wantText: strictJSONValidationCorrectiveInstruction},
-		{name: "extraction", stage: "extraction", wantRetry: false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			diagnostic := &StrictJSONValidationError{
-				Path: "$.__PRIVATE_BAD_JSON_VALUE_229", Keyword: "SUPER_SECRET_FIRST_OUTPUT_551",
-				Expected: "secret expected value", ActualType: "secret actual type", Stage: tt.stage,
-			}
-			instruction, retry := strictJSONCorrectiveInstruction(diagnostic)
-			require.Equal(t, tt.wantRetry, retry)
-			require.Equal(t, tt.wantText, instruction)
-			for _, secret := range []string{"SUPER_SECRET_FIRST_OUTPUT_551", "PRIVATE_BAD_JSON_VALUE_229", diagnostic.Path, diagnostic.Keyword, diagnostic.Expected, diagnostic.ActualType} {
-				require.NotContains(t, instruction, secret)
-			}
-			attemptErr := newStrictStructuredOutputAttemptError(diagnostic, nil, ClaudeUsage{})
-			require.Equal(t, tt.wantRetry, attemptErr.retryable)
-		})
-	}
-}
-
-func TestApplyGeminiStrictCorrectiveInstructionIsAdditiveAndEphemeral(t *testing.T) {
-	diagnostic := &StrictJSONValidationError{Stage: "parsing", Path: "$", Keyword: "parse", Expected: "valid JSON", ActualType: "invalid_json"}
-	original := []byte(`{"systemInstruction":{"parts":[{"text":"caller system instruction"}]},"contents":[{"role":"user","parts":[{"text":"caller message"},{"inlineData":{"mimeType":"image/png","data":"aW1hZ2U="}}]}],"generationConfig":{"temperature":0.7,"topP":0.8,"maxOutputTokens":8192},"tools":[{"functionDeclarations":[]}]}`)
-
-	corrected, err := applyGeminiStrictCorrectiveInstruction(original, diagnostic)
-	require.NoError(t, err)
-	require.NotEqual(t, string(original), string(corrected))
-	require.NotContains(t, string(original), strictJSONParsingCorrectiveInstruction)
-
-	var before, after map[string]any
-	require.NoError(t, json.Unmarshal(original, &before))
-	require.NoError(t, json.Unmarshal(corrected, &after))
-	require.Equal(t, before["contents"], after["contents"])
-	require.Equal(t, before["generationConfig"], after["generationConfig"])
-	require.Equal(t, before["tools"], after["tools"])
-	parts, ok := mustMapValue(t, after["systemInstruction"])["parts"].([]any)
-	require.True(t, ok)
-	require.Len(t, parts, 2)
-	require.Equal(t, "caller system instruction", mustMapValue(t, parts[0])["text"])
-	require.Equal(t, strictJSONParsingCorrectiveInstruction, mustMapValue(t, parts[1])["text"])
-}
-
 func TestGeminiStrictResponseValidationIsWiredBeforeHTTP200(t *testing.T) {
 	output, err := parseGeminiStructuredOutput(json.RawMessage(schemaProbeResponseFormat), false)
 	require.NoError(t, err)

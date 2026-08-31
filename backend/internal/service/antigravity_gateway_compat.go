@@ -40,6 +40,7 @@ type antigravityCompatRequest struct {
 	startTime        time.Time
 	reasoningEffort  *string
 	structuredOutput *geminiStructuredOutput
+	strictTransport  strictStructuredOutputTransport
 }
 
 type antigravityCompatUpstreamCall struct {
@@ -74,6 +75,14 @@ func (s *AntigravityGatewayService) ForwardAsChatCompletions(
 	if err != nil {
 		return nil, s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 	}
+	strictTransport := resolveStrictStructuredOutputTransport(
+		strictStructuredOutputAdapterAntigravityGemini,
+		structuredOutput,
+		antigravityStrictToolConflict(&request),
+	)
+	if strictTransport == strictStructuredOutputTransportUnsupported {
+		return nil, s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", "strict structured output cannot currently be combined with requested tool semantics on this provider route")
+	}
 
 	responsesRequest, err := apicompat.ChatCompletionsToResponses(&request)
 	if err != nil {
@@ -101,7 +110,17 @@ func (s *AntigravityGatewayService) ForwardAsChatCompletions(
 		startTime:        time.Now(),
 		reasoningEffort:  extractCCReasoningEffortFromBody(body),
 		structuredOutput: structuredOutput,
+		strictTransport:  strictTransport,
 	})
+}
+
+func antigravityStrictToolConflict(request *apicompat.ChatCompletionsRequest) bool {
+	if request == nil {
+		return false
+	}
+	return len(request.Tools) > 0 || len(request.Functions) > 0 ||
+		len(request.ToolChoice) > 0 || len(request.FunctionCall) > 0 ||
+		request.ParallelToolCalls != nil
 }
 
 // ForwardAsResponses 使用 Antigravity 原生 OAuth 账号转发 Responses 请求。
@@ -216,11 +235,10 @@ func (s *AntigravityGatewayService) forwardAntigravityCompat(
 		if !errors.As(consumeErr, &strictErr) {
 			return forwardResult, consumeErr
 		}
-		if strictErr.retryable && generation+1 < maxStrictStructuredOutputGenerations {
-			generationBody, err = applyGeminiStrictCorrectiveInstruction(call.geminiBody, strictErr.diagnostic)
-			if err != nil {
-				return nil, s.writeAntigravityCompatError(c, http.StatusInternalServerError, "api_error", "Failed to prepare strict structured output regeneration")
-			}
+		if call.request.strictTransport == strictStructuredOutputTransportSyntheticTool && strictErr.retryable && generation+1 < maxStrictStructuredOutputGenerations {
+			// Retry the same forced synthetic transport once. The failed value and
+			// diagnostics are deliberately not added to the second request.
+			generationBody = call.geminiBody
 			continue
 		}
 		publicErr := s.writeAntigravityCompatError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")
@@ -266,7 +284,7 @@ func (s *AntigravityGatewayService) prepareAntigravityCompatCall(
 		_ = s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 		return nil, err
 	}
-	geminiBody, err := s.buildAntigravityCompatGeminiBody(ctx, request.claudeBody, &claudeRequest, projectID, mappedModel, request.structuredOutput)
+	geminiBody, err := s.buildAntigravityCompatGeminiBody(ctx, request.claudeBody, &claudeRequest, projectID, mappedModel, request.structuredOutput, request.strictTransport)
 	if err != nil {
 		return nil, s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", "Invalid request")
 	}
@@ -289,6 +307,7 @@ func (s *AntigravityGatewayService) buildAntigravityCompatGeminiBody(
 	projectID string,
 	mappedModel string,
 	structuredOutput *geminiStructuredOutput,
+	strictTransport strictStructuredOutputTransport,
 ) ([]byte, error) {
 	if structuredOutput != nil && !strings.HasPrefix(strings.ToLower(mappedModel), "gemini-") {
 		return nil, errors.New("structured output requires a Gemini model")
@@ -303,7 +322,12 @@ func (s *AntigravityGatewayService) buildAntigravityCompatGeminiBody(
 			return nil, err
 		}
 		body = ensureGeminiFunctionCallThoughtSignatures(body)
-		body, err = applyGeminiStructuredOutput(body, structuredOutput)
+		switch strictTransport {
+		case strictStructuredOutputTransportSyntheticTool:
+			body, err = applyGeminiSyntheticStrictTransport(body, structuredOutput)
+		default:
+			body, err = applyGeminiStructuredOutput(body, structuredOutput)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -436,7 +460,7 @@ func (s *AntigravityGatewayService) consumeAntigravityCompatSuccess(
 	}
 
 	if call.request.protocol == antigravityCompatChatCompletions {
-		return s.handleChatCompletionsNonStreamingFromAntigravity(c, resp, call.request.startTime, call.request.originalModel, call.request.structuredOutput)
+		return s.handleChatCompletionsNonStreamingFromAntigravity(c, resp, call.request.startTime, call.request.originalModel, call.request.structuredOutput, call.request.strictTransport)
 	}
 	return s.handleResponsesNonStreamingFromAntigravity(c, resp, call.request.startTime, call.request.originalModel)
 }
@@ -558,6 +582,7 @@ func (s *AntigravityGatewayService) handleChatCompletionsNonStreamingFromAntigra
 	startTime time.Time,
 	originalModel string,
 	structuredOutput *geminiStructuredOutput,
+	strictTransport strictStructuredOutputTransport,
 ) (*antigravityStreamResult, error) {
 	claudeResponse, result, err := s.collectClaudeStreamResponse(c, resp, startTime, originalModel)
 	if err != nil {
@@ -567,9 +592,15 @@ func (s *AntigravityGatewayService) handleChatCompletionsNonStreamingFromAntigra
 	if json.Unmarshal(claudeResponse, &anthropicResponse) != nil {
 		return nil, s.writeAntigravityCompatError(c, http.StatusBadGateway, "upstream_error", "Failed to parse upstream response")
 	}
-	responsesResponse := apicompat.AnthropicToResponsesResponse(&anthropicResponse)
-	chatResponse := apicompat.ResponsesToChatCompletions(responsesResponse, originalModel)
-	if err := validateStrictStructuredChatResponse(chatResponse, structuredOutput); err != nil {
+	var chatResponse *apicompat.ChatCompletionsResponse
+	if strictTransport == strictStructuredOutputTransportSyntheticTool {
+		chatResponse, err = syntheticStrictChatResponse(&anthropicResponse, originalModel, structuredOutput)
+	} else {
+		responsesResponse := apicompat.AnthropicToResponsesResponse(&anthropicResponse)
+		chatResponse = apicompat.ResponsesToChatCompletions(responsesResponse, originalModel)
+		err = validateStrictStructuredChatResponse(chatResponse, structuredOutput)
+	}
+	if err != nil {
 		return result, newStrictStructuredOutputAttemptError(err, chatResponse, *result.usage)
 	}
 	c.JSON(http.StatusOK, chatResponse)

@@ -118,11 +118,15 @@ func antigravityCompatSuccessResponse() *http.Response {
 
 func antigravityCompatSuccessResponseWithText(t *testing.T, text string) *http.Response {
 	t.Helper()
+	var value any
+	require.NoError(t, json.Unmarshal([]byte(text), &value))
 	payload, err := json.Marshal(map[string]any{
 		"response": map[string]any{
 			"responseId": "resp_3757",
 			"candidates": []any{map[string]any{
-				"content":      map[string]any{"parts": []any{map[string]any{"text": text}}},
+				"content": map[string]any{"parts": []any{map[string]any{"functionCall": map[string]any{
+					"name": syntheticStrictJSONFunctionName, "args": map[string]any{"value": value},
+				}}}},
 				"finishReason": "STOP",
 			}},
 			"usageMetadata": map[string]any{"promptTokenCount": 8, "candidatesTokenCount": 3},
@@ -134,6 +138,17 @@ func antigravityCompatSuccessResponseWithText(t *testing.T, text string) *http.R
 		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
 		Body:       io.NopCloser(strings.NewReader("data: " + string(payload) + "\n\n")),
 	}
+}
+
+func antigravitySyntheticValueSchema(t *testing.T, body []byte) map[string]any {
+	t.Helper()
+	request := mustMapValue(t, mustObject(t, body)["request"])
+	tools, ok := request["tools"].([]any)
+	require.True(t, ok)
+	declarations, ok := mustMapValue(t, tools[0])["functionDeclarations"].([]any)
+	require.True(t, ok)
+	parameters := mustMapValue(t, mustMapValue(t, declarations[0])["parametersJsonSchema"])
+	return mustMapValue(t, mustMapValue(t, parameters["properties"])["value"])
 }
 
 func antigravityStrictChatBody(responseFormat string, stream bool) []byte {
@@ -160,9 +175,7 @@ func TestAntigravityCompatStrictJSONSchemaPropagatesAndValidates(t *testing.T) {
 	require.NotNil(t, result)
 	require.Equal(t, http.StatusOK, recorder.Code)
 	require.Len(t, upstream.requestBodies, 1)
-	config := mustMapValue(t, mustMapValue(t, mustObject(t, upstream.requestBodies[0])["request"])["generationConfig"])
-	require.Equal(t, "application/json", config["responseMimeType"])
-	schema := mustMapValue(t, config["responseJsonSchema"])
+	schema := antigravitySyntheticValueSchema(t, upstream.requestBodies[0])
 	require.Equal(t, false, schema["additionalProperties"])
 	require.Equal(t, []any{"alphaNode", "betaRef", "gammaItems", "nestedNode"}, schema["required"])
 	properties := mustMapValue(t, schema["properties"])
@@ -192,8 +205,7 @@ func TestAntigravityCompatStrictJSONSchemaSanitizesUpstreamAndEnforcesLocalBound
 	require.Equal(t, http.StatusBadGateway, recorder.Code)
 	require.Contains(t, recorder.Body.String(), "structured_output_validation_error")
 	require.Len(t, upstream.requestBodies, 2)
-	config := mustMapValue(t, mustMapValue(t, mustObject(t, upstream.requestBodies[0])["request"])["generationConfig"])
-	properties := mustMapValue(t, mustMapValue(t, config["responseJsonSchema"])["properties"])
+	properties := mustMapValue(t, antigravitySyntheticValueSchema(t, upstream.requestBodies[0])["properties"])
 	label := mustMapValue(t, properties["label"])
 	require.NotContains(t, label, "minLength")
 	require.NotContains(t, label, "maxLength")
@@ -248,8 +260,7 @@ func TestAntigravityCompatStrictJSONSchemaEnforcesOneOfExactlyOnce(t *testing.T)
 	require.Equal(t, http.StatusBadGateway, recorder.Code)
 	require.Contains(t, recorder.Body.String(), "structured_output_validation_error")
 	require.Len(t, upstream.requestBodies, 2)
-	config := mustMapValue(t, mustMapValue(t, mustObject(t, upstream.requestBodies[0])["request"])["generationConfig"])
-	valueSchema := mustMapValue(t, mustMapValue(t, mustMapValue(t, config["responseJsonSchema"])["properties"])["value"])
+	valueSchema := mustMapValue(t, mustMapValue(t, antigravitySyntheticValueSchema(t, upstream.requestBodies[0])["properties"])["value"])
 	require.Len(t, valueSchema["oneOf"], 2)
 }
 
@@ -271,8 +282,7 @@ func TestAntigravityCompatStrictJSONSchemaEnforcesAnyOf(t *testing.T) {
 	require.Equal(t, http.StatusBadGateway, recorder.Code)
 	require.Contains(t, recorder.Body.String(), "structured_output_validation_error")
 	require.Len(t, upstream.requestBodies, 2)
-	config := mustMapValue(t, mustMapValue(t, mustObject(t, upstream.requestBodies[0])["request"])["generationConfig"])
-	valueSchema := mustMapValue(t, mustMapValue(t, mustMapValue(t, config["responseJsonSchema"])["properties"])["value"])
+	valueSchema := mustMapValue(t, mustMapValue(t, antigravitySyntheticValueSchema(t, upstream.requestBodies[0])["properties"])["value"])
 	require.Len(t, valueSchema["anyOf"], 2)
 }
 
@@ -546,7 +556,7 @@ func TestBuildAntigravityCompatGeminiBody_ConfiguresMixedToolInvocations(t *test
 		t.Run(tt.name, func(t *testing.T) {
 			claudeBody := []byte(`{"messages":[{"role":"user","content":"hello"}],"tools":` + tt.tools + `}`)
 			claudeBody = bytes.ReplaceAll(claudeBody, []byte{92}, nil)
-			body, err := svc.buildAntigravityCompatGeminiBody(context.Background(), claudeBody, nil, "project-1", "gemini-2.5-flash", nil)
+			body, err := svc.buildAntigravityCompatGeminiBody(context.Background(), claudeBody, nil, "project-1", "gemini-2.5-flash", nil, strictStructuredOutputTransportNative)
 			require.NoError(t, err)
 
 			var wrapped map[string]any
