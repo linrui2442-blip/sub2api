@@ -117,9 +117,15 @@ func TestMergeCollectedGeminiPartsKeepsThinkingSeparateAndConcatenatesText(t *te
 		{"text": "third"},
 	})
 
-	candidates := merged["candidates"].([]any)
-	content := candidates[0].(map[string]any)["content"].(map[string]any)
-	parts := content["parts"].([]any)
+	candidates, ok := merged["candidates"].([]any)
+	require.True(t, ok)
+	require.NotEmpty(t, candidates)
+	candidate, ok := candidates[0].(map[string]any)
+	require.True(t, ok)
+	content, ok := candidate["content"].(map[string]any)
+	require.True(t, ok)
+	parts, ok := content["parts"].([]any)
+	require.True(t, ok)
 	require.Equal(t, []any{
 		map[string]any{"text": "firstsecond"},
 		map[string]any{"text": "reasoning", "thought": true},
