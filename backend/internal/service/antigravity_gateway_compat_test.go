@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -194,6 +195,35 @@ func TestAntigravityCompatStrictJSONSchemaSanitizesUpstreamAndEnforcesLocalBound
 	require.NotContains(t, label, "minLength")
 	require.NotContains(t, label, "maxLength")
 	require.Contains(t, mustMapValue(t, properties["choice"]), "anyOf")
+}
+
+func TestAntigravityCompatStrictValidationDiagnosticStaysInternal(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const sentinel = "SUPER_SECRET_ENUM_VALUE_9F21"
+	upstream := &queuedHTTPUpstreamStub{responses: []*http.Response{
+		antigravityCompatSuccessResponseWithText(t, `{"alphaNode":"`+sentinel+`","betaRef":null,"gammaItems":[],"nestedNode":{"deltaFlag":true}}`),
+	}}
+	svc := newAntigravityCompatService(config.GatewayConfig{MaxLineSize: defaultMaxLineSize}, upstream)
+	body := antigravityStrictChatBody(schemaProbeResponseFormat, false)
+	c, recorder := newAntigravityCompatContext(http.MethodPost, "/v1/chat/completions", body)
+
+	result, err := svc.ForwardAsChatCompletions(context.Background(), c, newAntigravityCompatAccount(AccountTypeOAuth), body, nil)
+
+	require.Nil(t, result)
+	require.EqualError(t, err, "Upstream response did not satisfy requested strict JSON schema")
+	var diagnostic *StrictJSONValidationError
+	require.True(t, errors.As(err, &diagnostic))
+	require.Equal(t, "$.alphaNode", diagnostic.Path)
+	require.Equal(t, "enum", diagnostic.Keyword)
+	require.Equal(t, "allowed enum member", diagnostic.Expected)
+	require.Equal(t, "string", diagnostic.ActualType)
+	require.NotContains(t, diagnostic.Error(), sentinel)
+	require.Equal(t, http.StatusBadGateway, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "structured_output_validation_error")
+	require.Contains(t, recorder.Body.String(), "Upstream response did not satisfy requested strict JSON schema")
+	require.NotContains(t, recorder.Body.String(), sentinel)
+	require.NotContains(t, recorder.Body.String(), diagnostic.Path)
+	require.NotContains(t, recorder.Body.String(), diagnostic.Keyword)
 }
 
 func TestAntigravityCompatStrictJSONSchemaEnforcesOneOfExactlyOnce(t *testing.T) {

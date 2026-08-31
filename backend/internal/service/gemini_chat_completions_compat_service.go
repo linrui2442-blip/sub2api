@@ -277,7 +277,8 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 			return nil, s.writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", "Failed to parse upstream response")
 		}
 		if err := validateStrictStructuredChatResponse(chatResp, structuredOutput); err != nil {
-			return nil, s.writeChatCompletionsError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")
+			publicErr := s.writeChatCompletionsError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")
+			return nil, preserveStrictJSONValidationDiagnostic(publicErr, err)
 		}
 		c.JSON(http.StatusOK, chatResp)
 		usage = usageObj2
@@ -515,7 +516,8 @@ func (s *GeminiMessagesCompatService) handleChatCompletionsNonStreamingResponseF
 		return nil, s.writeChatCompletionsError(c, http.StatusBadGateway, "upstream_error", "Failed to parse upstream response")
 	}
 	if err := validateStrictStructuredChatResponse(chatResp, structuredOutput); err != nil {
-		return nil, s.writeChatCompletionsError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")
+		publicErr := s.writeChatCompletionsError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")
+		return nil, preserveStrictJSONValidationDiagnostic(publicErr, err)
 	}
 
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -263,6 +264,69 @@ func TestValidateGeminiStrictStructuredResponse(t *testing.T) {
 	}
 }
 
+func TestStrictJSONValidationDiagnosticsAreTypedAndValueFree(t *testing.T) {
+	tests := []struct {
+		name, path, keyword, expected, actualType, sentinel string
+		value                                               any
+		schema                                              map[string]any
+	}{
+		{"root type", "$", "type", "object", "string", "PRIVATE_MODEL_STRING_77AA", "PRIVATE_MODEL_STRING_77AA", map[string]any{"type": "object"}},
+		{"required", "$", "required", "required property", "object", "", map[string]any{}, map[string]any{"type": "object", "required": []any{"requiredField"}}},
+		{"enum", "$", "enum", "allowed enum member", "string", "SUPER_SECRET_ENUM_VALUE_9F21", "SUPER_SECRET_ENUM_VALUE_9F21", map[string]any{"type": "string", "enum": []any{"allowed"}}},
+		{"additionalProperties", "$", "additionalProperties", "no additional properties", "object", "PRIVATE_VALUE_77AA", map[string]any{"extra": "PRIVATE_VALUE_77AA"}, map[string]any{"type": "object", "properties": map[string]any{}, "additionalProperties": false}},
+		{"nested type", "$.items[0].value", "type", "integer", "string", "PRIVATE_NESTED_77AA", map[string]any{"items": []any{map[string]any{"value": "PRIVATE_NESTED_77AA"}}}, map[string]any{"type": "object", "properties": map[string]any{"items": map[string]any{"type": "array", "items": map[string]any{"type": "object", "properties": map[string]any{"value": map[string]any{"type": "integer"}}}}}}},
+		{"oneOf", "$", "oneOf", "exactly one schema", "string", "PRIVATE_ONE_OF_77AA", "PRIVATE_ONE_OF_77AA", map[string]any{"oneOf": []any{map[string]any{"type": "string"}, map[string]any{"type": "string", "minLength": float64(1)}}}},
+		{"anyOf", "$", "anyOf", "at least one schema", "boolean", "", true, map[string]any{"anyOf": []any{map[string]any{"type": "string"}, map[string]any{"type": "null"}}}},
+		{"minLength", "$", "minLength", "minimum string length", "string", "PRIVATE_SHORT_77AA", "PRIVATE_SHORT_77AA", map[string]any{"type": "string", "minLength": float64(100)}},
+		{"maxLength", "$", "maxLength", "maximum string length", "string", "PRIVATE_EXCESS_77AA", "PRIVATE_EXCESS_77AA", map[string]any{"type": "string", "maxLength": float64(2)}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateJSONSchemaValue(tt.value, tt.schema, "$")
+			var diagnostic *StrictJSONValidationError
+			require.ErrorAs(t, err, &diagnostic)
+			require.Equal(t, tt.path, diagnostic.Path)
+			require.Equal(t, tt.keyword, diagnostic.Keyword)
+			require.Equal(t, tt.expected, diagnostic.Expected)
+			require.Equal(t, tt.actualType, diagnostic.ActualType)
+			require.Equal(t, "validation", diagnostic.Stage)
+			metadata := strings.Join([]string{diagnostic.Path, diagnostic.Keyword, diagnostic.Expected, diagnostic.ActualType, diagnostic.Stage}, "\n")
+			if tt.sentinel != "" {
+				require.NotContains(t, diagnostic.Error(), tt.sentinel)
+				require.NotContains(t, metadata, tt.sentinel)
+			}
+		})
+	}
+}
+
+func TestStrictJSONValidationDiagnosticsCoverExtractionAndParsing(t *testing.T) {
+	output := &geminiStructuredOutput{Strict: true, Schema: map[string]any{"type": "object"}}
+
+	t.Run("content extraction", func(t *testing.T) {
+		response := &apicompat.ChatCompletionsResponse{Choices: []apicompat.ChatChoice{{Message: apicompat.ChatMessage{Content: json.RawMessage(`{"private":"value"}`)}}}}
+		err := validateStrictStructuredChatResponse(response, output)
+		var diagnostic *StrictJSONValidationError
+		require.ErrorAs(t, err, &diagnostic)
+		require.Equal(t, "$.choices[0].message.content", diagnostic.Path)
+		require.Equal(t, "type", diagnostic.Keyword)
+		require.Equal(t, "object", diagnostic.ActualType)
+		require.NotContains(t, diagnostic.Error(), "private")
+		require.NotContains(t, diagnostic.Error(), "value")
+	})
+
+	t.Run("JSON parsing", func(t *testing.T) {
+		err := validateStrictStructuredChatResponse(chatResponseWithText(t, "PRIVATE_INVALID_JSON"), output)
+		var diagnostic *StrictJSONValidationError
+		require.ErrorAs(t, err, &diagnostic)
+		require.Equal(t, "$", diagnostic.Path)
+		require.Equal(t, "parse", diagnostic.Keyword)
+		require.Equal(t, "invalid_json", diagnostic.ActualType)
+		require.Equal(t, "parsing", diagnostic.Stage)
+		require.NotContains(t, diagnostic.Error(), "PRIVATE_INVALID_JSON")
+	})
+}
+
 func TestGeminiStrictResponseValidationIsWiredBeforeHTTP200(t *testing.T) {
 	output, err := parseGeminiStructuredOutput(json.RawMessage(schemaProbeResponseFormat), false)
 	require.NoError(t, err)
@@ -288,6 +352,29 @@ func TestGeminiStrictResponseValidationIsWiredBeforeHTTP200(t *testing.T) {
 		require.NotContains(t, recorder.Body.String(), "AUTHORIZATION_SECRET")
 		require.NotContains(t, recorder.Body.String(), "must-not-leak")
 	})
+}
+
+func TestGeminiStrictValidationDiagnosticStaysInternal(t *testing.T) {
+	output, err := parseGeminiStructuredOutput(json.RawMessage(schemaProbeResponseFormat), false)
+	require.NoError(t, err)
+	service := &GeminiMessagesCompatService{cfg: &config.Config{}}
+	const sentinel = "SUPER_SECRET_ENUM_VALUE_9F21"
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	upstream := geminiHTTPResponse(`{"alphaNode":"` + sentinel + `","betaRef":null,"gammaItems":[],"nestedNode":{"deltaFlag":true}}`)
+
+	_, err = service.handleChatCompletionsNonStreamingResponseFromGemini(context, upstream, "gemini-3.1-pro", false, output)
+
+	require.EqualError(t, err, "Upstream response did not satisfy requested strict JSON schema")
+	var diagnostic *StrictJSONValidationError
+	require.True(t, errors.As(err, &diagnostic))
+	require.Equal(t, "$.alphaNode", diagnostic.Path)
+	require.Equal(t, "enum", diagnostic.Keyword)
+	require.NotContains(t, diagnostic.Error(), sentinel)
+	require.Equal(t, http.StatusBadGateway, recorder.Code)
+	require.NotContains(t, recorder.Body.String(), sentinel)
+	require.NotContains(t, recorder.Body.String(), diagnostic.Path)
+	require.NotContains(t, recorder.Body.String(), diagnostic.Keyword)
 }
 
 func TestGeminiRequestWithoutResponseFormatIsUnchanged(t *testing.T) {

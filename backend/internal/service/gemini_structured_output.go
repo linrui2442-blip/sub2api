@@ -18,6 +18,95 @@ type geminiStructuredOutput struct {
 	Schema map[string]any
 }
 
+// StrictJSONValidationError carries value-free diagnostics for an internal
+// strict structured-output failure. It must never contain response values.
+type StrictJSONValidationError struct {
+	Path       string
+	Keyword    string
+	Expected   string
+	ActualType string
+	Stage      string
+}
+
+func (e *StrictJSONValidationError) Error() string {
+	if e == nil {
+		return "strict JSON validation failed"
+	}
+	return fmt.Sprintf("strict JSON validation failed at %s: keyword=%s expected=%s actual_type=%s stage=%s", e.Path, e.Keyword, e.Expected, e.ActualType, e.Stage)
+}
+
+// strictJSONSanitizedError preserves a typed diagnostic for errors.As while
+// keeping Error() identical to the generic public error. This prevents normal
+// handler logging from persisting diagnostic metadata.
+type strictJSONSanitizedError struct {
+	message    string
+	diagnostic *StrictJSONValidationError
+}
+
+func (e *strictJSONSanitizedError) Error() string { return e.message }
+func (e *strictJSONSanitizedError) Unwrap() error { return e.diagnostic }
+
+func preserveStrictJSONValidationDiagnostic(publicErr, validationErr error) error {
+	var diagnostic *StrictJSONValidationError
+	if publicErr == nil || !errors.As(validationErr, &diagnostic) {
+		return publicErr
+	}
+	return &strictJSONSanitizedError{message: publicErr.Error(), diagnostic: diagnostic}
+}
+
+func strictJSONValidationFailure(path, keyword, expected, actualType, stage, format string, args ...any) error {
+	diagnostic := &StrictJSONValidationError{Path: path, Keyword: keyword, Expected: expected, ActualType: actualType, Stage: stage}
+	return fmt.Errorf(format+": %w", append(args, diagnostic)...)
+}
+
+func jsonValueType(value any) string {
+	switch typed := value.(type) {
+	case nil:
+		return "null"
+	case map[string]any:
+		return "object"
+	case []any:
+		return "array"
+	case string:
+		return "string"
+	case float64:
+		if typed == math.Trunc(typed) {
+			return "integer"
+		}
+		return "number"
+	case bool:
+		return "boolean"
+	default:
+		return "unknown"
+	}
+}
+
+func rawJSONType(raw json.RawMessage) string {
+	var value any
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return "invalid_json"
+	}
+	return jsonValueType(value)
+}
+
+func declaredJSONType(declaration any) string {
+	if name, ok := declaration.(string); ok {
+		return name
+	}
+	if names, ok := declaration.([]any); ok {
+		result := make([]string, 0, len(names))
+		for _, rawName := range names {
+			if name, ok := rawName.(string); ok {
+				result = append(result, name)
+			}
+		}
+		if len(result) > 0 {
+			return strings.Join(result, " or ")
+		}
+	}
+	return "declared JSON type"
+}
+
 var supportedGeminiJSONSchemaKeywords = map[string]struct{}{
 	"$schema": {},
 	"type":    {}, "title": {}, "description": {}, "enum": {},
@@ -258,19 +347,20 @@ func validateStrictStructuredChatResponse(response *apicompat.ChatCompletionsRes
 		return nil
 	}
 	if response == nil || len(response.Choices) == 0 {
-		return errors.New("structured response has no choices")
+		return strictJSONValidationFailure("$", "response", "at least one response choice", "missing", "extraction", "structured response has no choices")
 	}
 	for index, choice := range response.Choices {
+		contentPath := fmt.Sprintf("$.choices[%d].message.content", index)
 		var text string
 		if err := json.Unmarshal(choice.Message.Content, &text); err != nil {
-			return fmt.Errorf("choice %d content is not text", index)
+			return strictJSONValidationFailure(contentPath, "type", "string", rawJSONType(choice.Message.Content), "extraction", "choice %d content is not text", index)
 		}
 		var value any
 		if err := json.Unmarshal([]byte(text), &value); err != nil {
-			return fmt.Errorf("choice %d content is not valid JSON", index)
+			return strictJSONValidationFailure("$", "parse", "valid JSON", "invalid_json", "parsing", "choice %d content is not valid JSON", index)
 		}
 		if err := validateJSONSchemaValue(value, output.Schema, "$" /* never include output values */); err != nil {
-			return fmt.Errorf("choice %d: %w", index, err)
+			return err
 		}
 	}
 	return nil
@@ -279,12 +369,12 @@ func validateStrictStructuredChatResponse(response *apicompat.ChatCompletionsRes
 func validateJSONSchemaValue(value any, schema map[string]any, path string) error {
 	if alternatives, ok := schema["anyOf"].([]any); ok {
 		if countMatchingSchemas(value, alternatives, path) == 0 {
-			return fmt.Errorf("value does not match anyOf at %s", path)
+			return strictJSONValidationFailure(path, "anyOf", "at least one schema", jsonValueType(value), "validation", "value does not match anyOf at %s", path)
 		}
 	}
 	if alternatives, ok := schema["oneOf"].([]any); ok {
 		if matches := countMatchingSchemas(value, alternatives, path); matches != 1 {
-			return fmt.Errorf("value matches %d oneOf schemas at %s; expected exactly one", matches, path)
+			return strictJSONValidationFailure(path, "oneOf", "exactly one schema", jsonValueType(value), "validation", "value matches %d oneOf schemas at %s; expected exactly one", matches, path)
 		}
 	}
 	if enum, ok := schema["enum"].([]any); ok {
@@ -296,11 +386,11 @@ func validateJSONSchemaValue(value any, schema map[string]any, path string) erro
 			}
 		}
 		if !matched {
-			return fmt.Errorf("value is not in enum at %s", path)
+			return strictJSONValidationFailure(path, "enum", "allowed enum member", jsonValueType(value), "validation", "value is not in enum at %s", path)
 		}
 	}
 	if declaredType, present := schema["type"]; present && !matchesDeclaredType(value, declaredType) {
-		return fmt.Errorf("type mismatch at %s", path)
+		return strictJSONValidationFailure(path, "type", declaredJSONType(declaredType), jsonValueType(value), "validation", "type mismatch at %s", path)
 	}
 	switch typed := value.(type) {
 	case map[string]any:
@@ -309,10 +399,10 @@ func validateJSONSchemaValue(value any, schema map[string]any, path string) erro
 			for _, rawName := range required {
 				name, ok := rawName.(string)
 				if !ok {
-					return fmt.Errorf("invalid required declaration at %s", path)
+					return strictJSONValidationFailure(path, "required", "valid required declaration", "schema", "validation", "invalid required declaration at %s", path)
 				}
 				if _, present := typed[name]; !present {
-					return fmt.Errorf("required property %s is missing at %s", name, path)
+					return strictJSONValidationFailure(path, "required", "required property", "object", "validation", "required property %s is missing at %s", name, path)
 				}
 			}
 		}
@@ -320,13 +410,13 @@ func validateJSONSchemaValue(value any, schema map[string]any, path string) erro
 			child, known := properties[name]
 			if !known {
 				if schema["additionalProperties"] == false {
-					return fmt.Errorf("additional property %s is not allowed at %s", name, path)
+					return strictJSONValidationFailure(path, "additionalProperties", "no additional properties", "object", "validation", "additional property is not allowed at %s", path)
 				}
 				continue
 			}
 			childSchema, ok := child.(map[string]any)
 			if !ok {
-				return fmt.Errorf("invalid property schema at %s", path)
+				return strictJSONValidationFailure(path+"."+name, "schema", "valid property schema", "schema", "validation", "invalid property schema at %s", path)
 			}
 			if err := validateJSONSchemaValue(childValue, childSchema, path+"."+name); err != nil {
 				return err
@@ -334,10 +424,10 @@ func validateJSONSchemaValue(value any, schema map[string]any, path string) erro
 		}
 	case []any:
 		if minimum, ok := schema["minItems"].(float64); ok && len(typed) < int(minimum) {
-			return fmt.Errorf("array is shorter than minItems at %s", path)
+			return strictJSONValidationFailure(path, "minItems", "minimum array length", "array", "validation", "array is shorter than minItems at %s", path)
 		}
 		if maximum, ok := schema["maxItems"].(float64); ok && len(typed) > int(maximum) {
-			return fmt.Errorf("array is longer than maxItems at %s", path)
+			return strictJSONValidationFailure(path, "maxItems", "maximum array length", "array", "validation", "array is longer than maxItems at %s", path)
 		}
 		if itemSchema, ok := schema["items"].(map[string]any); ok {
 			for i, item := range typed {
@@ -349,17 +439,17 @@ func validateJSONSchemaValue(value any, schema map[string]any, path string) erro
 	case string:
 		length := utf8.RuneCountInString(typed)
 		if minimum, ok := schema["minLength"].(float64); ok && length < int(minimum) {
-			return fmt.Errorf("string is shorter than minLength at %s", path)
+			return strictJSONValidationFailure(path, "minLength", "minimum string length", "string", "validation", "string is shorter than minLength at %s", path)
 		}
 		if maximum, ok := schema["maxLength"].(float64); ok && length > int(maximum) {
-			return fmt.Errorf("string is longer than maxLength at %s", path)
+			return strictJSONValidationFailure(path, "maxLength", "maximum string length", "string", "validation", "string is longer than maxLength at %s", path)
 		}
 	case float64:
 		if minimum, ok := schema["minimum"].(float64); ok && typed < minimum {
-			return fmt.Errorf("number is below minimum at %s", path)
+			return strictJSONValidationFailure(path, "minimum", "minimum numeric value", jsonValueType(typed), "validation", "number is below minimum at %s", path)
 		}
 		if maximum, ok := schema["maximum"].(float64); ok && typed > maximum {
-			return fmt.Errorf("number is above maximum at %s", path)
+			return strictJSONValidationFailure(path, "maximum", "maximum numeric value", jsonValueType(typed), "validation", "number is above maximum at %s", path)
 		}
 	}
 	return nil

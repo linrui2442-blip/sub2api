@@ -545,7 +545,8 @@ func (s *AntigravityGatewayService) handleChatCompletionsNonStreamingFromAntigra
 	responsesResponse := apicompat.AnthropicToResponsesResponse(&anthropicResponse)
 	chatResponse := apicompat.ResponsesToChatCompletions(responsesResponse, originalModel)
 	if err := validateStrictStructuredChatResponse(chatResponse, structuredOutput); err != nil {
-		return nil, s.writeAntigravityCompatError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")
+		publicErr := s.writeAntigravityCompatError(c, http.StatusBadGateway, "structured_output_validation_error", "Upstream response did not satisfy requested strict JSON schema")
+		return nil, preserveStrictJSONValidationDiagnostic(publicErr, err)
 	}
 	c.JSON(http.StatusOK, chatResponse)
 	return result, nil
