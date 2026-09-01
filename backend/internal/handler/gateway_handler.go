@@ -57,6 +57,15 @@ type GatewayHandler struct {
 	settingService            *service.SettingService
 }
 
+// ResolvePersonalProvider exposes the GatewayService's configured provider
+// catalog to the ingress-only Personal Unified router.
+func (h *GatewayHandler) ResolvePersonalProvider(ctx context.Context, model, endpointPlatform string) (string, string, error) {
+	if h == nil || h.gatewayService == nil {
+		return "", "", service.ErrPersonalRouteUnsupported
+	}
+	return h.gatewayService.ResolvePersonalProvider(ctx, model, endpointPlatform)
+}
+
 func (h *GatewayHandler) eligibilityChecker() service.RequestEligibilityChecker {
 	if h.requestEligibility != nil {
 		return h.requestEligibility

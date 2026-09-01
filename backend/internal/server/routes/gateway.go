@@ -37,8 +37,8 @@ func RegisterGatewayRoutes(
 	endpointNorm := handler.InboundEndpointMiddleware()
 	compositeTarget := compositeTargetPlatformMiddleware(compositeResolver)
 	compositeGeminiTarget := compositeGeminiTargetPlatformMiddleware(compositeResolver)
-	personalUnified := personalUnifiedRouterMiddleware("", middleware.AnthropicErrorWriter)
-	personalUnifiedGemini := personalUnifiedRouterMiddleware(service.PlatformGemini, middleware.GoogleErrorWriter)
+	personalUnified := personalUnifiedRouterMiddleware("", h.Gateway, openAICompatibleRoutingErrorWriter)
+	personalUnifiedGemini := personalUnifiedRouterMiddleware(service.PlatformGemini, h.Gateway, googleRoutingErrorWriter)
 
 	// 未分组 Key 拦截中间件（按协议格式区分错误响应）
 	requireGroupAnthropic := middleware.RequireGroupAssignment(settingService, middleware.AnthropicErrorWriter)
@@ -284,7 +284,26 @@ func getGroupPlatform(c *gin.Context) string {
 	return apiKey.Group.Platform
 }
 
-func personalUnifiedRouterMiddleware(endpointPlatform string, writeError middleware.GatewayErrorWriter) gin.HandlerFunc {
+type personalRoutingErrorWriter func(c *gin.Context, status int, errType, message string)
+
+func openAICompatibleRoutingErrorWriter(c *gin.Context, status int, errType, message string) {
+	c.JSON(status, gin.H{
+		"error": gin.H{
+			"type":    errType,
+			"message": message,
+		},
+	})
+}
+
+func googleRoutingErrorWriter(c *gin.Context, status int, _ string, message string) {
+	middleware.GoogleErrorWriter(c, status, message)
+}
+
+func personalUnifiedRouterMiddleware(
+	endpointPlatform string,
+	resolver service.PersonalProviderResolver,
+	writeError personalRoutingErrorWriter,
+) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey, ok := middleware.GetAPIKeyFromContext(c)
 		if !ok || apiKey == nil || apiKey.GroupID != nil || c.Request == nil || c.Request.Method == http.MethodGet {
@@ -300,20 +319,31 @@ func personalUnifiedRouterMiddleware(endpointPlatform string, writeError middlew
 			var err error
 			body, err = pkghttputil.ReadRequestBodyWithPrealloc(c.Request)
 			if err != nil {
-				writeError(c, http.StatusBadRequest, "Failed to read request body")
+				writeError(c, http.StatusBadRequest, "invalid_request_error", "Failed to read request body")
 				c.Abort()
 				return
 			}
 			model, modelPath = compositeJSONRequestModel(body)
 		}
 
-		platform, upstreamModel, err := service.ResolvePersonalProvider(model, endpointPlatform)
+		if resolver == nil {
+			writeError(c, http.StatusServiceUnavailable, "api_error", "Unified model routing is unavailable")
+			c.Abort()
+			return
+		}
+		platform, upstreamModel, err := resolver.ResolvePersonalProvider(c.Request.Context(), model, endpointPlatform)
 		if err != nil {
+			status := http.StatusBadRequest
+			errType := "invalid_request_error"
 			message := "Unsupported model for Unified Personal API Key"
 			if errors.Is(err, service.ErrPersonalRouteAmbiguous) {
 				message = "Model is available from multiple providers; use an explicit provider namespace (for example gemini/ or antigravity/)"
+			} else if !errors.Is(err, service.ErrPersonalRouteUnsupported) {
+				status = http.StatusServiceUnavailable
+				errType = "api_error"
+				message = "Unified model routing is temporarily unavailable"
 			}
-			writeError(c, http.StatusBadRequest, message)
+			writeError(c, status, errType, message)
 			c.Abort()
 			return
 		}
