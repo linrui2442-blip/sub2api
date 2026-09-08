@@ -119,3 +119,18 @@ func TestAPIKeyFromContext(t *testing.T) {
 	require.Equal(t, int64(1), gotKey.ID)
 
 }
+
+func TestRequireGroupAssignment_AllowsPersonalUnifiedModelsCatalog(t *testing.T) {
+	t.Setenv("SUB2_PERSONAL_MODE", "1")
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set(string(ContextKeyAPIKey), &service.APIKey{ID: 1})
+		c.Next()
+	})
+	r.Use(RequireGroupAssignment(nil, func(c *gin.Context, status int, message string) { c.String(status, message) }))
+	r.GET("/v1/models", func(c *gin.Context) { c.Status(http.StatusOK) })
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/models", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+}

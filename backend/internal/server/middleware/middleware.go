@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -130,6 +131,11 @@ func RequireGroupAssignment(settingService *service.SettingService, writeError G
 	return func(c *gin.Context) {
 		apiKey, ok := GetAPIKeyFromContext(c)
 		if !ok || apiKey.GroupID != nil {
+			c.Next()
+			return
+		}
+		if personal.Enabled() && c.Request.Method == http.MethodGet &&
+			(c.Request.URL.Path == "/v1/models" || c.Request.URL.Path == "/models") {
 			c.Next()
 			return
 		}
