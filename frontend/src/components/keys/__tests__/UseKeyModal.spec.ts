@@ -21,6 +21,26 @@ vi.mock('@/composables/useClipboard', () => ({
 import UseKeyModal from '../UseKeyModal.vue'
 
 describe('UseKeyModal', () => {
+  const mountModal = (mode: 'UNIFIED' | 'GROUP_PINNED', platform: any = null) => mount(UseKeyModal, {
+    props: { show: true, apiKey: 'sk-test', baseUrl: 'http://127.0.0.1:8080', platform, mode },
+    global: { stubs: { BaseDialog: { template: '<div><slot /><slot name="footer" /></div>' }, Icon: { template: '<span />' } } }
+  })
+
+  it('renders a generic OpenAI-compatible profile for Unified keys', () => {
+    const wrapper = mountModal('UNIFIED')
+    const text = wrapper.text()
+    expect(text).not.toContain('keys.useKeyModal.noGroupTitle')
+    expect(wrapper.html()).toContain('OPENAI_BASE_URL')
+    expect(wrapper.html()).toContain('/v1/models')
+    expect(wrapper.html()).not.toContain('ANTHROPIC_BASE_URL')
+  })
+
+  it('preserves provider-specific configuration for Group-Pinned keys', () => {
+    const wrapper = mountModal('GROUP_PINNED', 'grok')
+    expect(wrapper.html()).toContain('GROK_MODELS_BASE_URL')
+    expect(wrapper.html()).toContain('XAI_API_KEY')
+  })
+
   it('renders Grok Build and OpenCode setup for Grok groups', async () => {
     const wrapper = mount(UseKeyModal, {
       props: {

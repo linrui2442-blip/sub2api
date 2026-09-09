@@ -71,7 +71,7 @@ func (s *AntigravityGatewayService) ForwardAsChatCompletions(
 	if strings.TrimSpace(request.Model) == "" {
 		return nil, s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", "model is required")
 	}
-	structuredOutput, err := parseGeminiStructuredOutput(request.ResponseFormat, request.Stream)
+	structuredOutput, err := parseStructuredOutputForProvider(structuredOutputProviderAntigravity, request.ResponseFormat, request.Stream)
 	if err != nil {
 		return nil, s.writeAntigravityCompatError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 	}

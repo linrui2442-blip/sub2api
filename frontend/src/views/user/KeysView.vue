@@ -999,6 +999,7 @@
       :api-key="selectedKey?.key || ''"
       :base-url="publicSettings?.api_base_url || ''"
       :platform="selectedKey?.group?.platform || null"
+      :mode="selectedKey ? getApiKeyMode(selectedKey, isPersonalEdition) : null"
       :allow-messages-dispatch="selectedKey?.group?.allow_messages_dispatch || false"
       @close="closeUseKeyModal"
     />
@@ -1134,6 +1135,7 @@ import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 	import SearchInput from '@/components/common/SearchInput.vue'
 	import Icon from '@/components/icons/Icon.vue'
 	import UseKeyModal from '@/components/keys/UseKeyModal.vue'
+import { getApiKeyMode } from '@/components/keys/apiKeyMode'
 	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 	import GroupBadge from '@/components/common/GroupBadge.vue'
 	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
@@ -1292,6 +1294,7 @@ const showCcsClientSelect = ref(false)
 const showColumnDropdown = ref(false)
 const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
+const isPersonalEdition = import.meta.env.VITE_PERSONAL_EDITION === '1'
 const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
 const publicSettings = ref<PublicSettings | null>(null)

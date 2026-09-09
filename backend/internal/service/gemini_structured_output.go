@@ -18,6 +18,47 @@ type geminiStructuredOutput struct {
 	Schema map[string]any
 }
 
+type structuredOutputProvider string
+
+const (
+	structuredOutputProviderGemini      structuredOutputProvider = "gemini"
+	structuredOutputProviderAntigravity structuredOutputProvider = "antigravity"
+	structuredOutputProviderOpenAI      structuredOutputProvider = "openai"
+	structuredOutputProviderAnthropic   structuredOutputProvider = "anthropic"
+)
+
+type structuredOutputAdapter interface {
+	prepare(map[string]any, bool) (map[string]any, error)
+}
+
+type passthroughStructuredOutputAdapter struct{}
+
+func (passthroughStructuredOutputAdapter) prepare(schema map[string]any, _ bool) (map[string]any, error) {
+	return schema, nil
+}
+
+type geminiStructuredOutputAdapter struct{}
+
+func (geminiStructuredOutputAdapter) prepare(schema map[string]any, strict bool) (map[string]any, error) {
+	normalized, err := normalizeGeminiSchema(schema, "$")
+	if err != nil {
+		return nil, err
+	}
+	if err := validateGeminiJSONSchemaSupport(normalized, "$", strict); err != nil {
+		return nil, err
+	}
+	return normalized, nil
+}
+
+func resolveStructuredOutputAdapter(provider structuredOutputProvider) structuredOutputAdapter {
+	switch provider {
+	case structuredOutputProviderGemini, structuredOutputProviderAntigravity:
+		return geminiStructuredOutputAdapter{}
+	default:
+		return passthroughStructuredOutputAdapter{}
+	}
+}
+
 // StrictJSONValidationError carries value-free diagnostics for an internal
 // strict structured-output failure. It must never contain response values.
 type StrictJSONValidationError struct {
@@ -183,6 +224,10 @@ var supportedGeminiJSONSchemaKeywords = map[string]struct{}{
 }
 
 func parseGeminiStructuredOutput(raw json.RawMessage, stream bool) (*geminiStructuredOutput, error) {
+	return parseStructuredOutputForProvider(structuredOutputProviderGemini, raw, stream)
+}
+
+func parseStructuredOutputForProvider(provider structuredOutputProvider, raw json.RawMessage, stream bool) (*geminiStructuredOutput, error) {
 	if len(raw) == 0 || string(raw) == "null" {
 		return nil, nil
 	}
@@ -207,10 +252,52 @@ func parseGeminiStructuredOutput(raw json.RawMessage, stream bool) (*geminiStruc
 	if strict && stream {
 		return nil, errors.New("structured_output_not_supported: strict json_schema with stream=true")
 	}
-	if err := validateGeminiJSONSchemaSupport(format.JSONSchema.Schema, "$", strict); err != nil {
+	prepared, err := resolveStructuredOutputAdapter(provider).prepare(format.JSONSchema.Schema, strict)
+	if err != nil {
 		return nil, fmt.Errorf("structured_output_not_supported: %w", err)
 	}
-	return &geminiStructuredOutput{Name: strings.TrimSpace(format.JSONSchema.Name), Strict: strict, Schema: format.JSONSchema.Schema}, nil
+	return &geminiStructuredOutput{Name: strings.TrimSpace(format.JSONSchema.Name), Strict: strict, Schema: prepared}, nil
+}
+
+func normalizeGeminiSchema(schema map[string]any, path string) (map[string]any, error) {
+	out := make(map[string]any, len(schema))
+	for key, value := range schema {
+		if key == "const" {
+			if _, exists := schema["enum"]; exists {
+				return nil, fmt.Errorf("const cannot be combined with enum at %s", path)
+			}
+			if schema["type"] == "null" {
+				return nil, fmt.Errorf("const null is unsupported at %s", path)
+			}
+			out["enum"] = []any{value}
+			continue
+		}
+		switch child := value.(type) {
+		case map[string]any:
+			n, err := normalizeGeminiSchema(child, path+"."+key)
+			if err != nil {
+				return nil, err
+			}
+			out[key] = n
+		case []any:
+			arr := make([]any, len(child))
+			for i, item := range child {
+				if m, ok := item.(map[string]any); ok {
+					n, err := normalizeGeminiSchema(m, fmt.Sprintf("%s.%s[%d]", path, key, i))
+					if err != nil {
+						return nil, err
+					}
+					arr[i] = n
+				} else {
+					arr[i] = item
+				}
+			}
+			out[key] = arr
+		default:
+			out[key] = value
+		}
+	}
+	return out, nil
 }
 
 func validateGeminiJSONSchemaSupport(schema map[string]any, path string, strict bool) error {

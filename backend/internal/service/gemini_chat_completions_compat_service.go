@@ -41,7 +41,7 @@ func (s *GeminiMessagesCompatService) ForwardAsChatCompletions(
 	originalModel := ccReq.Model
 	clientStream := ccReq.Stream
 	includeUsage := ccReq.StreamOptions != nil && ccReq.StreamOptions.IncludeUsage
-	structuredOutput, err := parseGeminiStructuredOutput(ccReq.ResponseFormat, clientStream)
+	structuredOutput, err := parseStructuredOutputForProvider(structuredOutputProviderGemini, ccReq.ResponseFormat, clientStream)
 	if err != nil {
 		return nil, s.writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 	}
