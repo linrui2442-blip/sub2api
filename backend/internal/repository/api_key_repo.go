@@ -355,10 +355,11 @@ func (r *apiKeyRepository) DeleteWithAudit(ctx context.Context, id int64) error 
 }
 
 func (r *apiKeyRepository) deleteWithTombstone(ctx context.Context, exec *dbent.Client, id int64, tombstoneKey string) error {
+	now := time.Now()
 	res, err := exec.ExecContext(ctx, `
 		UPDATE api_keys
-		SET key = $1, deleted_at = NOW(), updated_at = NOW()
-		WHERE id = $2 AND deleted_at IS NULL`, tombstoneKey, id)
+		SET key = $1, deleted_at = $2, updated_at = $2
+		WHERE id = $3 AND deleted_at IS NULL`, tombstoneKey, now, id)
 	if err != nil {
 		return err
 	}
@@ -368,7 +369,7 @@ func (r *apiKeyRepository) deleteWithTombstone(ctx context.Context, exec *dbent.
 	}
 	if affected == 0 {
 		// 并发/重复删除:记录已存在(已软删)则幂等返回 nil(defer 回滚空事务),否则 NotFound。
-		exists, existErr := r.client.APIKey.Query().
+		exists, existErr := exec.APIKey.Query().
 			Where(apikey.IDEQ(id)).
 			Exist(mixins.SkipSoftDelete(ctx))
 		if existErr != nil {

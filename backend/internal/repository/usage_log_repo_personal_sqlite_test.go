@@ -62,6 +62,19 @@ func TestPersonalSQLiteUsageSingleAndDedup(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
+func TestPersonalSQLiteBatchAPIKeyUsagePortableDateFloor(t *testing.T) {
+	repo, closeRepo := openUsageSQLiteTest(t, "usage-api-key-dashboard")
+	defer closeRepo()
+	log := personalUsageLog("req-dashboard", false)
+	log.APIKeyID = 7
+	log.CreatedAt = time.Now().UTC()
+	_, err := repo.Create(context.Background(), log)
+	require.NoError(t, err)
+	stats, err := repo.GetBatchAPIKeyUsageStats(context.Background(), []int64{7}, time.Time{}, time.Time{})
+	require.NoError(t, err)
+	require.Equal(t, int64(1), stats[7].TotalRequests)
+}
+
 func TestPersonalSQLiteUsageBatchNonStreamAndStream(t *testing.T) {
 	repo, closeRepo := openUsageSQLiteTest(t, "usage-batch")
 	defer closeRepo()
