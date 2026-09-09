@@ -101,10 +101,20 @@ jobs:
       - name: Verify SaaS routes are absent from Personal bundle
         working-directory: frontend
         run: |
-          if grep -R -E 'PurchaseSubscription|AdminPaymentDashboard|AdminAffiliateInvites|ModelPlaza|ForgotPassword' dist >/dev/null 2>&1; then
+          DIST_DIR="../backend/internal/web/dist"
+          if [ ! -d "$DIST_DIR" ]; then
+            echo "Personal frontend dist directory is missing: $DIST_DIR"
+            exit 1
+          fi
+          if [ ! -f "$DIST_DIR/index.html" ]; then
+            echo 'Personal frontend index.html is missing.'
+            exit 1
+          fi
+          if grep -R -E 'PurchaseSubscription|AdminPaymentDashboard|AdminAffiliateInvites|ModelPlaza|ForgotPassword' "$DIST_DIR" >/dev/null 2>&1; then
             echo 'Commercial/public route markers leaked into Personal frontend bundle.'
             exit 1
           fi
+          echo 'Personal frontend SaaS-route gate passed.'
       - uses: actions/setup-go@v6
         with:
           go-version-file: backend/go.mod
