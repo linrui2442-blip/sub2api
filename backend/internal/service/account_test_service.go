@@ -151,6 +151,13 @@ type AccountTestService struct {
 	// grokWSDialer is optional; realtime account tests use the default OpenAI-style
 	// WS dialer when nil (supports proxy + coder/websocket handshake).
 	grokWSDialer openAIWSClientDialer
+	codexManifestFetcher func(context.Context, *Account) (*CodexModelsManifest, error)
+}
+
+// SetCodexManifestFetcher injects the canonical Codex manifest path used by
+// OpenAI OAuth model synchronization.
+func (s *AccountTestService) SetCodexManifestFetcher(fetcher func(context.Context, *Account) (*CodexModelsManifest, error)) {
+	if s != nil { s.codexManifestFetcher = fetcher }
 }
 
 func (s *AccountTestService) SetSettingService(settingService *SettingService) {

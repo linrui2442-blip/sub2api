@@ -1247,6 +1247,10 @@ func TestApplyCodexOAuthTransform_EmptyInput(t *testing.T) {
 
 func TestNormalizeCodexModel_Gpt53(t *testing.T) {
 	cases := map[string]string{
+		"gpt-6-astra":               "gpt-6-astra",
+		"openai/gpt-6-astra":        "gpt-6-astra",
+		"gpt-6":                     "gpt-6-astra",
+		"openai/gpt-6":              "gpt-6-astra",
 		"gpt-5.4":                   "gpt-5.4",
 		"gpt5.5":                    "gpt-5.5",
 		"openai/gpt5.5":             "gpt-5.5",
@@ -1376,6 +1380,19 @@ func TestApplyCodexOAuthTransform_GPT55SuppliesModelSpecificInstructions(t *test
 	require.True(t, ok)
 	require.Contains(t, instructions, "You are Codex, a coding agent based on GPT-5")
 	require.NotContains(t, instructions, "You are GPT-5.1 running in the Codex CLI")
+	require.True(t, result.Modified)
+}
+
+func TestApplyCodexOAuthTransform_GPT6AstraSuppliesModelSpecificInstructions(t *testing.T) {
+	upstreamModel := normalizeCodexModel("gpt-6")
+	require.Equal(t, "gpt-6-astra", upstreamModel)
+	reqBody := map[string]any{"model": upstreamModel}
+	result := applyCodexOAuthTransform(reqBody, true, false)
+	require.Equal(t, "gpt-6-astra", reqBody["model"])
+	require.Equal(t, "gpt-6-astra", result.NormalizedModel)
+	instructions, ok := reqBody["instructions"].(string)
+	require.True(t, ok)
+	require.True(t, strings.HasPrefix(strings.TrimSpace(instructions), "You are Codex, an agent based on GPT-6."))
 	require.True(t, result.Modified)
 }
 

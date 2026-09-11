@@ -363,6 +363,31 @@ func TestChatCompletionsToResponses_ImageURL(t *testing.T) {
 	assert.Equal(t, "data:image/png;base64,abc123", parts[1].ImageURL)
 }
 
+func TestChatCompletionsToResponses_ImageAndStrictJSONSchema(t *testing.T) {
+	content := `[{"type":"text","text":"Inspect the image and return JSON."},{"type":"image_url","image_url":{"url":"data:image/png;base64,iVBORw0KGgo="}}]`
+	req := &ChatCompletionsRequest{Model: "gpt-5.6", Messages: []ChatMessage{{Role: "user", Content: json.RawMessage(content)}}, ResponseFormat: json.RawMessage(`{"type":"json_schema","json_schema":{"name":"result","strict":true,"schema":{"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":false}}}`)}
+	resp, err := ChatCompletionsToResponses(req)
+	require.NoError(t, err)
+	var items []ResponsesInputItem
+	require.NoError(t, json.Unmarshal(resp.Input, &items))
+	require.Len(t, items, 1)
+	var parts []ResponsesContentPart
+	require.NoError(t, json.Unmarshal(items[0].Content, &parts))
+	require.Len(t, parts, 2)
+	assert.Equal(t, "input_text", parts[0].Type)
+	assert.Equal(t, "input_image", parts[1].Type)
+	assert.Equal(t, "data:image/png;base64,iVBORw0KGgo=", parts[1].ImageURL)
+	require.NotNil(t, resp.Text)
+	var format map[string]any
+	require.NoError(t, json.Unmarshal(resp.Text.Format, &format))
+	assert.Equal(t, "json_schema", format["type"])
+	assert.Equal(t, "result", format["name"])
+	assert.Equal(t, true, format["strict"])
+	schema := format["schema"].(map[string]any)
+	assert.Equal(t, []any{"ok"}, schema["required"])
+	assert.Equal(t, false, schema["additionalProperties"])
+}
+
 func TestChatCompletionsToResponses_EmptyBase64ImageURLSkipped(t *testing.T) {
 	content := `[{"type":"text","text":"Describe this"},{"type":"image_url","image_url":{"url":"data:image/png;base64,"}}]`
 	req := &ChatCompletionsRequest{

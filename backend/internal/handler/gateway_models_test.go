@@ -102,6 +102,51 @@ func TestGatewayModels_GeminiGroupFallsBackToGeminiModels(t *testing.T) {
 	require.NotContains(t, modelIDsForTest(got.Data), "claude-sonnet-4-6")
 }
 
+func TestGatewayModels_OpenAIDiscoveryPreservesLegacyCandidates(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	groupID := int64(36)
+	account := service.Account{ID: 1, Platform: service.PlatformOpenAI, Type: service.AccountTypeOAuth}
+	account.SetUpstreamModelMetadataSnapshot(service.UpstreamModelMetadataSnapshot{
+		LiveModelsAuthoritative: true,
+		LiveModels:              []string{"live-model"},
+	})
+	h := newGatewayModelsHandlerForTest(&gatewayModelsAccountRepoStub{byGroup: map[int64][]service.Account{groupID: {account}}})
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodGet, "/v1/models", nil)
+	c.Set(string(middleware2.ContextKeyAPIKey), &service.APIKey{Group: &service.Group{ID: groupID, Platform: service.PlatformOpenAI}})
+	h.Models(c)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var got gatewayModelsResponseForTest
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+	require.Contains(t, modelIDsForTest(got.Data), "live-model")
+	require.Greater(t, len(got.Data), 1, "manifest absence must not suppress legacy candidates")
+}
+
+func TestAntigravityModels_UsesScopedAuthoritativeMembership(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	groupID := int64(37)
+	account := service.Account{ID: 1, Platform: service.PlatformAntigravity, Type: service.AccountTypeOAuth}
+	account.SetUpstreamModelMetadataSnapshot(service.UpstreamModelMetadataSnapshot{
+		LiveModelsAuthoritative: true,
+		LiveModels:              []string{"live-antigravity"},
+	})
+	h := newGatewayModelsHandlerForTest(&gatewayModelsAccountRepoStub{byGroup: map[int64][]service.Account{groupID: {account}}})
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodGet, "/antigravity/models", nil)
+	c.Set(string(middleware2.ContextKeyAPIKey), &service.APIKey{GroupID: &groupID})
+	h.AntigravityModels(c)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var got gatewayModelsResponseForTest
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+	require.Equal(t, []string{"live-antigravity"}, modelIDsForTest(got.Data))
+}
+
 func TestGatewayModels_Grok45AdvertisesReasoningEffortForGrokBuild(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

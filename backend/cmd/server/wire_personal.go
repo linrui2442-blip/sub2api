@@ -84,6 +84,7 @@ func providePersonalCleanup(
 	geminiOAuth *service.GeminiOAuthService,
 	antigravityOAuth *service.AntigravityOAuthService,
 	openAIGateway *service.OpenAIGatewayService,
+	codexVersionSync *service.OpenAICodexVersionSyncService,
 	auditLog *service.AuditLogService,
 	promptAudit *securityaudit.PromptService,
 ) func() {
@@ -97,6 +98,12 @@ func providePersonalCleanup(
 		}
 
 		parallelSteps := []cleanupStep{
+			{"OpenAICodexVersionSyncService", func() error {
+				if codexVersionSync != nil {
+					codexVersionSync.Stop()
+				}
+				return nil
+			}},
 			{"AuthCacheInvalidationWorker", func() error {
 				if authCacheInvalidationWorker != nil {
 					authCacheInvalidationWorker.Stop()

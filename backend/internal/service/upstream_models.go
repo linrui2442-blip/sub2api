@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
@@ -15,6 +16,8 @@ import (
 )
 
 const upstreamModelsBodyLimit int64 = 8 << 20
+
+const upstreamModelMetadataExtraKey = "upstream_model_metadata"
 
 // UpstreamModelSyncErrorKind classifies model sync failures for safe HTTP mapping.
 type UpstreamModelSyncErrorKind string
@@ -27,6 +30,131 @@ const (
 	// UpstreamModelSyncErrorUpstream means the configured upstream failed or returned an unusable response.
 	UpstreamModelSyncErrorUpstream UpstreamModelSyncErrorKind = "upstream"
 )
+
+// UpstreamModelMetadataSnapshot stores one account's capability evidence.
+// Models contains metadata (and may include explicitly mapped targets), while
+// LiveModels is the discovered set. Discovery does not necessarily establish
+// that models absent from the response are unsupported by the credential.
+type UpstreamModelMetadataSnapshot struct {
+	Source                   string                           `json:"source"`
+	SyncedAt                 string                           `json:"synced_at"`
+	Models                   map[string]UpstreamModelMetadata `json:"models"`
+	LiveModels               []string                         `json:"live_models,omitempty"`
+	LiveModelsDiscoveryKnown bool                             `json:"live_models_discovery_known"`
+	// LiveModelsAuthoritative means absence is authoritative, not just that
+	// discovery succeeded. Kept under its original JSON key for compatibility.
+	LiveModelsAuthoritative bool `json:"live_models_authoritative"`
+}
+
+type UpstreamModelMetadata struct {
+	ID string `json:"id"`
+}
+
+type UpstreamModelCatalog struct {
+	AbsenceAuthoritative bool                             `json:"absence_authoritative"`
+	Models               []string                         `json:"models"`
+	Metadata             map[string]UpstreamModelMetadata `json:"metadata,omitempty"`
+	Warnings             []UpstreamModelSyncWarning       `json:"warnings,omitempty"`
+}
+
+type UpstreamModelSyncWarning struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func (a *Account) SetUpstreamModelMetadataSnapshot(snapshot UpstreamModelMetadataSnapshot) {
+	if a == nil {
+		return
+	}
+	if a.Extra == nil {
+		a.Extra = make(map[string]any)
+	}
+	a.Extra[upstreamModelMetadataExtraKey] = snapshot
+}
+
+func (a *Account) GetUpstreamModelMetadataSnapshot() *UpstreamModelMetadataSnapshot {
+	if a == nil || a.Extra == nil {
+		return nil
+	}
+	raw, ok := a.Extra[upstreamModelMetadataExtraKey]
+	if !ok || raw == nil {
+		return nil
+	}
+	body, err := json.Marshal(raw)
+	if err != nil {
+		return nil
+	}
+	var snapshot UpstreamModelMetadataSnapshot
+	if err := json.Unmarshal(body, &snapshot); err != nil {
+		return nil
+	}
+	if snapshot.Models == nil {
+		snapshot.Models = make(map[string]UpstreamModelMetadata)
+	}
+	// Older snapshots only stored the authority flag. Retain their successful
+	// discovery evidence, but never interpret Codex picker absence as a denial.
+	snapshot.LiveModelsDiscoveryKnown = snapshot.LiveModelsDiscoveryKnown || snapshot.LiveModelsAuthoritative
+	if a.IsOpenAIOAuth() {
+		snapshot.LiveModelsAuthoritative = false
+	}
+	if !snapshot.LiveModelsDiscoveryKnown && len(snapshot.Models) == 0 {
+		return nil
+	}
+	return &snapshot
+}
+
+// GetUpstreamLiveModels returns discovered IDs and whether discovery is known.
+// The boolean does not assert that absent models are unsupported.
+func (a *Account) GetUpstreamLiveModels() ([]string, bool) {
+	snapshot := a.GetUpstreamModelMetadataSnapshot()
+	if snapshot == nil || !snapshot.LiveModelsDiscoveryKnown {
+		return nil, false
+	}
+	return append([]string(nil), snapshot.LiveModels...), true
+}
+
+// CurrentSupportedModelIDs returns the public model IDs that the account can
+// currently serve. Static defaults are candidates only; IsModelSupported
+// remains the single support authority and resolves public aliases through the
+// account's existing model_mapping before interpreting provider evidence.
+func CurrentSupportedModelIDs(account *Account, defaultCandidates []string) []string {
+	if account == nil {
+		return nil
+	}
+
+	mapping := account.GetModelMapping()
+	_, discoveryKnown := account.GetUpstreamLiveModels()
+	explicitMapping := len(stringMappingFromRaw(account.Credentials["model_mapping"])) > 0
+	candidates := make([]string, 0, len(defaultCandidates)+len(mapping))
+	if discoveryKnown || !explicitMapping || account.IsOpenAIPassthroughEnabled() {
+		candidates = append(candidates, defaultCandidates...)
+	}
+	if discoveryKnown || explicitMapping {
+		for publicModel := range mapping {
+			candidates = append(candidates, publicModel)
+		}
+	}
+	if liveModels, ok := account.GetUpstreamLiveModels(); ok {
+		candidates = append(candidates, liveModels...)
+	}
+
+	seen := make(map[string]struct{}, len(candidates))
+	supported := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			continue
+		}
+		if _, ok := seen[candidate]; ok {
+			continue
+		}
+		seen[candidate] = struct{}{}
+		if account.IsModelSupported(candidate) {
+			supported = append(supported, candidate)
+		}
+	}
+	return supported
+}
 
 // UpstreamModelSyncError keeps internal failure details wrapped while exposing a safe client message.
 type UpstreamModelSyncError struct {
@@ -80,6 +208,22 @@ func (s *AccountTestService) FetchUpstreamSupportedModels(ctx context.Context, a
 	if account == nil {
 		return nil, newUpstreamModelSyncConfigError("Account is required", nil)
 	}
+	if account.IsOpenAIOAuth() {
+		if s.codexManifestFetcher == nil {
+			return nil, newUpstreamModelSyncConfigError("OpenAI OAuth model sync is not configured", nil)
+		}
+		manifest, err := s.codexManifestFetcher(ctx, account)
+		if err != nil {
+			return nil, newUpstreamModelSyncUpstreamError("Failed to request upstream model list", err)
+		}
+		models, err := extractCodexManifestModelIDs(manifest.Body)
+		if err != nil {
+			return nil, newUpstreamModelSyncUpstreamError("Upstream model list response was not valid JSON", err)
+		}
+		// An explicit empty Codex manifest is successful discovery, not proof
+		// that this credential cannot call any model.
+		return models, nil
+	}
 
 	if account.Platform == PlatformAntigravity && account.Type != AccountTypeAPIKey {
 		return s.fetchAntigravityOAuthUpstreamModels(ctx, account)
@@ -124,11 +268,108 @@ func (s *AccountTestService) FetchUpstreamSupportedModels(ctx context.Context, a
 	if err != nil {
 		return nil, newUpstreamModelSyncUpstreamError("Upstream model list response was not valid JSON", err)
 	}
-	if len(models) == 0 {
+	if len(models) == 0 && !supportsAuthoritativeEmptyManifest(account) {
 		return nil, newUpstreamModelSyncUpstreamError("Upstream returned no supported models", nil)
 	}
 
 	return models, nil
+}
+
+// SyncUpstreamModelCatalog records the discovered models returned by the
+// account's upstream while retaining model_mapping as routing configuration.
+// A failed sync never overwrites the previous discovery snapshot.
+func (s *AccountTestService) SyncUpstreamModelCatalog(ctx context.Context, account *Account) (*UpstreamModelCatalog, error) {
+	models, err := s.FetchUpstreamSupportedModels(ctx, account)
+	if err != nil {
+		return nil, err
+	}
+	models = dedupeAndSortModelIDs(models)
+	if account != nil && supportsLiveModelDiscovery(account) && account.ID > 0 && s.accountRepo != nil {
+		previous := account.GetUpstreamModelMetadataSnapshot()
+		snapshot := UpstreamModelMetadataSnapshot{
+			Source:                   "upstream",
+			SyncedAt:                 time.Now().UTC().Format(time.RFC3339),
+			Models:                   make(map[string]UpstreamModelMetadata),
+			LiveModels:               append([]string(nil), models...),
+			LiveModelsDiscoveryKnown: true,
+			LiveModelsAuthoritative:  supportsAuthoritativeMembership(account),
+		}
+		// Metadata remains a separate concern; retain only configured/live IDs.
+		for _, id := range models {
+			snapshot.Models[id] = UpstreamModelMetadata{ID: id}
+		}
+		for _, id := range configuredUpstreamModelsForCapabilitySync(account) {
+			if _, ok := snapshot.Models[id]; !ok {
+				if previous != nil {
+					if old, exists := previous.Models[id]; exists {
+						snapshot.Models[id] = old
+					}
+				}
+			}
+		}
+		if err := s.accountRepo.UpdateExtra(ctx, account.ID, map[string]any{upstreamModelMetadataExtraKey: snapshot}); err != nil {
+			return nil, newUpstreamModelSyncUpstreamError("Failed to save upstream model membership", err)
+		}
+		account.SetUpstreamModelMetadataSnapshot(snapshot)
+	}
+	return &UpstreamModelCatalog{Models: models, Metadata: snapshotMetadataForModels(account, models), AbsenceAuthoritative: supportsAuthoritativeMembership(account)}, nil
+}
+
+func supportsLiveModelDiscovery(account *Account) bool {
+	if account == nil {
+		return false
+	}
+	if account.IsOpenAIOAuth() {
+		return true
+	}
+	if account.IsGemini() && (account.Type == AccountTypeAPIKey || (account.Type == AccountTypeOAuth && !account.IsGeminiCodeAssist())) {
+		return true
+	}
+	if account.Platform == PlatformAntigravity && account.Type == AccountTypeOAuth {
+		return true
+	}
+	return false
+}
+
+// Only providers with verified complete-list semantics may use absence as a
+// negative capability. Codex manifests provide positive discovery evidence.
+func supportsAuthoritativeMembership(account *Account) bool {
+	return supportsLiveModelDiscovery(account) && !account.IsOpenAIOAuth()
+}
+
+func supportsAuthoritativeEmptyManifest(account *Account) bool {
+	return supportsAuthoritativeMembership(account)
+}
+
+func snapshotMetadataForModels(account *Account, models []string) map[string]UpstreamModelMetadata {
+	if account == nil {
+		return nil
+	}
+	snapshot := account.GetUpstreamModelMetadataSnapshot()
+	if snapshot == nil {
+		return nil
+	}
+	metadata := make(map[string]UpstreamModelMetadata)
+	for _, id := range models {
+		if item, ok := snapshot.Models[id]; ok {
+			metadata[id] = item
+		}
+	}
+	return metadata
+}
+
+func configuredUpstreamModelsForCapabilitySync(account *Account) []string {
+	if account == nil {
+		return nil
+	}
+	models := make([]string, 0)
+	for _, mapped := range account.GetModelMapping() {
+		mapped = strings.TrimSpace(mapped)
+		if mapped != "" && !strings.Contains(mapped, "*") {
+			models = append(models, mapped)
+		}
+	}
+	return dedupeAndSortModelIDs(models)
 }
 
 func (s *AccountTestService) buildUpstreamModelsRequest(ctx context.Context, account *Account) (*http.Request, error) {
@@ -451,7 +692,10 @@ func (s *AccountTestService) fetchAntigravityOAuthUpstreamModels(ctx context.Con
 	if err != nil {
 		return nil, newUpstreamModelSyncUpstreamError("Failed to fetch Antigravity available models", err)
 	}
-	if modelsResp == nil || len(modelsResp.Models) == 0 {
+	if modelsResp == nil {
+		return nil, newUpstreamModelSyncUpstreamError("Upstream returned no supported models", nil)
+	}
+	if len(modelsResp.Models) == 0 && !supportsAuthoritativeEmptyManifest(account) {
 		return nil, newUpstreamModelSyncUpstreamError("Upstream returned no supported models", nil)
 	}
 

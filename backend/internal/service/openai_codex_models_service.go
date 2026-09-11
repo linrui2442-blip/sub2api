@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -41,6 +42,38 @@ type CodexModelsManifest struct {
 	ETag         string
 	upstreamETag string
 	NotModified  bool
+}
+
+func extractCodexManifestModelIDs(body []byte) ([]string, error) {
+	var envelope struct {
+		Models []struct {
+			Slug string `json:"slug"`
+			ID   string `json:"id"`
+			Name string `json:"name"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, err
+	}
+	seen := map[string]struct{}{}
+	models := make([]string, 0, len(envelope.Models))
+	for _, model := range envelope.Models {
+		id := strings.TrimSpace(model.Slug)
+		if id == "" {
+			id = strings.TrimSpace(model.ID)
+		}
+		if id == "" {
+			id = strings.TrimSpace(model.Name)
+		}
+		if id != "" {
+			if _, ok := seen[id]; !ok {
+				seen[id] = struct{}{}
+				models = append(models, id)
+			}
+		}
+	}
+	sort.Strings(models)
+	return models, nil
 }
 
 type codexModelsManifestUpstreamError struct {
@@ -149,6 +182,24 @@ type codexModelsManifestRequest struct {
 	credentialAccount   *Account
 	accountConcurrency  int
 	useAPIKeyUpstream   bool
+}
+
+func classifyCodexManifestTransportError(err error) string {
+	if err == nil {
+		return "unknown_transport"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "context_deadline"
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return "client_timeout"
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return "dns"
+	}
+	return "unknown_transport"
 }
 
 type codexModelsManifestCacheEntry struct {
@@ -451,6 +502,9 @@ func (s *OpenAIGatewayService) refreshCachedAPIKeyCodexModelsManifest(cacheKey s
 }
 
 func (s *OpenAIGatewayService) fetchCodexModelsManifestUpstream(ctx context.Context, request codexModelsManifestRequest, ifNoneMatch string) (*CodexModelsManifest, error) {
+	started := time.Now()
+	parsedURL, _ := url.Parse(request.url)
+	slog.Info("openai_codex_manifest.request", "account_id", request.accountID, "host", parsedURL.Host, "path", parsedURL.Path, "method", http.MethodGet, "authorization_present", request.headers.Get("Authorization") != "", "chatgpt_account_id_present", request.headers.Get("ChatGPT-Account-ID") != "", "version_present", request.headers.Get("Version") != "", "user_agent_present", request.headers.Get("User-Agent") != "", "originator_present", request.headers.Get("Originator") != "", "timeout_ms", codexModelsManifestRequestTimeout.Milliseconds(), "response_header_timeout_ms", (10 * time.Second).Milliseconds(), "proxy_configured", strings.TrimSpace(request.proxyURL) != "")
 	reqCtx, cancel := context.WithTimeout(ctx, codexModelsManifestRequestTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, request.url, nil)
@@ -481,6 +535,7 @@ func (s *OpenAIGatewayService) fetchCodexModelsManifestUpstream(ctx context.Cont
 		resp, err = client.Do(req)
 	}
 	if err != nil {
+		slog.Warn("openai_codex_manifest.error", "account_id", request.accountID, "error_class", classifyCodexManifestTransportError(err), "elapsed_ms", time.Since(started).Milliseconds())
 		return nil, &codexModelsManifestUpstreamError{
 			err:       infraerrors.Newf(http.StatusBadGateway, "OPENAI_CODEX_MODELS_UPSTREAM_FAILED", "codex models manifest request failed: %v", err),
 			retryable: isRetryableCodexModelsManifestTransportError(err),
@@ -489,9 +544,11 @@ func (s *OpenAIGatewayService) fetchCodexModelsManifestUpstream(ctx context.Cont
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotModified {
+		slog.Info("openai_codex_manifest.response", "account_id", request.accountID, "upstream_status", resp.StatusCode, "elapsed_ms", time.Since(started).Milliseconds())
 		return &CodexModelsManifest{ETag: resp.Header.Get("ETag"), NotModified: true}, nil
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		slog.Warn("openai_codex_manifest.response", "account_id", request.accountID, "upstream_status", resp.StatusCode, "elapsed_ms", time.Since(started).Milliseconds())
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
 		body = s.redactAgentIdentitySensitiveBody(reqCtx, request.credentialAccount, body)
 		message := strings.TrimSpace(string(body))
@@ -521,6 +578,7 @@ func (s *OpenAIGatewayService) fetchCodexModelsManifestUpstream(ctx context.Cont
 		body = convertOpenAIModelListToCodexManifest(body)
 	}
 	if err := validateCodexModelsManifestEnvelope(body); err != nil {
+		slog.Warn("openai_codex_manifest.error", "account_id", request.accountID, "error_class", "malformed_manifest", "elapsed_ms", time.Since(started).Milliseconds())
 		return nil, &codexModelsManifestUpstreamError{
 			err: infraerrors.Newf(
 				http.StatusBadGateway,
@@ -531,6 +589,7 @@ func (s *OpenAIGatewayService) fetchCodexModelsManifestUpstream(ctx context.Cont
 			retryable: true,
 		}
 	}
+	slog.Info("openai_codex_manifest.response", "account_id", request.accountID, "upstream_status", resp.StatusCode, "elapsed_ms", time.Since(started).Milliseconds())
 	if request.useAPIKeyUpstream {
 		body, err = adjustAPIKeyCodexModelsManifest(body)
 		if err != nil {
@@ -562,6 +621,7 @@ func codexModelsManifestBodyETag(body []byte) string {
 }
 
 var apiKeyCodexModelsWithoutResponsesLite = map[string]struct{}{
+	"gpt-6-astra":   {},
 	"gpt-5.6-sol":   {},
 	"gpt-5.6-terra": {},
 	"gpt-5.6-luna":  {},

@@ -860,6 +860,36 @@ func TestOpenAIGatewayService_OAuthPassthrough_CodexMissingInstructionsGetsDefau
 	}
 }
 
+func TestOpenAIGatewayService_Forward_GPT6AstraMappedInstructionsAndReasoning(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+	c.Request.Header.Set("User-Agent", "codex_cli_rs/0.98.0")
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body:       io.NopCloser(strings.NewReader("data: {\"type\":\"response.completed\",\"response\":{\"id\":\"resp_1\",\"status\":\"completed\",\"output\":[],\"usage\":{\"input_tokens\":1,\"output_tokens\":1}}}\n\ndata: [DONE]\n\n")),
+	}}
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, httpUpstream: upstream}
+	account := &Account{
+		ID: 123, Name: "fixture", Platform: PlatformOpenAI, Type: AccountTypeOAuth, Concurrency: 1,
+		Credentials: map[string]any{
+			"access_token":       "test-oauth-token",
+			"chatgpt_account_id": "fixture-account",
+			"model_mapping":      map[string]any{"astra-public": "gpt-6-astra"},
+		},
+		Extra:  map[string]any{"openai_oauth_responses_websockets_v2_mode": OpenAIWSIngressModeOff},
+		Status: StatusActive, Schedulable: true,
+	}
+	result, err := svc.Forward(context.Background(), c, account, []byte(`{"model":"astra-public","stream":true,"reasoning":{"mode":"pro","effort":"max"},"input":[{"type":"text","text":"hi"}]}`))
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, "gpt-6-astra", gjson.GetBytes(upstream.lastBody, "model").String())
+	require.True(t, strings.HasPrefix(strings.TrimSpace(gjson.GetBytes(upstream.lastBody, "instructions").String()), "You are Codex, an agent based on GPT-6."))
+	require.Equal(t, "pro", gjson.GetBytes(upstream.lastBody, "reasoning.mode").String())
+	require.Equal(t, "max", gjson.GetBytes(upstream.lastBody, "reasoning.effort").String())
+}
+
 func TestOpenAIGatewayService_OAuthPassthrough_DisabledUsesLegacyTransform(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

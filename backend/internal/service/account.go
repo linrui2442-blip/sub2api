@@ -814,6 +814,25 @@ func (a *Account) IsModelSupported(requestedModel string) bool {
 	if a.IsOpenAIPassthroughEnabled() {
 		return true
 	}
+	if supportsLiveModelDiscovery(a) {
+		if snapshot := a.GetUpstreamModelMetadataSnapshot(); snapshot != nil && snapshot.LiveModelsDiscoveryKnown {
+			mapped, matched := a.ResolveMappedModel(requestedModel)
+			if !matched {
+				mapped = requestedModel
+			}
+			mapped = strings.TrimSpace(mapped)
+			for _, live := range snapshot.LiveModels {
+				if strings.EqualFold(strings.TrimSpace(live), mapped) {
+					return true
+				}
+			}
+			if snapshot.LiveModelsAuthoritative {
+				return false
+			}
+			// An absent Codex model is unknown. Keep the existing mapping and
+			// platform compatibility policy as the fallback below.
+		}
+	}
 	mapping := a.GetModelMapping()
 	if len(mapping) == 0 {
 		if a.IsOpenAIOAuth() {

@@ -653,6 +653,7 @@ export default {
 	  syncUpstreamModelsSuccess: 'Synced {count} account available model(s)',
 	  syncUpstreamModelsNoChanges: 'Account availability is unchanged ({count} models)',
 	  liveAvailableModels: 'Live upstream capabilities ({count})',
+      discoveredUpstreamModels: 'Upstream discovered models ({count})',
 	  liveAvailabilityCheckedAt: 'Last synced: {time}. This list is independent from compatibility mappings below.',
 	  advancedVerifiedModels: 'More verified models ({count})',
 	  currentlyUnavailableModels: 'Currently unavailable / unverified ({count})',

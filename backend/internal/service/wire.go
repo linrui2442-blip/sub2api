@@ -218,6 +218,11 @@ func ProvideAccountTestService(
 	)
 	service.agentIdentityWS = openAIGatewayService
 	service.SetSettingService(settingService)
+	if openAIGatewayService != nil {
+		service.SetCodexManifestFetcher(func(ctx context.Context, account *Account) (*CodexModelsManifest, error) {
+			return openAIGatewayService.FetchCodexModelsManifest(ctx, account, "", "")
+		})
+	}
 	return service
 }
 

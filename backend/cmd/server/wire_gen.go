@@ -203,7 +203,9 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	engine := server.ProvidePersonalRouter(configConfig, handlers, jwtAuthMiddleware, adminAuthMiddleware, apiKeyAuthMiddleware, auditLogMiddleware, stepUpAuthMiddleware, apiKeyService, opsService, settingService, compositeRouteResolver)
 	httpServer := server.ProvideHTTPServer(configConfig, engine)
 	tokenRefreshService := service.ProvideTokenRefreshService(accountRepository, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, grokOAuthService, compositeTokenCacheInvalidator, schedulerCache, configConfig, tempUnschedCache, privacyClientFactory, proxyRepository, oAuthRefreshAPI, openAIGatewayService)
-	v := providePersonalCleanup(client, redisClient, apiKeyService, authCacheInvalidationWorker, opsService, opsSystemLogSink, schedulerSnapshotService, tokenRefreshService, usageRecordWorkerPool, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, openAIGatewayService, auditLogService, promptService)
+	gitHubReleaseClient := repository.ProvideGitHubReleaseClient(configConfig)
+	openAICodexVersionSyncService := service.ProvideOpenAICodexVersionSyncService(settingRepository, settingService, gitHubReleaseClient)
+	v := providePersonalCleanup(client, redisClient, apiKeyService, authCacheInvalidationWorker, opsService, opsSystemLogSink, schedulerSnapshotService, tokenRefreshService, usageRecordWorkerPool, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, openAIGatewayService, openAICodexVersionSyncService, auditLogService, promptService)
 	application := &Application{
 		Server:      httpServer,
 		Handlers:    handlers,
@@ -246,6 +248,7 @@ func providePersonalCleanup(
 	geminiOAuth *service.GeminiOAuthService,
 	antigravityOAuth *service.AntigravityOAuthService,
 	openAIGateway *service.OpenAIGatewayService,
+	codexVersionSync *service.OpenAICodexVersionSyncService,
 	auditLog *service.AuditLogService,
 	promptAudit *securityaudit.PromptService,
 ) func() {
@@ -259,6 +262,12 @@ func providePersonalCleanup(
 		}
 
 		parallelSteps := []cleanupStep{
+			{"OpenAICodexVersionSyncService", func() error {
+				if codexVersionSync != nil {
+					codexVersionSync.Stop()
+				}
+				return nil
+			}},
 			{"AuthCacheInvalidationWorker", func() error {
 				if authCacheInvalidationWorker != nil {
 					authCacheInvalidationWorker.Stop()

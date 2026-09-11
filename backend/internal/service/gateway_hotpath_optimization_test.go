@@ -9,6 +9,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 	gocache "github.com/patrickmn/go-cache"
 	"github.com/stretchr/testify/require"
@@ -544,6 +545,64 @@ func TestGetAvailableModels_GlobalListPreservesMappedModelsWithOpenAIPassthrough
 	}
 
 	require.Equal(t, []string{"claude-mapped"}, svc.GetAvailableModels(context.Background(), &groupID, ""))
+}
+
+func TestGetAvailableModels_AuthoritativeMembershipUnionAndLegacyFallback(t *testing.T) {
+	groupID := int64(12)
+	a := Account{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeOAuth}
+	a.SetUpstreamModelMetadataSnapshot(UpstreamModelMetadataSnapshot{LiveModelsAuthoritative: true, LiveModels: []string{"a", "b"}})
+	b := Account{ID: 2, Platform: PlatformOpenAI, Type: AccountTypeOAuth}
+	b.SetUpstreamModelMetadataSnapshot(UpstreamModelMetadataSnapshot{LiveModelsAuthoritative: true, LiveModels: []string{"b", "c"}})
+
+	repo := &modelsListAccountRepoStub{byGroup: map[int64][]Account{groupID: {a, b}}}
+	svc := &GatewayService{accountRepo: repo}
+	models := svc.GetAvailableModels(context.Background(), &groupID, PlatformOpenAI)
+	require.Subset(t, models, []string{"a", "b", "c"})
+	require.Contains(t, models, openai.DefaultModelIDs()[0], "absence is unknown for OpenAI OAuth")
+
+	unknown := Account{ID: 3, Platform: PlatformOpenAI, Type: AccountTypeAPIKey}
+	repo.byGroup[groupID] = []Account{a, unknown}
+	models = svc.GetAvailableModels(context.Background(), &groupID, PlatformOpenAI)
+	require.Contains(t, models, "a")
+	require.Contains(t, models, openai.DefaultModelIDs()[0])
+}
+
+func TestGetAvailableModels_AuthoritativeMembershipIsGroupScoped(t *testing.T) {
+	groupA, groupB := int64(13), int64(14)
+	a := Account{ID: 1, Platform: PlatformOpenAI, Type: AccountTypeOAuth}
+	a.SetUpstreamModelMetadataSnapshot(UpstreamModelMetadataSnapshot{LiveModelsAuthoritative: true, LiveModels: []string{"group-a"}})
+	b := Account{ID: 2, Platform: PlatformOpenAI, Type: AccountTypeOAuth}
+	b.SetUpstreamModelMetadataSnapshot(UpstreamModelMetadataSnapshot{LiveModelsAuthoritative: true, LiveModels: []string{"group-b"}})
+	repo := &modelsListAccountRepoStub{byGroup: map[int64][]Account{groupA: {a}, groupB: {b}}}
+	svc := &GatewayService{accountRepo: repo}
+
+	modelsA := svc.GetAvailableModels(context.Background(), &groupA, PlatformOpenAI)
+	modelsB := svc.GetAvailableModels(context.Background(), &groupB, PlatformOpenAI)
+	require.Contains(t, modelsA, "group-a")
+	require.NotContains(t, modelsA, "group-b")
+	require.Contains(t, modelsB, "group-b")
+	require.NotContains(t, modelsB, "group-a")
+}
+
+func TestGetAvailableModels_AntigravityAuthoritativeMembershipIgnoresTransientState(t *testing.T) {
+	groupID := int64(15)
+	account := Account{
+		ID:       1,
+		Platform: PlatformAntigravity,
+		Type:     AccountTypeOAuth,
+		Extra: map[string]any{
+			"rate_limit_reset_at":  time.Now().Add(time.Hour).Format(time.RFC3339),
+			"temporary_overloaded": true,
+		},
+	}
+	account.SetUpstreamModelMetadataSnapshot(UpstreamModelMetadataSnapshot{
+		LiveModelsAuthoritative: true,
+		LiveModels:              []string{"live-antigravity"},
+	})
+	repo := &modelsListAccountRepoStub{byGroup: map[int64][]Account{groupID: {account}}}
+	svc := &GatewayService{accountRepo: repo}
+
+	require.Equal(t, []string{"live-antigravity"}, svc.GetAvailableModels(context.Background(), &groupID, PlatformAntigravity))
 }
 
 func TestGatewayHotpathHelpers_CacheTTLAndStickyContext(t *testing.T) {

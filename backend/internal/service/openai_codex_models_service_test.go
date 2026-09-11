@@ -202,6 +202,25 @@ func TestFetchCodexModelsManifestPassthrough(t *testing.T) {
 	}
 }
 
+func TestFetchCodexModelsManifestGPT6AstraCapabilitiesPassthrough(t *testing.T) {
+	const body = `{"models":[{"slug":"gpt-6-astra","context_window":1050000,"max_context_window":1050000,"input_modalities":["text","image"],"supported_reasoning_levels":[{"effort":"max"}],"supported_service_tiers":["priority"],"supports_search_tool":true,"apply_patch_tool_type":"freeform","comp_hash":"3000","tool_mode":"code_mode_only","use_responses_lite":true,"multi_agent_reasoning_effort":"high","multi_agent_version":"fixture-version"}]}`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer server.Close()
+	original := chatgptCodexModelsURL
+	chatgptCodexModelsURL = server.URL
+	t.Cleanup(func() { chatgptCodexModelsURL = original })
+
+	s := &OpenAIGatewayService{}
+	manifest, err := s.FetchCodexModelsManifest(context.Background(), newCodexModelsTestAccount(), "0.153.0", "")
+	require.NoError(t, err)
+	// Personal forwards the upstream descriptor, including unknown workflow
+	// metadata, without reconstructing capabilities from a static model table.
+	require.Equal(t, body, string(manifest.Body))
+}
+
 func TestFetchCodexModelsManifestAgentIdentityUsesAssertionWithoutOAuthToken(t *testing.T) {
 	key, privateKey := newTestAgentIdentityKey(t)
 	account := &Account{
@@ -533,7 +552,7 @@ func TestAdjustAPIKeyCodexModelsManifest(t *testing.T) {
 }
 
 func TestFetchCodexModelsManifestAPIKeyDisablesResponsesLiteForAffectedModels(t *testing.T) {
-	const upstreamBody = `{"models":[{"slug":"gpt-5.6-sol","use_responses_lite":true},{"slug":"gpt-5.6-codex","use_responses_lite":true}],"metadata":{"version":1}}`
+	const upstreamBody = `{"models":[{"slug":"gpt-6-astra","use_responses_lite":true},{"slug":"gpt-5.6-sol","use_responses_lite":true},{"slug":"gpt-5.6-codex","use_responses_lite":true}],"metadata":{"version":1}}`
 	upstream := &codexModelsHTTPUpstreamStub{do: func(_ *http.Request, _ string, _ int64, _ int) (*http.Response, error) {
 		return &http.Response{
 			StatusCode: http.StatusOK,
@@ -545,7 +564,7 @@ func TestFetchCodexModelsManifestAPIKeyDisablesResponsesLiteForAffectedModels(t 
 	s := newCodexModelsAPIKeyTestService(upstream)
 	manifest, err := s.FetchCodexModelsManifest(context.Background(), newCodexModelsAPIKeyTestAccount("https://upstream.example"), "0.145.0", "")
 	require.NoError(t, err)
-	require.JSONEq(t, `{"models":[{"slug":"gpt-5.6-sol","use_responses_lite":false},{"slug":"gpt-5.6-codex","use_responses_lite":true}],"metadata":{"version":1}}`, string(manifest.Body))
+	require.JSONEq(t, `{"models":[{"slug":"gpt-6-astra","use_responses_lite":false},{"slug":"gpt-5.6-sol","use_responses_lite":false},{"slug":"gpt-5.6-codex","use_responses_lite":true}],"metadata":{"version":1}}`, string(manifest.Body))
 	require.Equal(t, codexModelsManifestBodyETag(manifest.Body), manifest.ETag)
 	require.Equal(t, `"upstream-strong"`, manifest.upstreamETag)
 

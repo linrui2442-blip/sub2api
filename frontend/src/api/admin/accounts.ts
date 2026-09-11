@@ -542,6 +542,7 @@ export async function getAntigravityModelCatalog(id: number): Promise<import('@/
 
 export interface SyncUpstreamModelsResult {
   models: string[]
+  absence_authoritative?: boolean
   checked_at?: string
   source?: 'upstream_discovery'
 }

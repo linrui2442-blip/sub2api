@@ -34,6 +34,12 @@ func TestNormalizeOpenAIReasoningEffortForGPT56(t *testing.T) {
 	}
 }
 
+func TestNormalizeOpenAIReasoningEffortForGPT6Astra(t *testing.T) {
+	require.Equal(t, "max", normalizeOpenAIReasoningEffortForModel("max", "gpt-6"))
+	require.Equal(t, "max", normalizeOpenAIReasoningEffortForModel("max", "gpt-6-astra"))
+	require.Equal(t, "xhigh", normalizeOpenAIReasoningEffortForModel("max", "gpt-6-terra"))
+}
+
 func TestNormalizeOpenAICodexCompactReasoningEffortDowngradesMax(t *testing.T) {
 	body := []byte(`{"model":"gpt-5.6-sol","input":"compact me","reasoning":{"effort":"max","summary":"auto"}}`)
 

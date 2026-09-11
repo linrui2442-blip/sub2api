@@ -9,6 +9,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestShouldAutoInjectPromptCacheKeyForCompatGPT6AstraForms(t *testing.T) {
+	for _, model := range []string{"gpt-6", "gpt-6-astra", "openai/gpt-6", "openai/gpt-6-astra", "OPENAI/GPT-6_ASTRA"} {
+		require.True(t, shouldAutoInjectPromptCacheKeyForCompat(model), model)
+	}
+	for _, model := range []string{"gpt-6-terra", "gpt-6.1", "gpt-6-astra-preview", "gpt-6-astra-2026-09-01", "claude-sonnet-4-5"} {
+		require.False(t, shouldAutoInjectPromptCacheKeyForCompat(model), model)
+	}
+}
+
 func mustRawJSON(t *testing.T, s string) json.RawMessage {
 	t.Helper()
 	return json.RawMessage(s)

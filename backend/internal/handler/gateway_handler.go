@@ -1053,7 +1053,7 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 			writeCustomModelsList(c, service.PlatformComposite, availableModels)
 			return
 		}
-		if len(availableModels) > 0 {
+		if availableModels != nil {
 			writeModelsList(c, service.PlatformComposite, availableModels)
 			return
 		}
@@ -1070,7 +1070,7 @@ func (h *GatewayHandler) Models(c *gin.Context) {
 		return
 	}
 
-	if len(availableModels) > 0 {
+	if availableModels != nil {
 		writeModelsList(c, platform, availableModels)
 		return
 	}
@@ -1111,7 +1111,7 @@ func (h *GatewayHandler) compositeAvailableModels(ctx context.Context, groupID *
 	schedulablePlatforms := h.gatewayService.GetSchedulablePlatforms(ctx, groupID)
 	for _, platform := range []string{service.PlatformAnthropic, service.PlatformGemini, service.PlatformOpenAI, service.PlatformAntigravity, service.PlatformGrok, service.PlatformKimi, service.PlatformZhipu, service.PlatformDeepseek} {
 		platformModels := h.gatewayService.GetAvailableModels(ctx, groupID, platform)
-		if len(platformModels) == 0 {
+		if platformModels == nil {
 			// CN 供应商没有静态默认模型列表（defaultModelIDsForPlatform 的
 			// default 分支是 Claude 列表），composite 下只暴露账号映射键。
 			if _, ok := schedulablePlatforms[platform]; ok && !service.IsCNProvider(platform) {
@@ -1374,13 +1374,24 @@ func mergeModelIDs(primary, secondary []string) []string {
 	return merged
 }
 
-// AntigravityModels 返回 Antigravity 支持的全部模型
+// AntigravityModels returns models supported by the Antigravity accounts in
+// the authenticated scope. Static models remain a fallback candidate registry
+// when no account has authoritative or configured capability evidence.
 // GET /antigravity/models
 func (h *GatewayHandler) AntigravityModels(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"object": "list",
-		"data":   antigravity.DefaultModels(),
-	})
+	apiKey, _ := middleware2.GetAPIKeyFromContext(c)
+	var groupID *int64
+	if apiKey != nil {
+		groupID = apiKey.GroupID
+	}
+	var models []string
+	if h != nil && h.gatewayService != nil {
+		models = h.gatewayService.GetAvailableModels(c.Request.Context(), groupID, service.PlatformAntigravity)
+	}
+	if models == nil {
+		models = defaultModelIDsForPlatform(service.PlatformAntigravity)
+	}
+	writeModelsList(c, service.PlatformAntigravity, models)
 }
 
 func cloneAPIKeyWithGroup(apiKey *service.APIKey, group *service.Group) *service.APIKey {

@@ -723,6 +723,7 @@ export default {
 	  syncUpstreamModelsSuccess: '已同步 {count} 个账号可用模型',
 	  syncUpstreamModelsNoChanges: '账号可用模型无变化（{count} 个）',
 	  liveAvailableModels: '实时发现的上游能力（{count}）',
+      discoveredUpstreamModels: '上游发现模型（{count}）',
 	  liveAvailabilityCheckedAt: '最后同步：{time}。此列表与下方兼容映射独立。',
 	  advancedVerifiedModels: '更多已验证模型（{count}）',
 	  currentlyUnavailableModels: '当前不可用 / 未验证（{count}）',

@@ -1233,6 +1233,32 @@ type ApplyOAuthCredentialsRequest struct {
 	Extra       map[string]any `json:"extra"`
 }
 
+func preserveReauthModelMapping(existing, incoming map[string]any) map[string]any {
+	if _, supplied := incoming["model_mapping"]; supplied {
+		return incoming
+	}
+	if mapping, ok := existing["model_mapping"]; ok {
+		incoming["model_mapping"] = mapping
+	}
+	return incoming
+}
+
+func preserveReauthPlanType(existing, incoming map[string]any) map[string]any {
+	planType, supplied := incoming["plan_type"]
+	if supplied {
+		if value, ok := planType.(string); ok && strings.TrimSpace(value) != "" {
+			incoming["plan_type"] = strings.TrimSpace(value)
+			return incoming
+		}
+	}
+	if existingPlan, ok := existing["plan_type"]; ok {
+		incoming["plan_type"] = existingPlan
+	} else {
+		delete(incoming, "plan_type")
+	}
+	return incoming
+}
+
 // ApplyOAuthCredentials 将"重新授权"得到的新凭据原子落库。
 // POST /api/v1/admin/accounts/:id/apply-oauth-credentials
 //
@@ -1274,6 +1300,14 @@ func (h *AccountHandler) ApplyOAuthCredentials(c *gin.Context) {
 
 	// Drop SSO/password residue; re-auth must leave only OAuth tokens on disk.
 	req.Credentials = service.SanitizeStoredCredentials(existing.Platform, req.Credentials)
+	// Re-auth rotates OAuth material but does not edit persistent account
+	// configuration. Preserve an existing model_mapping unless the caller
+	// explicitly supplied one (normal account-edit semantics remain unchanged).
+	req.Credentials = preserveReauthModelMapping(existing.Credentials, req.Credentials)
+	// A complete OAuth reauthorization may authoritatively change the personal
+	// plan. Preserve the stored plan only when the new credentials omit it or
+	// provide no non-blank value.
+	req.Credentials = preserveReauthPlanType(existing.Credentials, req.Credentials)
 
 	updatedAccount, err := h.adminService.UpdateAccount(ctx, accountID, &service.UpdateAccountInput{
 		Type:        req.Type,
@@ -2398,21 +2432,9 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 
 	// Handle OpenAI accounts
 	if account.IsOpenAI() {
-		// OpenAI 自动透传会绕过常规模型改写，测试/模型列表也应回落到默认模型集。
-		if account.IsOpenAIPassthroughEnabled() {
-			response.Success(c, openai.DefaultModels)
-			return
-		}
-
-		mapping := account.GetModelMapping()
-		if len(mapping) == 0 {
-			response.Success(c, openai.DefaultModels)
-			return
-		}
-
-		// Return mapped models
-		var models []openai.Model
-		for requestedModel := range mapping {
+		modelIDs := service.CurrentSupportedModelIDs(account, openai.DefaultModelIDs())
+		models := make([]openai.Model, 0, len(modelIDs))
+		for _, requestedModel := range modelIDs {
 			var found bool
 			for _, dm := range openai.DefaultModels {
 				if dm.ID == requestedModel {
@@ -2436,21 +2458,13 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 
 	// Handle Gemini accounts
 	if account.IsGemini() {
-		// For OAuth accounts: return default Gemini models
-		if account.IsOAuth() {
-			response.Success(c, geminicli.DefaultModels)
-			return
+		defaultIDs := make([]string, 0, len(geminicli.DefaultModels))
+		for _, model := range geminicli.DefaultModels {
+			defaultIDs = append(defaultIDs, model.ID)
 		}
-
-		// For API Key accounts: return models based on model_mapping
-		mapping := account.GetModelMapping()
-		if len(mapping) == 0 {
-			response.Success(c, geminicli.DefaultModels)
-			return
-		}
-
-		var models []geminicli.Model
-		for requestedModel := range mapping {
+		modelIDs := service.CurrentSupportedModelIDs(account, defaultIDs)
+		models := make([]geminicli.Model, 0, len(modelIDs))
+		for _, requestedModel := range modelIDs {
 			var found bool
 			for _, dm := range geminicli.DefaultModels {
 				if dm.ID == requestedModel {
@@ -2479,9 +2493,25 @@ func (h *AccountHandler) GetAvailableModels(c *gin.Context) {
 			return
 		}
 		// Account testing is an availability surface, not a compatibility registry.
-		// Keep known 404s and aliases out of the normal picker while retaining them
-		// in the separate compatibility mapping catalog.
-		response.Success(c, antigravity.VerifiedModelsForAccountTest())
+		// Keep mapping configuration separate while using the same account support
+		// authority as scheduling and public catalogs.
+		verified := antigravity.VerifiedModelsForAccountTest()
+		defaultIDs := make([]string, 0, len(verified))
+		defaultByID := make(map[string]antigravity.ClaudeModel, len(verified))
+		for _, model := range verified {
+			defaultIDs = append(defaultIDs, model.ID)
+			defaultByID[model.ID] = model
+		}
+		modelIDs := service.CurrentSupportedModelIDs(account, defaultIDs)
+		models := make([]antigravity.ClaudeModel, 0, len(modelIDs))
+		for _, modelID := range modelIDs {
+			if model, ok := defaultByID[modelID]; ok {
+				models = append(models, model)
+				continue
+			}
+			models = append(models, antigravity.ClaudeModel{ID: modelID, Type: "model", DisplayName: modelID})
+		}
+		response.Success(c, models)
 		return
 	}
 
@@ -2596,7 +2626,7 @@ func (h *AccountHandler) SyncUpstreamModels(c *gin.Context) {
 		return
 	}
 
-	models, err := h.accountTestService.FetchUpstreamSupportedModels(c.Request.Context(), account)
+	catalog, err := h.accountTestService.SyncUpstreamModelCatalog(c.Request.Context(), account)
 	if err != nil {
 		var syncErr *service.UpstreamModelSyncError
 		if errors.As(err, &syncErr) {
@@ -2616,6 +2646,7 @@ func (h *AccountHandler) SyncUpstreamModels(c *gin.Context) {
 	}
 
 	checkedAt := time.Now().UTC()
+	models := catalog.Models
 	if account.Platform == service.PlatformAntigravity {
 		if err := h.adminService.UpdateAccountExtra(c.Request.Context(), accountID, map[string]any{
 			antigravity.ModelAvailabilityExtraKey: map[string]any{
@@ -2631,9 +2662,12 @@ func (h *AccountHandler) SyncUpstreamModels(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{
-		"models":     models,
-		"checked_at": checkedAt.Format(time.RFC3339),
-		"source":     "upstream_discovery",
+		"models":                models,
+		"absence_authoritative": catalog.AbsenceAuthoritative,
+		"metadata":              catalog.Metadata,
+		"warnings":              catalog.Warnings,
+		"checked_at":            checkedAt.Format(time.RFC3339),
+		"source":                "upstream_discovery",
 	})
 }
 

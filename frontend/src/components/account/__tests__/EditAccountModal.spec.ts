@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 
-const { updateAccountMock, checkMixedChannelRiskMock, authIsSimpleMode } = vi.hoisted(() => ({
+const { updateAccountMock, syncUpstreamModelsMock, checkMixedChannelRiskMock, authIsSimpleMode } = vi.hoisted(() => ({
   updateAccountMock: vi.fn(),
+  syncUpstreamModelsMock: vi.fn(),
   checkMixedChannelRiskMock: vi.fn(),
   authIsSimpleMode: { value: true }
 }))
@@ -28,6 +29,7 @@ vi.mock('@/api/admin', () => ({
   adminAPI: {
     accounts: {
       update: updateAccountMock,
+      syncUpstreamModels: syncUpstreamModelsMock,
       checkMixedChannelRisk: checkMixedChannelRiskMock
     },
     settings: {
@@ -49,7 +51,7 @@ vi.mock('vue-i18n', async () => {
   return {
     ...actual,
     useI18n: () => ({
-      t: (key: string) => key
+      t: (key: string, params?: { count?: number }) => key === 'admin.accounts.liveAvailableModels' ? `Live upstream capabilities (${params?.count})` : key
     })
   }
 })
@@ -931,6 +933,26 @@ describe('EditAccountModal', () => {
     expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.antigravity_project_id).toBe(
       'updated-project'
     )
+  })
+
+  it('keeps Antigravity discovery separate from configured mappings', async () => {
+    const account = buildAntigravityAccount()
+    const mappingBefore = { ...account.credentials.model_mapping }
+    syncUpstreamModelsMock.mockResolvedValue({ models: ['live-a', 'live-b'], absence_authoritative: true })
+    updateAccountMock.mockReset()
+    updateAccountMock.mockResolvedValue(account)
+    const wrapper = mountModal(account)
+    await wrapper.get('button.border-emerald-200').trigger('click')
+    await flushPromises()
+    expect(syncUpstreamModelsMock).toHaveBeenCalledWith(account.id)
+    expect(wrapper.text()).toContain('Live upstream capabilities (2)')
+    expect(wrapper.text()).toContain('live-a')
+    expect(wrapper.text()).toContain('live-b')
+    expect(updateAccountMock).not.toHaveBeenCalled()
+    expect(account.credentials.model_mapping).toEqual(mappingBefore)
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+    expect(updateAccountMock.mock.calls[0]?.[1]?.credentials?.model_mapping).toEqual(mappingBefore)
   })
 
   it('clears Antigravity configured project fallback when input is empty', async () => {

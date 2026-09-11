@@ -20,7 +20,11 @@ import (
 	"unsafe"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/geminicli"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/cespare/xxhash/v2"
@@ -156,7 +160,7 @@ func anthropicStreamEventIsTerminal(eventName, data string) bool {
 }
 
 func cloneStringSlice(src []string) []string {
-	if len(src) == 0 {
+	if src == nil {
 		return nil
 	}
 	dst := make([]string, len(src))
@@ -1234,38 +1238,52 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 		accounts = filtered
 	}
 
-	// Collect unique models from all accounts
+	// Build the union of public models supported by at least one account in the
+	// selected scope. Static registries provide candidate IDs and metadata only;
+	// Account.IsModelSupported remains the credential support authority.
 	modelSet := make(map[string]struct{})
-	hasAnyMapping := false
+	hasCapabilityCatalog := false
+	hasDiscoveryCatalog := false
+	hasLegacyDefaultAccount := false
 
 	for _, acc := range accounts {
-		// Passthrough routing accepts models independently of model_mapping. A stale
-		// mapping on any eligible passthrough account therefore cannot define the
-		// public whitelist; return nil so the handler uses its default model set.
-		if platform == PlatformOpenAI && acc.IsOpenAIPassthroughEnabled() {
-			if s.modelsListCache != nil {
-				s.modelsListCache.Set(cacheKey, []string(nil), s.modelsListCacheTTL)
-				modelsListCacheStoreTotal.Add(1)
+		// Preserve passthrough discovery semantics: its upstream, rather than a
+		// local mapping or snapshot, owns the open-ended model namespace.
+		if acc.IsOpenAIPassthroughEnabled() {
+			if platform == PlatformOpenAI {
+				if s.modelsListCache != nil {
+					s.modelsListCache.Set(cacheKey, []string(nil), s.modelsListCacheTTL)
+					modelsListCacheStoreTotal.Add(1)
+				}
+				return nil
 			}
-			return nil
+			continue
 		}
 
-		mapping := acc.GetModelMapping()
-		if len(mapping) > 0 {
-			hasAnyMapping = true
-			for model := range mapping {
+		_, discoveryKnown := acc.GetUpstreamLiveModels()
+		explicitMapping := len(stringMappingFromRaw(acc.Credentials["model_mapping"])) > 0
+		if !discoveryKnown && !explicitMapping {
+			hasLegacyDefaultAccount = true
+			continue
+		}
+		hasCapabilityCatalog = true
+		hasDiscoveryCatalog = hasDiscoveryCatalog || discoveryKnown
+		for _, model := range CurrentSupportedModelIDs(&acc, defaultModelCandidatesForAccount(&acc)) {
+			modelSet[model] = struct{}{}
+		}
+	}
+	if !hasCapabilityCatalog {
+		return nil
+	}
+	if hasLegacyDefaultAccount && hasDiscoveryCatalog {
+		for i := range accounts {
+			if _, discoveryKnown := accounts[i].GetUpstreamLiveModels(); discoveryKnown || len(stringMappingFromRaw(accounts[i].Credentials["model_mapping"])) != 0 {
+				continue
+			}
+			for _, model := range CurrentSupportedModelIDs(&accounts[i], defaultModelCandidatesForAccount(&accounts[i])) {
 				modelSet[model] = struct{}{}
 			}
 		}
-	}
-
-	// If no account has model_mapping, return nil (use default)
-	if !hasAnyMapping {
-		if s.modelsListCache != nil {
-			s.modelsListCache.Set(cacheKey, []string(nil), s.modelsListCacheTTL)
-			modelsListCacheStoreTotal.Add(1)
-		}
-		return nil
 	}
 
 	// Convert to slice
@@ -1280,6 +1298,37 @@ func (s *GatewayService) GetAvailableModels(ctx context.Context, groupID *int64,
 		modelsListCacheStoreTotal.Add(1)
 	}
 	return cloneStringSlice(models)
+}
+
+func defaultModelCandidatesForAccount(account *Account) []string {
+	if account == nil {
+		return nil
+	}
+	switch account.Platform {
+	case PlatformOpenAI:
+		return openai.DefaultModelIDs()
+	case PlatformGemini:
+		ids := make([]string, 0, len(geminicli.DefaultModels))
+		for _, model := range geminicli.DefaultModels {
+			ids = append(ids, model.ID)
+		}
+		return ids
+	case PlatformAntigravity:
+		models := antigravity.DefaultModels()
+		ids := make([]string, 0, len(models))
+		for _, model := range models {
+			ids = append(ids, model.ID)
+		}
+		return ids
+	case PlatformGrok:
+		return xai.DefaultModelIDs()
+	default:
+		ids := make([]string, 0, len(claude.DefaultModels))
+		for _, model := range claude.DefaultModels {
+			ids = append(ids, model.ID)
+		}
+		return ids
+	}
 }
 
 // GetSchedulablePlatforms returns the concrete platforms that currently have

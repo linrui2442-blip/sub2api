@@ -48,7 +48,7 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 
 	// 强制 antigravity 模式：返回 antigravity 支持的模型列表
 	if forcePlatform == service.PlatformAntigravity {
-		c.JSON(http.StatusOK, antigravity.FallbackGeminiModelsList())
+		h.writeCapabilityFilteredAntigravityModels(c, apiKey.GroupID)
 		return
 	}
 
@@ -57,8 +57,7 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		// 没有 gemini 账户，检查是否有 antigravity 账户可用
 		hasAntigravity, _ := h.geminiCompatService.HasAntigravityAccounts(c.Request.Context(), apiKey.GroupID)
 		if hasAntigravity {
-			// antigravity 账户使用静态模型列表
-			c.JSON(http.StatusOK, gemini.FallbackModelsList())
+			h.writeCapabilityFilteredGeminiModels(c, apiKey.GroupID, service.PlatformAntigravity, gemini.FallbackModelsList())
 			return
 		}
 		markOpsRoutingCapacityLimitedIfNoAvailable(c, err)
@@ -72,10 +71,45 @@ func (h *GatewayHandler) GeminiV1BetaListModels(c *gin.Context) {
 		return
 	}
 	if shouldFallbackGeminiModels(res) {
-		c.JSON(http.StatusOK, gemini.FallbackModelsList())
+		h.writeCapabilityFilteredGeminiModels(c, apiKey.GroupID, service.PlatformGemini, gemini.FallbackModelsList())
 		return
 	}
 	writeUpstreamResponse(c, res)
+}
+
+func (h *GatewayHandler) writeCapabilityFilteredAntigravityModels(c *gin.Context, groupID *int64) {
+	fallback := antigravity.FallbackGeminiModelsList()
+	if h == nil || h.gatewayService == nil {
+		c.JSON(http.StatusOK, fallback)
+		return
+	}
+	modelIDs := h.gatewayService.GetAvailableModels(c.Request.Context(), groupID, service.PlatformAntigravity)
+	if modelIDs == nil {
+		c.JSON(http.StatusOK, fallback)
+		return
+	}
+	models := make([]antigravity.GeminiModel, 0, len(modelIDs))
+	for _, modelID := range modelIDs {
+		models = append(models, antigravity.FallbackGeminiModel(modelID))
+	}
+	c.JSON(http.StatusOK, antigravity.GeminiModelsListResponse{Models: models})
+}
+
+func (h *GatewayHandler) writeCapabilityFilteredGeminiModels(c *gin.Context, groupID *int64, platform string, fallback gemini.ModelsListResponse) {
+	if h == nil || h.gatewayService == nil {
+		c.JSON(http.StatusOK, fallback)
+		return
+	}
+	modelIDs := h.gatewayService.GetAvailableModels(c.Request.Context(), groupID, platform)
+	if modelIDs == nil {
+		c.JSON(http.StatusOK, fallback)
+		return
+	}
+	models := make([]gemini.Model, 0, len(modelIDs))
+	for _, modelID := range modelIDs {
+		models = append(models, gemini.FallbackModel(modelID))
+	}
+	c.JSON(http.StatusOK, gemini.ModelsListResponse{Models: models})
 }
 
 // GeminiV1BetaGetModel proxies:

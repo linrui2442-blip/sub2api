@@ -119,6 +119,13 @@
       </button>
     </div>
 
+    <div v-if="discoveredModels !== null" data-testid="discovered-models" class="mb-3 rounded-lg border border-gray-200 p-3 dark:border-dark-600">
+      <p class="mb-2 text-sm font-medium">{{ t('admin.accounts.discoveredUpstreamModels', { count: discoveredModels.length }) }}</p>
+      <div class="flex flex-wrap gap-2">
+        <span v-for="model in discoveredModels" :key="model" data-testid="discovered-model" class="text-xs">{{ model }}</span>
+      </div>
+    </div>
+
     <!-- Custom Model Input -->
     <div class="mb-3">
       <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.accounts.customModelName') }}</label>
@@ -182,6 +189,7 @@ const searchQuery = ref('')
 const customModel = ref('')
 const isComposing = ref(false)
 const isSyncingUpstream = ref(false)
+const discoveredModels = ref<string[] | null>(null)
 const normalizedPlatforms = computed(() => {
   const rawPlatforms =
     props.platforms && props.platforms.length > 0
@@ -306,26 +314,35 @@ const syncUpstreamModels = async () => {
       return
     }
 
-    const upstreamModels = result.models.map(model => model.trim()).filter(Boolean)
+    const upstreamModels = Array.from(new Set(result.models.map(model => model.trim()).filter(Boolean)))
+    discoveredModels.value = upstreamModels
+    // Only a provider-confirmed complete list can remove configured entries.
+    // Missing/older response semantics conservatively preserve user choices.
+    const nextModels = result.absence_authoritative === true
+      ? upstreamModels
+      : Array.from(new Set([...props.modelValue, ...upstreamModels]))
     if (upstreamModels.length === 0) {
+      if (props.accountId && result.absence_authoritative === true) {
+        emit('update:modelValue', [])
+      }
       appStore.showInfo(t('admin.accounts.syncUpstreamModelsEmpty'))
       return
     }
 
-    const newModels = [...props.modelValue]
-    let addedCount = 0
-    for (const model of upstreamModels) {
-      if (!newModels.includes(model)) {
-        newModels.push(model)
-        addedCount += 1
-      }
-    }
+    const unchanged =
+      nextModels.length === props.modelValue.length &&
+      nextModels.every(model => props.modelValue.includes(model))
 
-    emit('update:modelValue', newModels)
-    if (addedCount > 0) {
-      appStore.showSuccess(t('admin.accounts.syncUpstreamModelsSuccess', { count: addedCount, total: upstreamModels.length }))
-    } else {
+    emit('update:modelValue', nextModels)
+    if (unchanged) {
       appStore.showInfo(t('admin.accounts.syncUpstreamModelsNoChanges', { count: upstreamModels.length }))
+    } else {
+      appStore.showSuccess(
+        t('admin.accounts.syncUpstreamModelsSuccess', {
+          count: upstreamModels.length,
+          total: nextModels.length
+        })
+      )
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : t('admin.accounts.syncUpstreamModelsFailed')

@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -62,7 +63,7 @@ func (u *syncUpstreamHTTPUpstream) DoWithTLS(req *http.Request, proxyURL string,
 	return u.Do(req, proxyURL, accountID, accountConcurrency)
 }
 
-func setupSyncUpstreamModelsRouter(adminSvc service.AdminService, upstream service.HTTPUpstream) *gin.Engine {
+func setupSyncUpstreamModelsRouter(adminSvc service.AdminService, upstream service.HTTPUpstream, overrides ...*service.AccountTestService) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	accountTestSvc := service.NewAccountTestService(
@@ -75,9 +76,54 @@ func setupSyncUpstreamModelsRouter(adminSvc service.AdminService, upstream servi
 		&config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}}},
 		nil,
 	)
+	if len(overrides) > 0 && overrides[0] != nil {
+		accountTestSvc = overrides[0]
+	}
 	handler := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, accountTestSvc, nil, nil, nil, nil)
 	router.POST("/api/v1/admin/accounts/:id/models/sync-upstream", handler.SyncUpstreamModels)
 	return router
+}
+
+func TestSyncUpstreamModels_OpenAIOAuth_UsesCodexManifest(t *testing.T) {
+	called := false
+	account := service.Account{ID: 77, Platform: service.PlatformOpenAI, Type: service.AccountTypeOAuth, Credentials: map[string]any{"access_token": "oauth"}}
+	adminSvc := &availableModelsAdminService{stubAdminService: newStubAdminService(), account: account}
+	svc := service.NewAccountTestService(nil, nil, nil, nil, nil, nil, &config.Config{}, nil)
+	svc.SetCodexManifestFetcher(func(context.Context, *service.Account) (*service.CodexModelsManifest, error) {
+		called = true
+		return &service.CodexModelsManifest{Body: []byte(`{"models":[{"slug":"gpt-5.6-sol"},{"slug":"gpt-5.6-terra"},{"slug":"gpt-5.6-luna"}]}`)}, nil
+	})
+	router := setupSyncUpstreamModelsRouter(adminSvc, nil, svc)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/77/models/sync-upstream", nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.True(t, called)
+	require.Contains(t, rec.Body.String(), "gpt-5.6-sol")
+	require.Contains(t, rec.Body.String(), "gpt-5.6-terra")
+	require.Contains(t, rec.Body.String(), "gpt-5.6-luna")
+	var result struct {
+		Data struct {
+			AbsenceAuthoritative *bool `json:"absence_authoritative"`
+		} `json:"data"`
+	}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &result))
+	require.NotNil(t, result.Data.AbsenceAuthoritative)
+	require.False(t, *result.Data.AbsenceAuthoritative)
+}
+
+func TestSyncUpstreamModels_OpenAIOAuth_DoesNotLeakToken(t *testing.T) {
+	const secret = "SUPER_SECRET_OAUTH_TOKEN_DO_NOT_LEAK_123456"
+	account := service.Account{ID: 78, Platform: service.PlatformOpenAI, Type: service.AccountTypeOAuth, Credentials: map[string]any{"access_token": secret}}
+	adminSvc := &availableModelsAdminService{stubAdminService: newStubAdminService(), account: account}
+	svc := service.NewAccountTestService(nil, nil, nil, nil, nil, nil, &config.Config{}, nil)
+	svc.SetCodexManifestFetcher(func(context.Context, *service.Account) (*service.CodexModelsManifest, error) {
+		return nil, errors.New(secret)
+	})
+	router := setupSyncUpstreamModelsRouter(adminSvc, nil, svc)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/78/models/sync-upstream", nil))
+	require.NotEqual(t, http.StatusOK, rec.Code)
+	require.NotContains(t, rec.Body.String(), secret)
 }
 
 func TestAccountHandlerGetAvailableModels_GrokUsesXAIModels(t *testing.T) {
@@ -183,6 +229,31 @@ func TestAccountHandlerGetAvailableModels_OpenAIOAuthUsesExplicitModelMapping(t 
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
 	require.Len(t, resp.Data, 1)
 	require.Equal(t, "gpt-5", resp.Data[0].ID)
+}
+
+func TestAccountHandlerGetAvailableModels_OpenAIOAuthPreservesUnlistedConfiguredAlias(t *testing.T) {
+	account := service.Account{
+		ID:       48,
+		Platform: service.PlatformOpenAI,
+		Type:     service.AccountTypeOAuth,
+		Credentials: map[string]any{"model_mapping": map[string]any{
+			"live-alias":  "live-target",
+			"stale-alias": "stale-target",
+		}},
+	}
+	account.SetUpstreamModelMetadataSnapshot(service.UpstreamModelMetadataSnapshot{
+		LiveModelsAuthoritative: true,
+		LiveModels:              []string{"live-direct", "live-target"},
+	})
+	router := setupAvailableModelsRouter(&availableModelsAdminService{stubAdminService: newStubAdminService(), account: account})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/48/models", nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "live-direct")
+	require.Contains(t, rec.Body.String(), "live-alias")
+	require.Contains(t, rec.Body.String(), "stale-alias", "Codex absence does not invalidate configured mappings")
+	require.NotContains(t, rec.Body.String(), "gpt-5.4-mini")
 }
 
 func TestAccountHandlerGetAvailableModels_OpenAIOAuthPassthroughFallsBackToDefaults(t *testing.T) {
@@ -321,6 +392,31 @@ func TestAccountHandlerGetAvailableModels_AntigravitySeparatesVerifiedAndUnavail
 	require.Contains(t, catalog.Body.String(), `"availability":"recommended"`)
 	require.Contains(t, catalog.Body.String(), `"availability":"currently_unavailable"`)
 	require.Contains(t, catalog.Body.String(), "claude-fable-5")
+}
+
+func TestAccountHandlerGetAvailableModels_AntigravityUsesAuthoritativeMembership(t *testing.T) {
+	account := service.Account{
+		ID:       49,
+		Platform: service.PlatformAntigravity,
+		Type:     service.AccountTypeOAuth,
+		Credentials: map[string]any{"model_mapping": map[string]any{
+			"current-alias": "live-target",
+			"stale-alias":   "stale-target",
+		}},
+	}
+	account.SetUpstreamModelMetadataSnapshot(service.UpstreamModelMetadataSnapshot{
+		LiveModelsAuthoritative: true,
+		LiveModels:              []string{"live-target"},
+	})
+	router := setupAvailableModelsRouter(&availableModelsAdminService{stubAdminService: newStubAdminService(), account: account})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/49/models", nil))
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "live-target")
+	require.Contains(t, rec.Body.String(), "current-alias")
+	require.NotContains(t, rec.Body.String(), "stale-alias")
+	require.NotContains(t, rec.Body.String(), "claude-fable-5")
 }
 
 func TestAccountHandlerSyncUpstreamModels_ConfigErrorReturnsBadRequest(t *testing.T) {
