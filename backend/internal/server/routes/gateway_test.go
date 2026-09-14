@@ -3,7 +3,9 @@ package routes
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -107,6 +109,112 @@ func TestPersonalUnifiedKeyRoutesAcrossProvidersWhilePinnedKeyCannotOverrideGrou
 }
 
 func ptrInt64(v int64) *int64 { return &v }
+
+func buildMultipartModelBody(t *testing.T, model string) ([]byte, string) {
+	t.Helper()
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	require.NoError(t, writer.WriteField("model", model))
+	part, err := writer.CreateFormFile("image", "test.png")
+	require.NoError(t, err)
+	_, err = part.Write([]byte("png"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+	return body.Bytes(), writer.FormDataContentType()
+}
+
+func TestMultipartModelExtractedCorrectly(t *testing.T) {
+	body, contentType := buildMultipartModelBody(t, "gpt-image-2")
+	require.Equal(t, "gpt-image-2", multipartRequestModel(body, contentType))
+}
+
+func TestPersonalImagesEditsMultipartModelValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tt := range []struct {
+		name       string
+		model      string
+		wantStatus int
+	}{
+		{name: "supported image model", model: "gpt-image-2", wantStatus: http.StatusOK},
+		{name: "unsupported model", model: "definitely-unsupported-model", wantStatus: http.StatusBadRequest},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			body, contentType := buildMultipartModelBody(t, tt.model)
+			resolver := personalProviderResolverFunc(func(_ context.Context, model, _ string) (string, string, error) {
+				require.Equal(t, tt.model, model)
+				if model == "definitely-unsupported-model" {
+					return "", "", service.ErrPersonalRouteUnsupported
+				}
+				return service.PlatformOpenAI, model, nil
+			})
+			router := gin.New()
+			router.POST("/v1/images/edits", func(c *gin.Context) {
+				c.Set(string(servermiddleware.ContextKeyAPIKey), &service.APIKey{})
+				c.Next()
+			}, personalUnifiedRouterMiddleware("", resolver, openAICompatibleRoutingErrorWriter), func(c *gin.Context) {
+				c.Status(http.StatusOK)
+			})
+			request := httptest.NewRequest(http.MethodPost, "/v1/images/edits", bytes.NewReader(body))
+			request.Header.Set("Content-Type", contentType)
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, request)
+			require.Equal(t, tt.wantStatus, recorder.Code)
+		})
+	}
+}
+
+func TestPersonalUnifiedMultipartBodyPreservedForImagesParser(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, modelFirst := range []bool{true, false} {
+		name := "model-before-file"
+		if !modelFirst {
+			name = "model-after-file"
+		}
+		t.Run(name, func(t *testing.T) {
+			var body bytes.Buffer
+			writer := multipart.NewWriter(&body)
+			writeModel := func() {
+				require.NoError(t, writer.WriteField("model", "gpt-image-2"))
+			}
+			writeFile := func() {
+				part, err := writer.CreateFormFile("image", "test.png")
+				require.NoError(t, err)
+				_, err = part.Write([]byte{0, 1, 2, 3, 255})
+				require.NoError(t, err)
+			}
+			if modelFirst {
+				writeModel()
+				writeFile()
+			} else {
+				writeFile()
+				writeModel()
+			}
+			require.NoError(t, writer.WriteField("prompt", "test"))
+			require.NoError(t, writer.Close())
+			before := append([]byte(nil), body.Bytes()...)
+			resolver := personalProviderResolverFunc(func(_ context.Context, model, _ string) (string, string, error) {
+				require.Equal(t, "gpt-image-2", model)
+				return service.PlatformOpenAI, model, nil
+			})
+			router := gin.New()
+			router.POST("/v1/images/edits", func(c *gin.Context) {
+				c.Set(string(servermiddleware.ContextKeyAPIKey), &service.APIKey{})
+				c.Next()
+			}, personalUnifiedRouterMiddleware("", resolver, openAICompatibleRoutingErrorWriter), func(c *gin.Context) {
+				got, err := io.ReadAll(c.Request.Body)
+				require.NoError(t, err)
+				require.Equal(t, len(before), len(got))
+				require.Equal(t, sha256.Sum256(before), sha256.Sum256(got))
+				c.Status(http.StatusOK)
+			})
+			request := httptest.NewRequest(http.MethodPost, "/v1/images/edits", bytes.NewReader(before))
+			request.Header.Set("Content-Type", writer.FormDataContentType())
+			recorder := httptest.NewRecorder()
+			router.ServeHTTP(recorder, request)
+			require.Equal(t, http.StatusOK, recorder.Code)
+		})
+	}
+}
 
 func TestPersonalUnifiedGeminiRouteUsesEndpointHintAndStripsExplicitNamespace(t *testing.T) {
 	gin.SetMode(gin.TestMode)
@@ -232,7 +340,7 @@ func TestPersonalGatewayCoreSurfaceIsRegistered(t *testing.T) {
 func TestPersonalGatewayNonCoreMediaAndSearchSurfaceIsAbsent(t *testing.T) {
 	routes := registeredGatewayRoutes(newGatewayRoutesTestRouter(service.PlatformGrok))
 	for _, route := range []string{
-		"POST /v1/images/generations", "POST /v1/images/edits", "POST /v1/images/generations/async",
+		"POST /v1/images/generations/async",
 		"GET /v1/images/tasks/:task_id", "POST /v1/videos", "POST /v1/videos/generations",
 		"GET /v1/videos/:request_id", "POST /v1/audio/speech", "POST /v1/audio/transcriptions",
 		"POST /v1/tts", "POST /v1/stt", "POST /v1/custom-voices", "POST /v1/search",
@@ -240,6 +348,16 @@ func TestPersonalGatewayNonCoreMediaAndSearchSurfaceIsAbsent(t *testing.T) {
 	} {
 		require.False(t, routes[route], "%s must not be exposed by Personal Edition", route)
 	}
+}
+
+func TestPersonalGatewayImageGenerationSurface(t *testing.T) {
+	routes := registeredGatewayRoutes(newGatewayRoutesTestRouter(service.PlatformOpenAI))
+	require.True(t, routes["POST /v1/images/generations"])
+}
+
+func TestPersonalGatewayImageEditSurface(t *testing.T) {
+	routes := registeredGatewayRoutes(newGatewayRoutesTestRouter(service.PlatformOpenAI))
+	require.True(t, routes["POST /v1/images/edits"])
 }
 
 func TestPersonalGatewayKeepsProviderNeutralAliases(t *testing.T) {

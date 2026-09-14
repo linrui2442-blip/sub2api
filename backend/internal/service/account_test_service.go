@@ -150,14 +150,16 @@ type AccountTestService struct {
 	agentIdentityWS           agentIdentityWSConnectionInvalidator
 	// grokWSDialer is optional; realtime account tests use the default OpenAI-style
 	// WS dialer when nil (supports proxy + coder/websocket handshake).
-	grokWSDialer openAIWSClientDialer
+	grokWSDialer         openAIWSClientDialer
 	codexManifestFetcher func(context.Context, *Account) (*CodexModelsManifest, error)
 }
 
 // SetCodexManifestFetcher injects the canonical Codex manifest path used by
 // OpenAI OAuth model synchronization.
 func (s *AccountTestService) SetCodexManifestFetcher(fetcher func(context.Context, *Account) (*CodexModelsManifest, error)) {
-	if s != nil { s.codexManifestFetcher = fetcher }
+	if s != nil {
+		s.codexManifestFetcher = fetcher
+	}
 }
 
 func (s *AccountTestService) SetSettingService(settingService *SettingService) {
@@ -2968,7 +2970,12 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 	c.Writer.Flush()
 
 	s.sendEvent(c, TestEvent{Type: "test_start", Model: modelID})
-	s.sendEvent(c, TestEvent{Type: "content", Text: "Calling Codex /responses image tool...\n"})
+	direct := usesCodexDirectImages(credentialAccount.GetMappedModel(strings.TrimSpace(modelID)))
+	if direct {
+		s.sendEvent(c, TestEvent{Type: "content", Text: "Calling Codex Images direct endpoint...\n"})
+	} else {
+		s.sendEvent(c, TestEvent{Type: "content", Text: "Calling Codex /responses image tool...\n"})
+	}
 
 	parsed := &OpenAIImagesRequest{
 		Endpoint: openAIImagesGenerationsEndpoint,
@@ -2977,12 +2984,24 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 	}
 	applyOpenAIImagesDefaults(parsed)
 
-	responsesBody, err := buildOpenAIImagesResponsesRequest(parsed, parsed.Model)
+	upstreamModel := credentialAccount.GetMappedModel(parsed.Model)
+	if strings.TrimSpace(upstreamModel) == "" {
+		upstreamModel = parsed.Model
+	}
+	var responsesBody []byte
+	var targetURL string
+	var err error
+	if direct {
+		responsesBody, targetURL, err = buildOpenAIImagesOAuthPayload(parsed, upstreamModel)
+	} else {
+		responsesBody, err = buildOpenAIImagesResponsesRequest(parsed, upstreamModel)
+		targetURL = chatgptCodexAPIURL
+	}
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Failed to build image request: %s", err.Error()))
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, chatgptCodexAPIURL, bytes.NewReader(responsesBody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, targetURL, bytes.NewReader(responsesBody))
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Failed to create request")
 	}
@@ -3002,8 +3021,12 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 		req.Header.Set("Authorization", "Bearer "+authToken)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "text/event-stream")
-	req.Header.Set("OpenAI-Beta", "responses=experimental")
+	if direct {
+		req.Header.Set("Accept", "application/json")
+	} else {
+		req.Header.Set("Accept", "text/event-stream")
+		req.Header.Set("OpenAI-Beta", "responses=experimental")
+	}
 	canonical := resolveCodexOutboundIdentity("")
 	req.Header.Set("originator", canonical.originator)
 	if customUA := strings.TrimSpace(credentialAccount.GetOpenAIUserAgent()); customUA != "" {
@@ -3045,7 +3068,12 @@ func (s *AccountTestService) testOpenAIImageOAuth(c *gin.Context, ctx context.Co
 	}
 	body = redactAgentIdentitySensitiveBodyForAccount(ctx, s.accountRepo, credentialAccount, body)
 
-	results, _, _, _, _, err := collectOpenAIImagesFromResponsesBody(body)
+	var results []openAIResponsesImageResult
+	if direct {
+		results, err = parseCodexDirectImagesResponse(body)
+	} else {
+		results, _, _, _, _, err = collectOpenAIImagesFromResponsesBody(body)
+	}
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Failed to parse image response: %s", err.Error()))
 	}

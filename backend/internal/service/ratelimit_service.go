@@ -2077,6 +2077,24 @@ func (s *RateLimitService) HandleOpenAIImageRateLimit(ctx context.Context, accou
 	return true
 }
 
+// HandleOpenAIImageCapabilityForbidden records a native Images entitlement
+// failure at the Images/model scope. It deliberately does not touch the
+// account-wide schedulability state, so text and Responses traffic can keep
+// using the same OAuth account.
+func (s *RateLimitService) HandleOpenAIImageCapabilityForbidden(ctx context.Context, account *Account, responseBody []byte) bool {
+	if s == nil || account == nil || s.accountRepo == nil || account.Platform != PlatformOpenAI || account.Type != AccountTypeOAuth {
+		return false
+	}
+	resetAt := time.Now().Add(time.Duration(openAI403CooldownMinutesDefault) * time.Minute)
+	reason := openAIImageRateLimitReason + ": native image capability unavailable"
+	if err := s.accountRepo.SetModelRateLimit(ctx, account.ID, openAIImageGenerationRateLimitKey, resetAt, reason); err != nil {
+		slog.Warn("openai_image_capability_cooldown_failed", "account_id", account.ID, "error", err)
+		return false
+	}
+	slog.Warn("openai_image_capability_cooldown", "account_id", account.ID, "scope", openAIImageGenerationRateLimitKey, "reset_at", resetAt)
+	return true
+}
+
 func isOpenAIImageRateLimitError(statusCode int, body []byte) bool {
 	if statusCode != http.StatusTooManyRequests || len(body) == 0 {
 		return false

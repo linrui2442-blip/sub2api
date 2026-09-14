@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
@@ -153,6 +155,10 @@ func RegisterGatewayRoutes(
 			}
 			h.Gateway.ChatCompletions(c)
 		})
+		// Personal v1.1.8: expose the existing OpenAI image-generation path.
+		// Edits and asynchronous media routes remain intentionally excluded.
+		gateway.POST("/images/generations", h.OpenAIGateway.Images)
+		gateway.POST("/images/edits", h.OpenAIGateway.Images)
 		gateway.POST("/embeddings", textBodyLimit, func(c *gin.Context) {
 			if !isOpenAIOnlyEndpointGatewayPlatform(c) {
 				service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
@@ -323,7 +329,11 @@ func personalUnifiedRouterMiddleware(
 				c.Abort()
 				return
 			}
-			model, modelPath = compositeJSONRequestModel(body)
+			if strings.HasPrefix(strings.ToLower(c.GetHeader("Content-Type")), "multipart/form-data") {
+				model = multipartRequestModel(body, c.GetHeader("Content-Type"))
+			} else {
+				model, modelPath = compositeJSONRequestModel(body)
+			}
 		}
 
 		if resolver == nil {
@@ -360,6 +370,33 @@ func personalUnifiedRouterMiddleware(
 			resetRequestBody(c, body)
 		}
 		c.Next()
+	}
+}
+
+// multipartRequestModel extracts only the standard Images form field used by
+// the Personal model resolver. It intentionally does not make arbitrary
+// multipart bodies eligible for other endpoints.
+func multipartRequestModel(body []byte, contentType string) string {
+	_, params, err := mime.ParseMediaType(contentType)
+	if err != nil || params["boundary"] == "" {
+		return ""
+	}
+	r := multipart.NewReader(bytes.NewReader(body), params["boundary"])
+	for {
+		part, err := r.NextPart()
+		if err == io.EOF {
+			return ""
+		}
+		if err != nil {
+			return ""
+		}
+		if part.FormName() == "model" {
+			value, readErr := io.ReadAll(io.LimitReader(part, 4096))
+			if readErr != nil {
+				return ""
+			}
+			return strings.TrimSpace(string(value))
+		}
 	}
 }
 
