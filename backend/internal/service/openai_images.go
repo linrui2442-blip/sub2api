@@ -184,6 +184,17 @@ func (r *OpenAIImagesRequest) StickySessionSeed() string {
 }
 
 func (s *OpenAIGatewayService) ParseOpenAIImagesRequest(c *gin.Context, body []byte) (*OpenAIImagesRequest, error) {
+	return s.parseOpenAIImagesRequest(c, body, false)
+}
+
+// ParseOpenAIImagesRequestForPlatform keeps the shared OpenAI-compatible
+// Images parser while allowing a provider adapter to validate its own image
+// model family. The default OpenAI path remains unchanged.
+func (s *OpenAIGatewayService) ParseOpenAIImagesRequestForPlatform(c *gin.Context, body []byte, platform string) (*OpenAIImagesRequest, error) {
+	return s.parseOpenAIImagesRequest(c, body, strings.EqualFold(strings.TrimSpace(platform), PlatformAntigravity) || strings.EqualFold(strings.TrimSpace(platform), PlatformGemini))
+}
+
+func (s *OpenAIGatewayService) parseOpenAIImagesRequest(c *gin.Context, body []byte, allowGeminiImageModel bool) (*OpenAIImagesRequest, error) {
 	if c == nil || c.Request == nil {
 		return nil, fmt.Errorf("missing request context")
 	}
@@ -223,12 +234,20 @@ func (s *OpenAIGatewayService) ParseOpenAIImagesRequest(c *gin.Context, body []b
 	}
 
 	applyOpenAIImagesDefaults(req)
-	if err := validateOpenAIImagesModel(req.Model); err != nil {
+	if err := validateOpenAIImagesModel(req.Model); err != nil && !(allowGeminiImageModel && IsGeminiImageModel(req.Model)) {
 		return nil, err
 	}
 	req.SizeTier = normalizeOpenAIImageSizeTier(req.Size)
 	req.RequiredCapability = classifyOpenAIImagesCapability(req)
 	return req, nil
+}
+
+// IsGeminiImageModel identifies Gemini image-capable model IDs exposed by the
+// existing Gemini/Antigravity catalog. It is intentionally narrow so a
+// Gemini text model cannot enter the Images adapter.
+func IsGeminiImageModel(model string) bool {
+	model = strings.ToLower(strings.TrimSpace(model))
+	return strings.HasPrefix(model, "gemini-") && strings.Contains(model, "image")
 }
 
 func parseOpenAIImagesJSONRequest(body []byte, req *OpenAIImagesRequest) error {

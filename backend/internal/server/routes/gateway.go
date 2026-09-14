@@ -41,6 +41,13 @@ func RegisterGatewayRoutes(
 	compositeGeminiTarget := compositeGeminiTargetPlatformMiddleware(compositeResolver)
 	personalUnified := personalUnifiedRouterMiddleware("", h.Gateway, openAICompatibleRoutingErrorWriter)
 	personalUnifiedGemini := personalUnifiedRouterMiddleware(service.PlatformGemini, h.Gateway, googleRoutingErrorWriter)
+	personalImages := func(c *gin.Context) {
+		if platform, ok := middleware.GetForcePlatformFromContext(c); ok && platform == service.PlatformAntigravity {
+			h.Gateway.Images(c)
+			return
+		}
+		h.OpenAIGateway.Images(c)
+	}
 
 	// 未分组 Key 拦截中间件（按协议格式区分错误响应）
 	requireGroupAnthropic := middleware.RequireGroupAssignment(settingService, middleware.AnthropicErrorWriter)
@@ -155,10 +162,11 @@ func RegisterGatewayRoutes(
 			}
 			h.Gateway.ChatCompletions(c)
 		})
-		// Personal v1.1.8: expose the existing OpenAI image-generation path.
-		// Edits and asynchronous media routes remain intentionally excluded.
-		gateway.POST("/images/generations", h.OpenAIGateway.Images)
-		gateway.POST("/images/edits", h.OpenAIGateway.Images)
+		// Personal v1.1.8: unified Images dispatch. OpenAI accounts retain the
+		// locked native/Responses path; Antigravity Gemini image models use the
+		// thin adapter backed by the existing Gemini transport.
+		gateway.POST("/images/generations", personalImages)
+		gateway.POST("/images/edits", personalImages)
 		gateway.POST("/embeddings", textBodyLimit, func(c *gin.Context) {
 			if !isOpenAIOnlyEndpointGatewayPlatform(c) {
 				service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)
