@@ -62,10 +62,15 @@ type AccountHandler struct {
 	tokenCacheInvalidator   service.TokenCacheInvalidator
 	grokImportProber        grokImportProber
 	ollamaCloudUsage        *service.OllamaCloudUsageService
+	consumerWebEncryptor    service.SecretEncryptor
 }
 
 func (h *AccountHandler) SetOllamaCloudUsageService(usage *service.OllamaCloudUsageService) {
 	h.ollamaCloudUsage = usage
+}
+
+func (h *AccountHandler) SetConsumerWebCredentialEncryptor(encryptor service.SecretEncryptor) {
+	h.consumerWebEncryptor = encryptor
 }
 
 // NewAccountHandler creates a new admin account handler
@@ -1233,6 +1238,11 @@ type ApplyOAuthCredentialsRequest struct {
 	Extra       map[string]any `json:"extra"`
 }
 
+type ConsumerWebCredentialsRequest struct {
+	Secure1PSID   *string `json:"secure_1psid"`
+	Secure1PSIDTS *string `json:"secure_1psidts"`
+}
+
 func preserveReauthModelMapping(existing, incoming map[string]any) map[string]any {
 	if _, supplied := incoming["model_mapping"]; supplied {
 		return incoming
@@ -1303,6 +1313,10 @@ func (h *AccountHandler) ApplyOAuthCredentials(c *gin.Context) {
 	// Re-auth rotates OAuth material but does not edit persistent account
 	// configuration. Preserve an existing model_mapping unless the caller
 	// explicitly supplied one (normal account-edit semantics remain unchanged).
+	// OAuth reauthorization is an authoritative patch, not permission to erase
+	// unrelated credential namespaces or omitted provider metadata.
+	req.Credentials = service.MergeCredentials(existing.Credentials, req.Credentials)
+	req.Credentials = service.SanitizeStoredCredentials(existing.Platform, req.Credentials)
 	req.Credentials = preserveReauthModelMapping(existing.Credentials, req.Credentials)
 	// A complete OAuth reauthorization may authoritatively change the personal
 	// plan. Preserve the stored plan only when the new credentials omit it or
@@ -1369,6 +1383,44 @@ func (h *AccountHandler) ApplyOAuthCredentials(c *gin.Context) {
 	}
 
 	response.Success(c, h.buildAccountResponseWithRuntime(ctx, updatedAccount))
+}
+
+// UpdateConsumerWebCredentials provisions encrypted Consumer Web secrets on
+// an existing Antigravity OAuth account. It performs no upstream validation.
+func (h *AccountHandler) UpdateConsumerWebCredentials(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+	var req ConsumerWebCredentialsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request")
+		return
+	}
+	ctx := c.Request.Context()
+	account, err := h.adminService.GetAccount(ctx, accountID)
+	if err != nil {
+		response.NotFound(c, "Account not found")
+		return
+	}
+	if account.Platform != service.PlatformAntigravity || account.Type != service.AccountTypeOAuth {
+		response.ErrorFrom(c, infraerrors.BadRequest("INVALID_CONSUMER_WEB_ACCOUNT", "consumer web credentials require an Antigravity OAuth account"))
+		return
+	}
+	patch, err := service.EncryptConsumerWebCredentialPatch(h.consumerWebEncryptor, req.Secure1PSID, req.Secure1PSIDTS)
+	if err != nil {
+		response.ErrorFrom(c, infraerrors.New(http.StatusInternalServerError, "CREDENTIAL_ENCRYPTION_FAILED", "consumer web credential encryption failed"))
+		return
+	}
+	merged := service.UpdateAccountCredentialNamespace(account.Credentials, service.ConsumerWebCredentialNamespace, patch)
+	updated, err := h.adminService.UpdateAccount(ctx, accountID, &service.UpdateAccountInput{Credentials: merged})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	_ = updated
+	response.Success(c, service.ConsumerWebCredentialsStatus(merged))
 }
 
 // GetStats handles getting account statistics

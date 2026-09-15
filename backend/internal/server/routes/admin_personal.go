@@ -127,6 +127,7 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers, stepUpAu
 	accounts.POST("/:id/recover-state", h.Admin.Account.RecoverState)
 	accounts.POST("/:id/refresh", h.Admin.Account.Refresh)
 	accounts.POST("/:id/apply-oauth-credentials", h.Admin.Account.ApplyOAuthCredentials)
+	accounts.PUT("/:id/consumer-web-credentials", h.Admin.Account.UpdateConsumerWebCredentials)
 	accounts.GET("/:id/stats", h.Admin.Account.GetStats)
 	accounts.POST("/:id/clear-error", h.Admin.Account.ClearError)
 	accounts.POST("/:id/revert-proxy-fallback", h.Admin.Account.RevertProxyFallback)

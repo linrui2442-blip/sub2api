@@ -23,7 +23,20 @@ func RedactCredentials(in map[string]any) (out map[string]any, status map[string
 			}
 			continue
 		}
-		out[k] = v
+		if nested, ok := v.(map[string]any); ok {
+			redacted, nestedStatus := RedactCredentials(nested)
+			out[k] = redacted
+			for statusKey, present := range nestedStatus {
+				if present {
+					if status == nil {
+						status = make(map[string]bool)
+					}
+					status[statusKey] = true
+				}
+			}
+		} else {
+			out[k] = v
+		}
 	}
 	return out, status
 }

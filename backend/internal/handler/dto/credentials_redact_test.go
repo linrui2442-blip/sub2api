@@ -99,3 +99,14 @@ func TestRedactCredentials_AllKnownSensitiveKeys(t *testing.T) {
 		require.True(t, status["has_"+k], "key %s 应在 status 中标记为已配置", k)
 	}
 }
+
+func TestRedactCredentials_RecursivelyRemovesConsumerWebSecrets(t *testing.T) {
+	in := map[string]any{"safe": "ok", "nested": map[string]any{"__Secure-1PSID_ciphertext": "cipher", "visible": "yes"}, "consumer_web": map[string]any{"__Secure-1PSIDTS_ciphertext": "cipher"}}
+	out, status := RedactCredentials(in)
+	require.Equal(t, "ok", out["safe"])
+	require.NotContains(t, out, "consumer_web")
+	nested := out["nested"].(map[string]any)
+	require.NotContains(t, nested, "__Secure-1PSID_ciphertext")
+	require.Equal(t, "yes", nested["visible"])
+	require.True(t, status["has_consumer_web"])
+}
