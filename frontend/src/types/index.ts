@@ -857,6 +857,17 @@ export interface Account {
   parent_chatgpt_account_id?: string
 }
 
+export interface ConsumerWebCredentialsPatch {
+  secure_1psid?: string
+  secure_1psidts?: string
+}
+
+export interface ConsumerWebCredentialStatus {
+  consumer_web_credentials_present: boolean
+  has_secure_1psid: boolean
+  has_secure_1psidts: boolean
+}
+
 export interface AccountSchedulerGroupScore {
   group_id?: number | null
   group_name?: string

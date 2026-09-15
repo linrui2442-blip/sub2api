@@ -180,6 +180,14 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 		return nil
 	}
 	redactedCreds, credsStatus := RedactCredentials(a.Credentials)
+	consumerWebStatus := service.ConsumerWebCredentialsStatus(a.Credentials)
+	if consumerWebStatus.HasSecure1PSID || consumerWebStatus.HasSecure1PSIDTS {
+		if credsStatus == nil {
+			credsStatus = make(map[string]bool, 2)
+		}
+		credsStatus["has_secure_1psid"] = consumerWebStatus.HasSecure1PSID
+		credsStatus["has_secure_1psidts"] = consumerWebStatus.HasSecure1PSIDTS
+	}
 	extra := redactAccountManagedExtra(a.Extra)
 	var ollamaCloudUsage *service.OllamaCloudUsageState
 	if state := service.OllamaCloudUsageStateFromAccount(a); state.Eligible {

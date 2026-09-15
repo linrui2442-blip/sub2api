@@ -420,6 +420,17 @@ export default {
         personal: '个人版',
         unlimited: '无限制'
       },
+      consumerWebCredentials: {
+        title: 'Consumer Web 凭据',
+        encryptedHint: '凭据将加密保存到当前账号。',
+        blankPreserves: '字段留空会保留现有值。',
+        firstSetupHint: '首次配置建议同时填写两项。',
+        configured: '已配置',
+        notConfigured: '未配置',
+        save: '保存 Consumer Web 凭据',
+        saved: 'Consumer Web 凭据已保存',
+        saveFailed: 'Consumer Web 凭据保存失败'
+      },
       ineligibleWarning:
         '该账号无 Antigravity 使用权限，但仍能进行 API 转发。继续使用请自行承担风险。',
       forbidden: '已封禁',

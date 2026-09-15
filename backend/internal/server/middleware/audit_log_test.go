@@ -186,3 +186,8 @@ func TestOllamaCloudUsageSessionRouteOmitsAuditBody(t *testing.T) {
 	require.Equal(t, "<credential-bearing body omitted>", logs[0].RequestBody)
 	require.NotContains(t, logs[0].RequestBody, "audit-canary")
 }
+
+func TestConsumerWebCredentialRouteOmitsAuditBody(t *testing.T) {
+	route := "PUT /api/v1/admin/accounts/:id/consumer-web-credentials"
+	require.Contains(t, auditBodyOmittedRoutes, route)
+}

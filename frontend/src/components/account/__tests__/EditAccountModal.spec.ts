@@ -318,6 +318,15 @@ describe('EditAccountModal', () => {
     authIsSimpleMode.value = true
   })
 
+  it('embeds Consumer Web credentials only for Antigravity OAuth accounts', () => {
+    expect(
+      mountModal(buildAntigravityAccount()).find('[data-testid="consumer-web-credentials-section"]').exists()
+    ).toBe(true)
+    expect(
+      mountModal(buildAccount()).find('[data-testid="consumer-web-credentials-section"]').exists()
+    ).toBe(false)
+  })
+
   it('reopening the same account rehydrates the OpenAI whitelist from props', async () => {
     const account = buildAccount()
     updateAccountMock.mockReset()

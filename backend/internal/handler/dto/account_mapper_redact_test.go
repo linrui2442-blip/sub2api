@@ -58,6 +58,22 @@ func TestAccountFromServiceShallow_RedactsSensitiveCredentials(t *testing.T) {
 	require.Equal(t, "rt-secret", src.Credentials["refresh_token"])
 }
 
+func TestAccountFromServiceShallowExposesOnlyConsumerWebExistence(t *testing.T) {
+	account := &service.Account{Credentials: map[string]any{
+		service.ConsumerWebCredentialNamespace: map[string]any{
+			service.ConsumerWebPSIDCiphertextKey:   "cipher-psid",
+			service.ConsumerWebPSIDTSCiphertextKey: "cipher-psidts",
+		},
+	}}
+	out := AccountFromServiceShallow(account)
+	require.True(t, out.CredentialsStatus["has_secure_1psid"])
+	require.True(t, out.CredentialsStatus["has_secure_1psidts"])
+	raw, err := json.Marshal(out)
+	require.NoError(t, err)
+	require.NotContains(t, string(raw), "cipher-psid")
+	require.NotContains(t, string(raw), "cipher-psidts")
+}
+
 func TestAccountFromServiceShallow_RedactsOllamaCloudManagedExtra(t *testing.T) {
 	snapshot := map[string]any{
 		"status":          service.OllamaCloudUsageStatusOK,

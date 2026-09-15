@@ -1447,6 +1447,17 @@ export default {
         personal: 'Personal',
         unlimited: 'Unlimited'
       },
+      consumerWebCredentials: {
+        title: 'Consumer Web Credentials',
+        encryptedHint: 'Credentials are stored encrypted for this account.',
+        blankPreserves: 'Leaving a field blank preserves its existing value.',
+        firstSetupHint: 'For first-time setup, configure both values together.',
+        configured: 'Configured',
+        notConfigured: 'Not configured',
+        save: 'Save Consumer Web Credentials',
+        saved: 'Consumer Web credentials saved',
+        saveFailed: 'Failed to save Consumer Web credentials'
+      },
       ineligibleWarning:
         'This account is not eligible for Antigravity, but API forwarding still works. Use at your own risk.',
       forbidden: 'Forbidden',

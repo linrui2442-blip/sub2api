@@ -22,7 +22,9 @@ import type {
   CheckMixedChannelRequest,
   CheckMixedChannelResponse,
   OllamaCloudUsageSettings,
-  OllamaCloudUsageState
+  OllamaCloudUsageState,
+  ConsumerWebCredentialsPatch,
+  ConsumerWebCredentialStatus
 } from '@/types'
 
 /**
@@ -273,6 +275,17 @@ export async function applyOAuthCredentials(
   const { data } = await apiClient.post<Account>(
     `/admin/accounts/${id}/apply-oauth-credentials`,
     payload
+  )
+  return data
+}
+
+export async function updateConsumerWebCredentials(
+  id: number,
+  patch: ConsumerWebCredentialsPatch
+): Promise<ConsumerWebCredentialStatus> {
+  const { data } = await apiClient.put<ConsumerWebCredentialStatus>(
+    `/admin/accounts/${id}/consumer-web-credentials`,
+    patch
   )
   return data
 }
@@ -901,6 +914,7 @@ export const accountsAPI = {
   testAccount,
   refreshCredentials,
   applyOAuthCredentials,
+  updateConsumerWebCredentials,
   getStats,
   clearError,
   getUsage,

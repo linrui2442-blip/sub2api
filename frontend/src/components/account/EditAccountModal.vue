@@ -479,6 +479,12 @@
 
       </div>
 
+      <!-- Antigravity OAuth Consumer Web credentials -->
+      <ConsumerWebCredentialsSection
+        v-if="account.platform === 'antigravity' && account.type === 'oauth'"
+        :account="account"
+      />
+
       <!-- Grok OAuth client-tool prompt cache opt-in -->
       <div
         v-if="account.platform === 'grok' && account.type === 'oauth'"
@@ -2717,6 +2723,7 @@ import GrokBaseUrlPresets from '@/components/account/GrokBaseUrlPresets.vue'
 import CnBaseUrlPresets from '@/components/account/CnBaseUrlPresets.vue'
 import HeaderOverrideEditor from '@/components/account/HeaderOverrideEditor.vue'
 import OllamaCloudUsageSettings from '@/components/account/OllamaCloudUsageSettings.vue'
+import ConsumerWebCredentialsSection from '@/components/account/ConsumerWebCredentialsSection.vue'
 import {
   applyAntigravityProjectID,
   applyHeaderOverride,
