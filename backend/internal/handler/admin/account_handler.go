@@ -1410,6 +1410,10 @@ func (h *AccountHandler) UpdateConsumerWebCredentials(c *gin.Context) {
 	}
 	patch, err := service.EncryptConsumerWebCredentialPatch(h.consumerWebEncryptor, req.Secure1PSID, req.Secure1PSIDTS)
 	if err != nil {
+		if errors.Is(err, service.ErrInvalidConsumerWebCredential) {
+			response.ErrorFrom(c, infraerrors.BadRequest("INVALID_CONSUMER_WEB_CREDENTIAL", "invalid consumer web credential format"))
+			return
+		}
 		response.ErrorFrom(c, infraerrors.New(http.StatusInternalServerError, "CREDENTIAL_ENCRYPTION_FAILED", "consumer web credential encryption failed"))
 		return
 	}

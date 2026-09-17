@@ -72,6 +72,51 @@ func TestUpdateConsumerWebCredentialsRejectsWrongAccountAndEncryptionFailureIsAt
 	require.Zero(t, svc.updateAccountCalls)
 }
 
+func TestUpdateConsumerWebCredentialsNormalizesInBackendAndMapsValidationToBadRequest(t *testing.T) {
+	svc := newStubAdminService()
+	svc.getAccountResult = &service.Account{ID: 2, Platform: service.PlatformAntigravity, Type: service.AccountTypeOAuth, Credentials: map[string]any{
+		"access_token": "oauth",
+		service.ConsumerWebCredentialNamespace: map[string]any{
+			service.ConsumerWebPSIDTSCiphertextKey: "cipher:old-psidts",
+		},
+	}}
+
+	w := runConsumerWebCredentialHandler(t, svc, handlerConsumerWebEncryptor{}, `{"secure_1psid":"  \"\"\"fake-normalized-psid\"\"\"  "}`)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, 1, svc.updateAccountCalls)
+	creds := svc.lastUpdateAccountInput.Credentials
+	ns := creds[service.ConsumerWebCredentialNamespace].(map[string]any)
+	require.Equal(t, "cipher:fake-normalized-psid", ns[service.ConsumerWebPSIDCiphertextKey])
+	require.Equal(t, "cipher:old-psidts", ns[service.ConsumerWebPSIDTSCiphertextKey])
+	require.NotContains(t, w.Body.String(), "fake-normalized-psid")
+	require.NotContains(t, w.Body.String(), "cipher:")
+
+	svc.updateAccountCalls = 0
+	invalidSecret := "fake-invalid-secret-that-must-not-echo"
+	w = runConsumerWebCredentialHandler(t, svc, handlerConsumerWebEncryptor{}, `{"secure_1psid":"__Secure-1PSID=`+invalidSecret+`"}`)
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.Zero(t, svc.updateAccountCalls)
+	require.Contains(t, w.Body.String(), "INVALID_CONSUMER_WEB_CREDENTIAL")
+	require.NotContains(t, w.Body.String(), invalidSecret)
+	require.NotContains(t, w.Body.String(), "CREDENTIAL_ENCRYPTION_FAILED")
+}
+
+func TestUpdateConsumerWebCredentialsPresentEmptyIsValidationErrorAndEncryptionFailureStays500(t *testing.T) {
+	svc := newStubAdminService()
+	svc.getAccountResult = &service.Account{ID: 2, Platform: service.PlatformAntigravity, Type: service.AccountTypeOAuth}
+
+	w := runConsumerWebCredentialHandler(t, svc, handlerConsumerWebEncryptor{}, `{"secure_1psid":"''"}`)
+	require.Equal(t, http.StatusBadRequest, w.Code)
+	require.Zero(t, svc.updateAccountCalls)
+	require.Contains(t, w.Body.String(), "INVALID_CONSUMER_WEB_CREDENTIAL")
+
+	w = runConsumerWebCredentialHandler(t, svc, handlerConsumerWebEncryptor{fail: true}, `{"secure_1psid":"fake-valid-value"}`)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+	require.Zero(t, svc.updateAccountCalls)
+	require.Contains(t, w.Body.String(), "CREDENTIAL_ENCRYPTION_FAILED")
+	require.NotContains(t, w.Body.String(), "fake-valid-value")
+}
+
 func TestApplyOAuthCredentialsPreservesConsumerWebNamespaceAndProviderMetadata(t *testing.T) {
 	svc := newStubAdminService()
 	svc.getAccountResult = &service.Account{ID: 2, Platform: service.PlatformAntigravity, Type: service.AccountTypeOAuth, Credentials: map[string]any{

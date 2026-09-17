@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 )
 
@@ -10,6 +11,8 @@ const (
 	ConsumerWebPSIDCiphertextKey   = "__Secure-1PSID_ciphertext"
 	ConsumerWebPSIDTSCiphertextKey = "__Secure-1PSIDTS_ciphertext"
 )
+
+var ErrInvalidConsumerWebCredential = errors.New("invalid consumer web credential")
 
 type ConsumerWebCredentialStatus struct {
 	ConsumerWebCredentialsPresent bool `json:"consumer_web_credentials_present"`
@@ -50,12 +53,20 @@ func EncryptConsumerWebCredentialPatch(encryptor SecretEncryptor, psid, psidts *
 	if encryptor == nil {
 		return nil, errors.New("consumer web credential encryption is unavailable")
 	}
+	normalizedPSID, err := normalizeConsumerWebCookieValue("__Secure-1PSID", psid)
+	if err != nil {
+		return nil, err
+	}
+	normalizedPSIDTS, err := normalizeConsumerWebCookieValue("__Secure-1PSIDTS", psidts)
+	if err != nil {
+		return nil, err
+	}
 	patch := make(map[string]any, 2)
 	for key, value := range map[string]*string{
-		ConsumerWebPSIDCiphertextKey:   psid,
-		ConsumerWebPSIDTSCiphertextKey: psidts,
+		ConsumerWebPSIDCiphertextKey:   normalizedPSID,
+		ConsumerWebPSIDTSCiphertextKey: normalizedPSIDTS,
 	} {
-		if value == nil || strings.TrimSpace(*value) == "" {
+		if value == nil {
 			continue
 		}
 		ciphertext, err := encryptor.Encrypt(*value)
@@ -65,6 +76,28 @@ func EncryptConsumerWebCredentialPatch(encryptor SecretEncryptor, psid, psidts *
 		patch[key] = ciphertext
 	}
 	return patch, nil
+}
+
+func normalizeConsumerWebCookieValue(field string, supplied *string) (*string, error) {
+	if supplied == nil {
+		return nil, nil
+	}
+
+	value := strings.TrimSpace(*supplied)
+	value = strings.Trim(value, "\"")
+	value = strings.Trim(value, "'")
+	value = strings.TrimSuffix(value, ";")
+
+	invalid := value == "" ||
+		strings.ContainsAny(value, "\r\n") ||
+		strings.HasPrefix(value, "__Secure-1PSID=") ||
+		strings.HasPrefix(value, "__Secure-1PSIDTS=") ||
+		strings.HasPrefix(strings.ToLower(value), "cookie:") ||
+		strings.Contains(value, ";")
+	if invalid {
+		return nil, fmt.Errorf("%w: invalid %s format", ErrInvalidConsumerWebCredential, field)
+	}
+	return &value, nil
 }
 
 func DecryptConsumerWebCredentials(encryptor SecretEncryptor, credentials map[string]any) (psid, psidts string, err error) {
