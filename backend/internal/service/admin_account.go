@@ -649,6 +649,33 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		}
 	}
 
+	// Production repositories persist credentials through DB-level CAS. Reapply
+	// the caller's logical patch to the latest snapshot so metadata edits and
+	// stale Account objects cannot overwrite concurrent credential mutations.
+	if input.Credentials != nil {
+		if _, ok := AtomicCredentialsRepository(s.accountRepo); ok {
+			updatedCredentials, mutationErr := MutateAccountCredentialsReplaySafe(ctx, s.accountRepo, id, func(current map[string]any) (map[string]any, error) {
+				if account.IsCredentialShadow() {
+					return sanitizeSparkShadowCredentials(input.Credentials), nil
+				}
+				var merged map[string]any
+				if consumerPatch, isConsumerPatch := input.Credentials[ConsumerWebCredentialNamespace].(map[string]any); isConsumerPatch && len(input.Credentials) == 1 {
+					merged = UpdateAccountCredentialNamespace(current, ConsumerWebCredentialNamespace, consumerPatch)
+				} else {
+					merged = MergePreservingSensitiveCreds(current, input.Credentials)
+				}
+				if err := NormalizeHeaderOverrideCredentials(merged); err != nil {
+					return nil, err
+				}
+				return SanitizeStoredCredentials(account.Platform, merged), nil
+			})
+			if mutationErr != nil {
+				return nil, mutationErr
+			}
+			account.Credentials = cloneCredentialMap(updatedCredentials.Credentials)
+		}
+	}
+
 	if err := s.accountRepo.Update(ctx, account); err != nil {
 		return nil, err
 	}
@@ -806,9 +833,21 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 
 	// Prepare bulk updates for columns and JSONB fields.
 	repoUpdates := AccountBulkUpdate{
-		Credentials:                input.Credentials,
 		Extra:                      input.Extra,
 		EnsureCodexFingerprintSeed: ShouldEnsureCodexFingerprintSeedForExtraUpdates(input.Extra),
+	}
+	if len(input.Credentials) > 0 {
+		if _, ok := AtomicCredentialsRepository(s.accountRepo); ok {
+			for _, accountID := range input.AccountIDs {
+				if _, err := MutateAccountCredentialsReplaySafe(ctx, s.accountRepo, accountID, func(current map[string]any) (map[string]any, error) {
+					return mergeCredentialPatch(current, input.Credentials), nil
+				}); err != nil {
+					return nil, err
+				}
+			}
+		} else {
+			repoUpdates.Credentials = input.Credentials
+		}
 	}
 	if input.Name != "" {
 		repoUpdates.Name = &input.Name

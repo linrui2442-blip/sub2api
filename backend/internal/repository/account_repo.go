@@ -437,7 +437,6 @@ func (r *accountRepository) updateLockedAccount(
 		SetNillableNotes(account.Notes).
 		SetPlatform(account.Platform).
 		SetType(account.Type).
-		SetCredentials(normalizeJSONMap(account.Credentials)).
 		SetExtra(extra).
 		SetConcurrency(account.Concurrency).
 		SetPriority(account.Priority).
@@ -508,51 +507,59 @@ func (r *accountRepository) updateLockedAccount(
 }
 
 func (r *accountRepository) UpdateCredentials(ctx context.Context, id int64, credentials map[string]any) error {
+	// Lightweight repository doubles used by legacy callers may not expose the
+	// raw SQL handle. Preserve their existing Ent update behavior; production
+	// repositories use the CAS path below.
+	if r == nil || r.sql == nil || r.client == nil {
+		return r.updateCredentialsLegacy(ctx, id, credentials)
+	}
+	// Ollama API-key identity updates retain their existing conditional cleanup
+	// transaction; OAuth/consumer-web credentials use the CAS path.
+	if _, ok := credentials["api_key"]; ok {
+		return r.updateCredentialsLegacy(ctx, id, credentials)
+	}
+	snapshot, err := r.LoadCredentialSnapshot(ctx, id)
+	if err != nil {
+		return err
+	}
+	_, err = r.CompareAndSwapCredentials(ctx, id, snapshot.Revision, normalizeJSONMap(credentials))
+	return err
+}
+
+// updateCredentialsLegacy is retained for repository doubles and older
+// transaction-backed callers that do not expose the raw SQL handle. Production
+// repositories use UpdateCredentials' CAS path above.
+func (r *accountRepository) updateCredentialsLegacy(ctx context.Context, id int64, credentials map[string]any) error {
 	payload, err := json.Marshal(normalizeJSONMap(credentials))
 	if err != nil {
 		return err
 	}
-	baseCtx := ctx
-	contextTx := dbent.TxFromContext(ctx)
 	client := r.client
-	var tx *dbent.Tx
-	if contextTx != nil {
-		client = contextTx.Client()
-	} else if r.client != nil {
-		var txErr error
-		tx, txErr = r.client.Tx(ctx)
-		if txErr != nil && !errors.Is(txErr, dbent.ErrTxStarted) {
-			return txErr
-		}
-		if tx != nil {
-			defer func() { _ = tx.Rollback() }()
-			ctx = dbent.NewTxContext(ctx, tx)
-			client = tx.Client()
-		}
+	if client == nil {
+		return errors.New("account credential repository is unavailable")
 	}
+	baseCtx := ctx
+	tx, err := client.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	ctx = dbent.NewTxContext(ctx, tx)
+	client = tx.Client()
 	result, err := client.ExecContext(ctx, `
 		UPDATE accounts
 		SET
 			credentials = $1::jsonb,
 			extra = CASE
-				-- Ollama Cloud 的会话与用量快照绑定 API key、base URL 和代理。
 				WHEN platform IN ('openai', 'anthropic')
 					AND type = 'apikey'
 					AND credentials IS DISTINCT FROM $1::jsonb
 					AND (
 						credentials -> 'api_key' IS DISTINCT FROM $1::jsonb -> 'api_key'
-						OR NOT (
-							`+ollamaCloudBaseURLMatchesSQL("credentials ->> 'base_url'")+`
-							AND `+ollamaCloudBaseURLMatchesSQL("$1::jsonb ->> 'base_url'")+`
-						)
+						OR NOT (`+ollamaCloudBaseURLMatchesSQL("credentials ->> 'base_url'")+` AND `+ollamaCloudBaseURLMatchesSQL("$1::jsonb ->> 'base_url'")+`)
 					)
-				THEN COALESCE(extra, '{}'::jsonb)
-					- 'ollama_cloud_usage_session'
-					- 'ollama_cloud_usage_auto_refresh'
-					- 'ollama_cloud_usage_snapshot'
-				ELSE extra
-			END,
-			updated_at = NOW()
+			THEN COALESCE(extra, '{}'::jsonb) - 'ollama_cloud_usage_session' - 'ollama_cloud_usage_auto_refresh' - 'ollama_cloud_usage_snapshot'
+			ELSE extra END, updated_at = NOW()
 		WHERE id = $2 AND deleted_at IS NULL
 	`, string(payload), id)
 	if err != nil {
@@ -568,14 +575,10 @@ func (r *accountRepository) UpdateCredentials(ctx context.Context, id int64, cre
 	if err := enqueueSchedulerOutbox(ctx, client, service.SchedulerOutboxEventAccountChanged, &id, nil, nil); err != nil {
 		return err
 	}
-	if tx != nil {
-		if err := tx.Commit(); err != nil {
-			return err
-		}
+	if err := tx.Commit(); err != nil {
+		return err
 	}
-	if contextTx == nil {
-		r.syncSchedulerAccountSnapshot(baseCtx, id)
-	}
+	r.syncSchedulerAccountSnapshot(baseCtx, id)
 	return nil
 }
 
@@ -2355,6 +2358,32 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 		return 0, nil
 	}
 	updates.Extra = stripCodexFingerprintSeedFromExtraUpdate(updates.Extra)
+	if len(updates.Credentials) > 0 && r != nil && r.sql != nil && r.client != nil {
+		patch := normalizeJSONMap(updates.Credentials)
+		for _, id := range ids {
+			snapshot, err := r.LoadCredentialSnapshot(ctx, id)
+			if err != nil {
+				return 0, err
+			}
+			next := cloneRepositoryCredentialMap(snapshot.Credentials)
+			for key, value := range patch {
+				if nested, ok := value.(map[string]any); ok && key == service.ConsumerWebCredentialNamespace {
+					nestedCurrent, _ := next[key].(map[string]any)
+					merged := cloneRepositoryCredentialMap(nestedCurrent)
+					for nestedKey, nestedValue := range nested {
+						merged[nestedKey] = nestedValue
+					}
+					next[key] = merged
+				} else {
+					next[key] = value
+				}
+			}
+			if _, err := r.CompareAndSwapCredentials(ctx, id, snapshot.Revision, next); err != nil {
+				return 0, err
+			}
+		}
+		updates.Credentials = nil
+	}
 
 	setClauses := make([]string, 0, 8)
 	args := make([]any, 0, 8)

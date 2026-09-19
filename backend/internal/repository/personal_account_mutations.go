@@ -8,27 +8,27 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
+func (r *personalAccountRepository) LoadCredentialSnapshot(ctx context.Context, id int64) (*service.AccountCredentialSnapshot, error) {
+	return r.base.LoadCredentialSnapshot(ctx, id)
+}
+
+func (r *personalAccountRepository) CompareAndSwapCredentials(ctx context.Context, id int64, expectedRevision any, credentials map[string]any) (*service.AccountCredentialSnapshot, error) {
+	return r.base.CompareAndSwapCredentials(ctx, id, expectedRevision, credentials)
+}
+
 // UpdateCredentials is the Personal Edition credential persistence path used by
 // OAuthRefreshAPI / TokenRefreshService after a successful GPT/Gemini refresh.
 // The upstream implementation deliberately performs PostgreSQL jsonb cleanup;
 // Personal Edition does not run those SaaS billing/Ollama probes, so a direct
 // Ent update is both sufficient and dialect-safe.
 func (r *personalAccountRepository) UpdateCredentials(ctx context.Context, id int64, credentials map[string]any) error {
-	updated, err := r.base.client.Account.UpdateOneID(id).
-		SetCredentials(normalizeJSONMap(credentials)).
-		Save(ctx)
+	snapshot, err := r.LoadCredentialSnapshot(ctx, id)
 	if err != nil {
-		if dbent.IsNotFound(err) {
-			return service.ErrAccountNotFound
-		}
 		return err
 	}
-
-	if err := enqueueSchedulerOutbox(ctx, r.base.sql, service.SchedulerOutboxEventAccountChanged, &id, nil, nil); err != nil {
+	if _, err := r.CompareAndSwapCredentials(ctx, id, snapshot.Revision, normalizeJSONMap(credentials)); err != nil {
 		return err
 	}
-	r.base.syncSchedulerAccountSnapshot(ctx, id)
-	_ = updated
 	return nil
 }
 
@@ -51,7 +51,6 @@ func (r *personalAccountRepository) Update(ctx context.Context, account *service
 		SetNillableNotes(account.Notes).
 		SetPlatform(account.Platform).
 		SetType(account.Type).
-		SetCredentials(normalizeJSONMap(account.Credentials)).
 		SetExtra(normalizeJSONMap(account.Extra)).
 		SetConcurrency(account.Concurrency).
 		SetPriority(account.Priority).

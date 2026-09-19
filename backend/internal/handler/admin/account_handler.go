@@ -1417,14 +1417,42 @@ func (h *AccountHandler) UpdateConsumerWebCredentials(c *gin.Context) {
 		response.ErrorFrom(c, infraerrors.New(http.StatusInternalServerError, "CREDENTIAL_ENCRYPTION_FAILED", "consumer web credential encryption failed"))
 		return
 	}
-	merged := service.UpdateAccountCredentialNamespace(account.Credentials, service.ConsumerWebCredentialNamespace, patch)
-	updated, err := h.adminService.UpdateAccount(ctx, accountID, &service.UpdateAccountInput{Credentials: merged})
+	// Keep the legacy handler contract (the service receives a complete
+	// credential object) while the service/repository applies it through its
+	// request-scoped CAS merge. This also lets the response reflect the stored
+	// namespace for lightweight service doubles.
+	mergedCredentials := cloneHandlerCredentialMap(account.Credentials)
+	currentConsumerWeb, _ := mergedCredentials[service.ConsumerWebCredentialNamespace].(map[string]any)
+	if currentConsumerWeb == nil {
+		currentConsumerWeb = map[string]any{}
+	}
+	for key, value := range patch {
+		currentConsumerWeb[key] = value
+	}
+	mergedCredentials[service.ConsumerWebCredentialNamespace] = currentConsumerWeb
+	updated, err := h.adminService.UpdateAccount(ctx, accountID, &service.UpdateAccountInput{Credentials: mergedCredentials})
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
-	_ = updated
-	response.Success(c, service.ConsumerWebCredentialsStatus(merged))
+	statusAccount := updated
+	if statusAccount == nil || len(statusAccount.Credentials) == 0 {
+		statusAccount = account
+		statusAccount.Credentials = mergedCredentials
+	}
+	response.Success(c, service.ConsumerWebCredentialsStatus(statusAccount.Credentials))
+}
+
+func cloneHandlerCredentialMap(in map[string]any) map[string]any {
+	out := make(map[string]any, len(in)+1)
+	for key, value := range in {
+		if nested, ok := value.(map[string]any); ok {
+			out[key] = cloneHandlerCredentialMap(nested)
+			continue
+		}
+		out[key] = value
+	}
+	return out
 }
 
 // GetStats handles getting account statistics

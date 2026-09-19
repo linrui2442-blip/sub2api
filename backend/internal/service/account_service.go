@@ -306,7 +306,18 @@ func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccount
 	}
 
 	if req.Credentials != nil {
-		account.Credentials = SanitizeStoredCredentials(account.Platform, *req.Credentials)
+		intended := SanitizeStoredCredentials(account.Platform, *req.Credentials)
+		if _, ok := AtomicCredentialsRepository(s.accountRepo); ok {
+			updated, mutationErr := MutateAccountCredentialsReplaySafe(ctx, s.accountRepo, id, func(map[string]any) (map[string]any, error) {
+				return cloneCredentialMap(intended), nil
+			})
+			if mutationErr != nil {
+				return nil, fmt.Errorf("update account credentials: %w", mutationErr)
+			}
+			account.Credentials = cloneCredentialMap(updated.Credentials)
+		} else {
+			account.Credentials = intended
+		}
 	}
 
 	if req.Extra != nil {

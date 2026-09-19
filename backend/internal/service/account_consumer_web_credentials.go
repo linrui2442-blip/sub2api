@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -13,6 +14,30 @@ const (
 )
 
 var ErrInvalidConsumerWebCredential = errors.New("invalid consumer web credential")
+
+type ConditionalConsumerWebPSIDTSPersister interface {
+	PersistPSIDTS(ctx context.Context, accountID int64, expectedRevision any, psidts string) error
+}
+
+type conditionalConsumerWebPSIDTSPersister struct {
+	repo      AccountRepository
+	encryptor SecretEncryptor
+}
+
+func NewConditionalConsumerWebPSIDTSPersister(repo AccountRepository, encryptor SecretEncryptor) ConditionalConsumerWebPSIDTSPersister {
+	return &conditionalConsumerWebPSIDTSPersister{repo: repo, encryptor: encryptor}
+}
+
+func (p *conditionalConsumerWebPSIDTSPersister) PersistPSIDTS(ctx context.Context, accountID int64, expectedRevision any, psidts string) error {
+	patch, err := EncryptConsumerWebCredentialPatch(p.encryptor, nil, &psidts)
+	if err != nil {
+		return err
+	}
+	_, err = MutateAccountCredentialsConditional(ctx, p.repo, accountID, expectedRevision, func(current map[string]any) (map[string]any, error) {
+		return UpdateAccountCredentialNamespace(current, ConsumerWebCredentialNamespace, patch), nil
+	})
+	return err
+}
 
 type ConsumerWebCredentialStatus struct {
 	ConsumerWebCredentialsPresent bool `json:"consumer_web_credentials_present"`

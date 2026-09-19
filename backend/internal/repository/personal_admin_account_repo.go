@@ -35,6 +35,14 @@ func (r *personalAdminAccountRepository) UpdateCredentials(ctx context.Context, 
 	return r.compat.UpdateCredentials(ctx, id, credentials)
 }
 
+func (r *personalAdminAccountRepository) LoadCredentialSnapshot(ctx context.Context, id int64) (*service.AccountCredentialSnapshot, error) {
+	return r.compat.LoadCredentialSnapshot(ctx, id)
+}
+
+func (r *personalAdminAccountRepository) CompareAndSwapCredentials(ctx context.Context, id int64, expectedRevision any, credentials map[string]any) (*service.AccountCredentialSnapshot, error) {
+	return r.compat.CompareAndSwapCredentials(ctx, id, expectedRevision, credentials)
+}
+
 func (r *personalAdminAccountRepository) UpdateExtra(ctx context.Context, id int64, updates map[string]any) error {
 	return r.compat.UpdateExtra(ctx, id, updates)
 }
