@@ -25,7 +25,7 @@ func (e handlerConsumerWebEncryptor) Decrypt(v string) (string, error) {
 	return strings.TrimPrefix(v, "cipher:"), nil
 }
 
-func runConsumerWebCredentialHandler(t *testing.T, svc *stubAdminService, encryptor service.SecretEncryptor, body string) *httptest.ResponseRecorder {
+func runConsumerWebCredentialHandler(t *testing.T, svc *stubAdminService, encryptor service.SecretEncryptor, body string, invalidators ...service.ConsumerWebSessionInvalidator) *httptest.ResponseRecorder {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
@@ -35,8 +35,29 @@ func runConsumerWebCredentialHandler(t *testing.T, svc *stubAdminService, encryp
 	c.Params = gin.Params{{Key: "id", Value: "2"}}
 	h := NewAccountHandler(svc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	h.SetConsumerWebCredentialEncryptor(encryptor)
+	if len(invalidators) > 0 {
+		h.SetConsumerWebSessionInvalidator(invalidators[0])
+	}
 	h.UpdateConsumerWebCredentials(c)
 	return w
+}
+
+type countingConsumerWebInvalidator struct{ calls int }
+
+func (i *countingConsumerWebInvalidator) InvalidateAccount(int64) { i.calls++ }
+
+func TestUpdateConsumerWebCredentialsInvalidatesOnlyAfterSuccess(t *testing.T) {
+	inv := &countingConsumerWebInvalidator{}
+	svc := newStubAdminService()
+	svc.getAccountResult = &service.Account{ID: 2, Platform: service.PlatformAntigravity, Type: service.AccountTypeOAuth}
+	w := runConsumerWebCredentialHandler(t, svc, handlerConsumerWebEncryptor{}, `{"secure_1psid":"valid-secret"}`, inv)
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, 1, inv.calls)
+
+	inv.calls = 0
+	w = runConsumerWebCredentialHandler(t, svc, handlerConsumerWebEncryptor{fail: true}, `{"secure_1psid":"valid-secret"}`, inv)
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+	require.Zero(t, inv.calls)
 }
 
 func TestUpdateConsumerWebCredentialsExistenceOnlyAndPartialMerge(t *testing.T) {

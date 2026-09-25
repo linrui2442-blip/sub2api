@@ -33,7 +33,9 @@ type stubAdminService struct {
 	bulkUpdateAccountErr                error
 	lastBulkUpdateAccountInput          *service.BulkUpdateAccountsInput
 	getAccountResult                    *service.Account
+	getAccountFn                        func(context.Context, int64) (*service.Account, error)
 	updateAccountCalls                  int
+	updateAccountFn                     func(context.Context, int64, *service.UpdateAccountInput) (*service.Account, error)
 	updateAccountExtraCalls             int
 	checkMixedErr                       error
 	lastMixedCheck                      struct {
@@ -373,6 +375,9 @@ func (s *stubAdminService) ListOpenAISchedulableAccountsForSchedulerScore(_ cont
 }
 
 func (s *stubAdminService) GetAccount(ctx context.Context, id int64) (*service.Account, error) {
+	if s.getAccountFn != nil {
+		return s.getAccountFn(ctx, id)
+	}
 	if s.getAccountResult != nil {
 		return s.getAccountResult, nil
 	}
@@ -412,6 +417,9 @@ func (s *stubAdminService) RecoverDuplicateAccount(ctx context.Context, id int64
 func (s *stubAdminService) UpdateAccount(ctx context.Context, id int64, input *service.UpdateAccountInput) (*service.Account, error) {
 	s.updateAccountCalls++
 	s.lastUpdateAccountInput = input
+	if s.updateAccountFn != nil {
+		return s.updateAccountFn(ctx, id, input)
+	}
 	if s.updateAccountErr != nil {
 		return nil, s.updateAccountErr
 	}

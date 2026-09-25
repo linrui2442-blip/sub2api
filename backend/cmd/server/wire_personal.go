@@ -87,10 +87,16 @@ func providePersonalCleanup(
 	codexVersionSync *service.OpenAICodexVersionSyncService,
 	auditLog *service.AuditLogService,
 	promptAudit *securityaudit.PromptService,
+	consumerWebSessions *service.ConsumerWebSessionManager,
 ) func() {
 	return func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		if consumerWebSessions != nil {
+			if err := consumerWebSessions.Close(); err != nil {
+				log.Printf("[Personal Cleanup] ConsumerWebSessionManager failed: %v", err)
+			}
+		}
 
 		type cleanupStep struct {
 			name string

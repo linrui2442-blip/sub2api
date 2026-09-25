@@ -633,6 +633,26 @@ func ProvidePersonalAPIKeyService(
 	return svc
 }
 
+func ProvideAtomicAccountCredentialsRepository(repo AccountRepository) AtomicAccountCredentialsRepository {
+	atomicRepo, ok := AtomicCredentialsRepository(repo)
+	if !ok {
+		panic("production account repository does not support atomic credential persistence")
+	}
+	return atomicRepo
+}
+
+func ProvideConsumerWebSessionTransport(httpUpstream HTTPUpstream, encryptor SecretEncryptor) ConsumerWebSessionTransport {
+	return NewConsumerWebHTTPTransport(ConsumerWebHTTPTransportOptions{HTTPUpstream: httpUpstream, Encryptor: encryptor})
+}
+
+func ProvideConsumerWebSessionManager(
+	transport ConsumerWebSessionTransport,
+	credentials AtomicAccountCredentialsRepository,
+	persister ConditionalConsumerWebPSIDTSPersister,
+) *ConsumerWebSessionManager {
+	return NewConsumerWebSessionManager(ConsumerWebSessionManagerOptions{Transport: transport, Credentials: credentials, Persister: persister})
+}
+
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
@@ -703,6 +723,11 @@ var ProviderSet = wire.NewSet(
 	NewDigestSessionStore,
 	ProvideIdempotencyCoordinator,
 	ProvideSystemOperationLockService,
+	ProvideAtomicAccountCredentialsRepository,
+	NewConditionalConsumerWebPSIDTSPersister,
+	ProvideConsumerWebSessionTransport,
+	ProvideConsumerWebSessionManager,
+	wire.Bind(new(ConsumerWebSessionInvalidator), new(*ConsumerWebSessionManager)),
 	ProvideIdempotencyCleanupService,
 	ProvideScheduledTestService,
 	ProvideScheduledTestRunnerService,

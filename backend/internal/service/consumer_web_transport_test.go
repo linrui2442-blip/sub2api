@@ -1,0 +1,228 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"net/url"
+	"strings"
+	"testing"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
+)
+
+type consumerWebTransportEncryptor struct{}
+
+func (consumerWebTransportEncryptor) Encrypt(v string) (string, error) { return "enc:" + v, nil }
+func (consumerWebTransportEncryptor) Decrypt(v string) (string, error) {
+	return strings.TrimPrefix(v, "enc:"), nil
+}
+
+type consumerWebTestUpstream struct {
+	responses []*http.Response
+	requests  []*http.Request
+	proxies   []string
+}
+
+func (u *consumerWebTestUpstream) Do(r *http.Request, proxy string, _ int64, _ int) (*http.Response, error) {
+	u.requests = append(u.requests, r)
+	u.proxies = append(u.proxies, proxy)
+	x := u.responses[0]
+	u.responses = u.responses[1:]
+	return x, nil
+}
+func (u *consumerWebTestUpstream) DoWithTLS(r *http.Request, p string, id int64, c int, _ *tlsfingerprint.Profile) (*http.Response, error) {
+	return u.Do(r, p, id, c)
+}
+
+func consumerWebResp(status int, body string, cookies ...*http.Cookie) *http.Response {
+	h := make(http.Header)
+	for _, c := range cookies {
+		h.Add("Set-Cookie", c.String())
+	}
+	return &http.Response{StatusCode: status, Header: h, Body: io.NopCloser(strings.NewReader(body))}
+}
+
+func TestConsumerWebTransportProductionEndpointsAndOTAQParser(t *testing.T) {
+	if consumerWebAppURL != "https://gemini.google.com/app" || consumerWebOTAQURL != "https://gemini.google.com/_/BardChatUi/data/batchexecute" || consumerWebRotateURL != "https://accounts.google.com/RotateCookies" {
+		t.Fatal("production endpoint changed")
+	}
+	inner := make([]any, 16)
+	inner[14] = float64(1000)
+	inner[15] = []any{map[string]any{"id": "m", "display": "Model", "tier": "pro"}}
+	b, _ := jsonMarshal(inner)
+	frame, _ := jsonMarshal([]any{"wrb.fr", "otAQ7b", string(b)})
+	status, registry, err := parseConsumerWebOTAQ(")]}'\n" + string(frame) + "\n")
+	if err != nil || status != 1000 || len(registry) != 1 || registry[0].ID != "m" {
+		t.Fatalf("parser: status=%d registry=%v err=%v", status, registry, err)
+	}
+}
+
+func TestConsumerWebOTAQStatusNormalizationAndProtocolDrift(t *testing.T) {
+	makeBody := func(v any) string {
+		inner := make([]any, 16)
+		inner[14] = v
+		b, _ := json.Marshal(inner)
+		f, _ := json.Marshal([]any{"wrb.fr", "otAQ7b", string(b)})
+		return ")]}'\n7\n" + string(f) + "\n"
+	}
+	for _, tc := range []struct {
+		name string
+		v    any
+		want int
+	}{
+		{"primary nil", nil, 1000},
+		{"secondary available", float64(1000), 1000},
+		{"auth lost", float64(1016), 1016},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, _, err := parseConsumerWebOTAQ(makeBody(tc.v))
+			if err != nil || got != tc.want {
+				t.Fatalf("status=%d err=%v want=%d", got, err, tc.want)
+			}
+		})
+	}
+	for _, v := range []any{float64(42), "bad"} {
+		if _, _, err := parseConsumerWebOTAQ(makeBody(v)); !errors.Is(err, ErrConsumerWebProtocolDrift) {
+			t.Fatalf("unknown status should fail closed: %v", err)
+		}
+	}
+}
+
+func TestConsumerWebOTAQMultiframeAndMalformedNoise(t *testing.T) {
+	inner := make([]any, 16)
+	inner[14] = nil
+	b, _ := json.Marshal(inner)
+	f, _ := json.Marshal([]any{"wrb.fr", "otAQ7b", string(b)})
+	body := "noise\n12\n[malformed\n" + string(f) + "\n"
+	status, _, err := parseConsumerWebOTAQ(body)
+	if err != nil || status != 1000 {
+		t.Fatalf("status=%d err=%v", status, err)
+	}
+}
+
+func TestConsumerWebTransportAppAuthGateAndCookieJar(t *testing.T) {
+	appURL := "http://app.test/app"
+	otaqURL := "http://app.test/otaq"
+	rotateURL := "http://app.test/rotate"
+	inner := make([]any, 16)
+	inner[14] = float64(1000)
+	b, _ := jsonMarshal(inner)
+	frame, _ := jsonMarshal([]any{"wrb.fr", "otAQ7b", string(b)})
+	u := &consumerWebTestUpstream{responses: []*http.Response{consumerWebResp(200, `"SNlM0e":"token" "cfb2h":"b" "FdrFJe":"s" "TuX5cc":"en"`), consumerWebResp(200, string(frame))}}
+	tx := NewConsumerWebHTTPTransport(ConsumerWebHTTPTransportOptions{HTTPUpstream: u, Encryptor: consumerWebTransportEncryptor{}, Endpoints: &consumerWebEndpointSet{app: appURL, otaq: otaqURL, rotate: rotateURL}})
+	acct := &Account{ID: 1, Platform: PlatformAntigravity, Type: AccountTypeOAuth}
+	creds := map[string]any{ConsumerWebCredentialNamespace: map[string]any{ConsumerWebPSIDCiphertextKey: "enc:psid", ConsumerWebPSIDTSCiphertextKey: "enc:psidts"}}
+	res, err := tx.Bootstrap(context.Background(), acct, creds, 1)
+	if err != nil || !res.Authenticated {
+		t.Fatalf("bootstrap err=%v result=%+v", err, res)
+	}
+	if len(u.requests) != 2 || u.requests[0].Method != http.MethodGet || u.requests[1].Method != http.MethodPost {
+		t.Fatalf("unexpected requests=%d", len(u.requests))
+	}
+}
+
+func consumerWebTestTransport(u *consumerWebTestUpstream) *ConsumerWebHTTPTransport {
+	return NewConsumerWebHTTPTransport(ConsumerWebHTTPTransportOptions{HTTPUpstream: u, Encryptor: consumerWebTransportEncryptor{}, Endpoints: &consumerWebEndpointSet{app: "http://app.test/app", otaq: "http://app.test/otaq", rotate: "http://accounts.test/rotate"}})
+}
+
+func consumerWebTestAccount() *Account {
+	return &Account{ID: 1, Platform: PlatformAntigravity, Type: AccountTypeOAuth}
+}
+func consumerWebTestCreds() map[string]any {
+	return map[string]any{ConsumerWebCredentialNamespace: map[string]any{ConsumerWebPSIDCiphertextKey: "enc:psid", ConsumerWebPSIDTSCiphertextKey: "enc:psidts"}}
+}
+
+func TestConsumerWebBootstrapMissingSNlM0eDoesNotCallOTAQ(t *testing.T) {
+	u := &consumerWebTestUpstream{responses: []*http.Response{consumerWebResp(200, `"qKIAYe":"p" "cfb2h":"b"`)}}
+	_, err := consumerWebTestTransport(u).Bootstrap(context.Background(), consumerWebTestAccount(), consumerWebTestCreds(), nil)
+	if !errors.Is(err, ErrConsumerWebAuthLost) || len(u.requests) != 1 {
+		t.Fatalf("missing auth token must stop before otaq")
+	}
+}
+
+func TestConsumerWebTransportCloseStopsRequests(t *testing.T) {
+	u := &consumerWebTestUpstream{responses: []*http.Response{consumerWebResp(200, "")}}
+	tx := consumerWebTestTransport(u)
+	h := &consumerWebHTTPHandle{jar: mustCookieJar(), endpoints: tx.endpoints}
+	if err := tx.Close(context.Background(), h); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.do(context.Background(), consumerWebTestAccount(), h, http.MethodGet, tx.endpoints.app, nil, ""); !errors.Is(err, ErrConsumerWebTransportClosed) || len(u.requests) != 0 {
+		t.Fatal("closed handle made request")
+	}
+}
+
+func TestConsumerWebHTTPErrorClassification(t *testing.T) {
+	for _, tc := range []struct {
+		code   int
+		target error
+	}{{401, ErrConsumerWebAuthLost}, {403, ErrConsumerWebAuthLost}, {429, ErrConsumerWebRateLimited}, {500, ErrConsumerWebTransportTransient}, {502, ErrConsumerWebTransportTransient}, {503, ErrConsumerWebTransportTransient}} {
+		if !errors.Is(mapConsumerWebStatus(tc.code), tc.target) {
+			t.Fatalf("status %d classification mismatch", tc.code)
+		}
+	}
+	if !errors.Is(mapConsumerWebStatus(200), ErrConsumerWebProtocolDrift) {
+		t.Fatal("unexpected 200 classification")
+	}
+}
+
+func TestConsumerWebRotateRequiresReplacementPSIDTS(t *testing.T) {
+	u := &consumerWebTestUpstream{responses: []*http.Response{consumerWebResp(200, "", &http.Cookie{Name: "__Secure-1PSIDTS", Value: "replacement"})}}
+	tx := consumerWebTestTransport(u)
+	h := &consumerWebHTTPHandle{jar: mustCookieJar(), endpoints: tx.endpoints}
+	res, err := tx.RotatePSIDTS(context.Background(), consumerWebTestAccount(), h)
+	if err != nil || res.PSIDTS != "replacement" {
+		t.Fatalf("rotation failed: %v", err)
+	}
+	if got := h.jar.Cookies(mustURL(tx.endpoints.app)); len(got) != 1 || got[0].Value != "replacement" {
+		t.Fatal("replacement not retained in session jar")
+	}
+	u.responses = []*http.Response{consumerWebResp(200, "", &http.Cookie{Name: "PSIDCC", Value: "only"})}
+	if _, err := tx.RotatePSIDTS(context.Background(), consumerWebTestAccount(), h); !errors.Is(err, ErrConsumerWebProtocolDrift) {
+		t.Fatal("PSIDCC-only rotation accepted")
+	}
+}
+
+func mustCookieJar() http.CookieJar { j, _ := cookiejar.New(nil); return j }
+
+func TestConsumerWebTransportUsesConfiguredProxy(t *testing.T) {
+	u := &consumerWebTestUpstream{responses: []*http.Response{consumerWebResp(200, `"SNlM0e":"token"`), consumerWebResp(200, func() string {
+		in := make([]any, 16)
+		in[14] = nil
+		b, _ := json.Marshal(in)
+		f, _ := json.Marshal([]any{"wrb.fr", "otAQ7b", string(b)})
+		return string(f)
+	}())}}
+	tx := consumerWebTestTransport(u)
+	proxy, _ := url.Parse("http://proxy.test:8080")
+	acct := consumerWebTestAccount()
+	acct.Proxy = &Proxy{Protocol: proxy.Scheme, Host: proxy.Hostname(), Port: 8080, Status: StatusActive}
+	if _, err := tx.Bootstrap(context.Background(), acct, consumerWebTestCreds(), nil); err != nil || len(u.requests) != 2 || u.proxies[0] == "" || u.proxies[1] == "" {
+		t.Fatalf("proxy transport failed: %v", err)
+	}
+}
+
+func TestConsumerWebTransportCookieIsolation(t *testing.T) {
+	makeUpstream := func(marker string) *consumerWebTestUpstream {
+		in := make([]any, 16)
+		in[14] = nil
+		b, _ := json.Marshal(in)
+		f, _ := json.Marshal([]any{"wrb.fr", "otAQ7b", string(b)})
+		return &consumerWebTestUpstream{responses: []*http.Response{consumerWebResp(200, `"SNlM0e":"token"`, &http.Cookie{Name: "runtime", Value: marker, Path: "/"}), consumerWebResp(200, string(f))}}
+	}
+	a, b := makeUpstream("A"), makeUpstream("B")
+	_, errA := consumerWebTestTransport(a).Bootstrap(context.Background(), consumerWebTestAccount(), consumerWebTestCreds(), nil)
+	_, errB := consumerWebTestTransport(b).Bootstrap(context.Background(), consumerWebTestAccount(), consumerWebTestCreds(), nil)
+	if errA != nil || errB != nil || len(a.requests) != 2 || len(b.requests) != 2 {
+		t.Fatal("isolated bootstrap failed")
+	}
+	if strings.Contains(a.requests[1].Header.Get("Cookie"), "B") || strings.Contains(b.requests[1].Header.Get("Cookie"), "A") {
+		t.Fatal("cross-session cookie leak")
+	}
+}
+
+func jsonMarshal(v any) ([]byte, error) { return json.Marshal(v) }

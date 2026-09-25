@@ -209,6 +209,7 @@ func ProvideAccountHandler(
 	tokenCacheInvalidator service.TokenCacheInvalidator,
 	grokQuotaService *service.GrokQuotaService,
 	consumerWebEncryptor service.SecretEncryptor,
+	consumerWebInvalidator service.ConsumerWebSessionInvalidator,
 ) *AccountHandler {
 	handler := NewAccountHandler(
 		adminService,
@@ -227,5 +228,6 @@ func ProvideAccountHandler(
 	)
 	handler.grokImportProber = grokQuotaService
 	handler.SetConsumerWebCredentialEncryptor(consumerWebEncryptor)
+	handler.SetConsumerWebSessionInvalidator(consumerWebInvalidator)
 	return handler
 }

@@ -53,6 +53,9 @@ type ConsumerWebSessionTransport interface {
 	RotatePSIDTS(context.Context, *Account, ConsumerWebSessionHandle) (ConsumerWebRotationResult, error)
 	Close(context.Context, ConsumerWebSessionHandle) error
 }
+type ConsumerWebSessionInvalidator interface {
+	InvalidateAccount(accountID int64)
+}
 type ConsumerWebSessionHandle interface{}
 type ConsumerWebBootstrapResult struct {
 	Authenticated                           bool

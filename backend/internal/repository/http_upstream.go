@@ -197,6 +197,14 @@ func NewHTTPUpstream(cfg *config.Config) service.HTTPUpstream {
 //   - 调用方必须关闭 resp.Body，否则会导致 inFlight 计数泄漏
 //   - inFlight > 0 的客户端不会被淘汰，确保活跃请求不被中断
 func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID int64, accountConcurrency int) (*http.Response, error) {
+	return s.doWithRedirectPolicy(req, proxyURL, accountID, accountConcurrency, nil)
+}
+
+func (s *httpUpstreamService) DoWithRedirectPolicy(req *http.Request, proxyURL string, accountID int64, accountConcurrency int, policy func(*http.Request, []*http.Request) error) (*http.Response, error) {
+	return s.doWithRedirectPolicy(req, proxyURL, accountID, accountConcurrency, policy)
+}
+
+func (s *httpUpstreamService) doWithRedirectPolicy(req *http.Request, proxyURL string, accountID int64, accountConcurrency int, policy func(*http.Request, []*http.Request) error) (*http.Response, error) {
 	applyGrokCLIProxyHeaders(req)
 	if err := s.validateRequestHost(req); err != nil {
 		return nil, err
@@ -218,6 +226,11 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 
 	// 执行请求
 	client := httpClientForUpstreamRequest(entry.client, req)
+	if policy != nil {
+		clientCopy := *client
+		clientCopy.CheckRedirect = policy
+		client = &clientCopy
+	}
 	client = httpClientWithGrokAccessDeniedFallback(client)
 	resp, err := servertiming.Do(client, req)
 	if err != nil {

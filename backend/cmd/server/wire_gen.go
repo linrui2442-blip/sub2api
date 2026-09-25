@@ -157,7 +157,11 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	usageCache := service.NewUsageCache()
 	accountUsageService := service.ProvideAccountUsageService(accountRepository, usageLogRepository, claudeUsageFetcher, geminiQuotaService, antigravityQuotaFetcher, grokQuotaFetcher, grokQuotaService, openAIQuotaService, usageCache, identityCache, tlsFingerprintProfileService, openAIGatewayService, oAuthRefreshAPI)
 	accountTestService := service.ProvideAccountTestService(accountRepository, geminiTokenProvider, claudeTokenProvider, grokTokenProvider, antigravityGatewayService, httpUpstream, configConfig, tlsFingerprintProfileService, openAIGatewayService, settingService)
-	accountHandler := admin.ProvideAccountHandler(adminService, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, grokOAuthService, rateLimitService, accountUsageService, accountTestService, concurrencyService, sessionLimitCache, rpmCache, compositeTokenCacheInvalidator, grokQuotaService, secretEncryptor)
+	consumerWebSessionTransport := service.ProvideConsumerWebSessionTransport(httpUpstream, secretEncryptor)
+	atomicAccountCredentialsRepository := service.ProvideAtomicAccountCredentialsRepository(accountRepository)
+	conditionalConsumerWebPSIDTSPersister := service.NewConditionalConsumerWebPSIDTSPersister(accountRepository, secretEncryptor)
+	consumerWebSessionManager := service.ProvideConsumerWebSessionManager(consumerWebSessionTransport, atomicAccountCredentialsRepository, conditionalConsumerWebPSIDTSPersister)
+	accountHandler := admin.ProvideAccountHandler(adminService, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, grokOAuthService, rateLimitService, accountUsageService, accountTestService, concurrencyService, sessionLimitCache, rpmCache, compositeTokenCacheInvalidator, grokQuotaService, secretEncryptor, consumerWebSessionManager)
 	oAuthHandler := admin.NewOAuthHandler(oAuthService)
 	openAIOAuthHandler := admin.NewOpenAIOAuthHandler(openAIOAuthService, adminService, openAIQuotaService, rateLimitService)
 	geminiOAuthHandler := admin.NewGeminiOAuthHandler(geminiOAuthService)
@@ -205,7 +209,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	tokenRefreshService := service.ProvideTokenRefreshService(accountRepository, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, grokOAuthService, compositeTokenCacheInvalidator, schedulerCache, configConfig, tempUnschedCache, privacyClientFactory, proxyRepository, oAuthRefreshAPI, openAIGatewayService)
 	gitHubReleaseClient := repository.ProvideGitHubReleaseClient(configConfig)
 	openAICodexVersionSyncService := service.ProvideOpenAICodexVersionSyncService(settingRepository, settingService, gitHubReleaseClient)
-	v := providePersonalCleanup(client, redisClient, apiKeyService, authCacheInvalidationWorker, opsService, opsSystemLogSink, schedulerSnapshotService, tokenRefreshService, usageRecordWorkerPool, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, openAIGatewayService, openAICodexVersionSyncService, auditLogService, promptService)
+	v := providePersonalCleanup(client, redisClient, apiKeyService, authCacheInvalidationWorker, opsService, opsSystemLogSink, schedulerSnapshotService, tokenRefreshService, usageRecordWorkerPool, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, openAIGatewayService, openAICodexVersionSyncService, auditLogService, promptService, consumerWebSessionManager)
 	application := &Application{
 		Server:      httpServer,
 		Handlers:    handlers,
@@ -251,10 +255,16 @@ func providePersonalCleanup(
 	codexVersionSync *service.OpenAICodexVersionSyncService,
 	auditLog *service.AuditLogService,
 	promptAudit *securityaudit.PromptService,
+	consumerWebSessions *service.ConsumerWebSessionManager,
 ) func() {
 	return func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+		if consumerWebSessions != nil {
+			if err := consumerWebSessions.Close(); err != nil {
+				log.Printf("[Personal Cleanup] ConsumerWebSessionManager failed: %v", err)
+			}
+		}
 
 		type cleanupStep struct {
 			name string

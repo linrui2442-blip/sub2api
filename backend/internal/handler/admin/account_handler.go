@@ -63,6 +63,7 @@ type AccountHandler struct {
 	grokImportProber        grokImportProber
 	ollamaCloudUsage        *service.OllamaCloudUsageService
 	consumerWebEncryptor    service.SecretEncryptor
+	consumerWebInvalidator  service.ConsumerWebSessionInvalidator
 }
 
 func (h *AccountHandler) SetOllamaCloudUsageService(usage *service.OllamaCloudUsageService) {
@@ -71,6 +72,10 @@ func (h *AccountHandler) SetOllamaCloudUsageService(usage *service.OllamaCloudUs
 
 func (h *AccountHandler) SetConsumerWebCredentialEncryptor(encryptor service.SecretEncryptor) {
 	h.consumerWebEncryptor = encryptor
+}
+
+func (h *AccountHandler) SetConsumerWebSessionInvalidator(invalidator service.ConsumerWebSessionInvalidator) {
+	h.consumerWebInvalidator = invalidator
 }
 
 // NewAccountHandler creates a new admin account handler
@@ -1434,6 +1439,9 @@ func (h *AccountHandler) UpdateConsumerWebCredentials(c *gin.Context) {
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
+	}
+	if h.consumerWebInvalidator != nil {
+		h.consumerWebInvalidator.InvalidateAccount(accountID)
 	}
 	statusAccount := updated
 	if statusAccount == nil || len(statusAccount.Credentials) == 0 {
