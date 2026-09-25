@@ -209,6 +209,11 @@ func (s *httpUpstreamService) doWithRedirectPolicy(req *http.Request, proxyURL s
 	diag := service.HTTPTransportDiagnosticFromContext(req.Context())
 	if diag != nil {
 		diag.ProxyConfigured = strings.TrimSpace(proxyURL) != ""
+		if diag.ProxyConfigured {
+			diag.ConnectionRole = "PROXY"
+		} else {
+			diag.ConnectionRole = "ORIGIN"
+		}
 		if trimmed, parsed, parseErr := proxyurl.Parse(proxyURL); parseErr == nil && trimmed != "" && parsed != nil {
 			diag.ProxyScheme = strings.ToLower(parsed.Scheme)
 			diag.ProxyAuthConfigured = parsed.User != nil

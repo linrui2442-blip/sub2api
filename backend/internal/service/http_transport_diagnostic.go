@@ -47,11 +47,27 @@ type HTTPTransportDiagnostic struct {
 	ProxyConfigured                                         bool
 	ProxyScheme                                             string
 	ProxyAuthConfigured                                     bool
+	ConnectionRole                                          string
 	DNSStarted, DNSCompleted                                bool
 	ConnectStarted, ConnectCompleted                        bool
 	TLSStarted, TLSCompleted                                bool
 	RequestWritten, FirstResponseByte, HTTPResponseReceived bool
 	Timeout, ContextCanceled, RedirectRejected              bool
+}
+
+// SafeTransportDiagnostic exposes only non-sensitive lifecycle metadata.
+func SafeTransportDiagnostic(d HTTPTransportDiagnostic) map[string]any {
+	return map[string]any{
+		"failure_stage": d.Stage, "failure_class": d.FailureClass,
+		"proxy_configured": d.ProxyConfigured, "proxy_scheme": d.ProxyScheme,
+		"proxy_auth_configured": d.ProxyAuthConfigured, "connection_role": d.ConnectionRole,
+		"dns_started": d.DNSStarted, "dns_completed": d.DNSCompleted,
+		"connect_started": d.ConnectStarted, "connect_completed": d.ConnectCompleted,
+		"tls_started": d.TLSStarted, "tls_completed": d.TLSCompleted,
+		"request_written": d.RequestWritten, "first_response_byte": d.FirstResponseByte,
+		"http_response_received": d.HTTPResponseReceived, "timeout": d.Timeout,
+		"context_canceled": d.ContextCanceled, "redirect_rejected": d.RedirectRejected,
+	}
 }
 
 type transportDiagnosticContextKey struct{}
@@ -132,11 +148,11 @@ func ClassifyHTTPTransportError(err error, d HTTPTransportDiagnostic) TransportD
 			return DiagnosticFailureTCPConnect
 		}
 	}
-	if d.ConnectStarted && !d.ConnectCompleted {
-		return DiagnosticFailureTCPConnect
-	}
 	if d.TLSStarted && !d.TLSCompleted {
 		return DiagnosticFailureTLSHandshake
+	}
+	if d.ConnectStarted && !d.ConnectCompleted {
+		return DiagnosticFailureTCPConnect
 	}
 	return DiagnosticFailureRoundTrip
 }

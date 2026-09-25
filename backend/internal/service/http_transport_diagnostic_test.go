@@ -29,6 +29,50 @@ func TestHTTPTransportDiagnosticClassificationIsTypedAndSafe(t *testing.T) {
 	_ = x509.UnknownAuthorityError{}
 }
 
+func TestHTTPTransportDiagnosticFailureMatrix(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		d    HTTPTransportDiagnostic
+		want TransportDiagnosticFailureClass
+	}{
+		{"dns", &net.DNSError{Err: "synthetic", IsTimeout: false}, HTTPTransportDiagnostic{}, DiagnosticFailureDNS},
+		{"cancel", context.Canceled, HTTPTransportDiagnostic{}, DiagnosticFailureContextCanceled},
+		{"timeout", context.DeadlineExceeded, HTTPTransportDiagnostic{}, DiagnosticFailureTimeout},
+		{"connect", &net.OpError{Op: "dial", Net: "tcp", Err: errors.New("closed")}, HTTPTransportDiagnostic{ConnectStarted: true}, DiagnosticFailureTCPConnect},
+		{"tls", errors.New("tls"), HTTPTransportDiagnostic{TLSStarted: true}, DiagnosticFailureTLSHandshake},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ClassifyHTTPTransportError(tt.err, tt.d); got != tt.want {
+				t.Fatalf("got %s want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSafeTransportDiagnosticFormatterRedactsSecrets(t *testing.T) {
+	d := HTTPTransportDiagnostic{Stage: DiagnosticStageConnect, FailureClass: DiagnosticFailureProxyConnect, ProxyConfigured: true, ProxyScheme: "http", ProxyAuthConfigured: true, ConnectionRole: "PROXY"}
+	b := SafeTransportDiagnostic(d)
+	if b["connection_role"] != "PROXY" || b["proxy_scheme"] != "http" {
+		t.Fatal("missing safe metadata")
+	}
+	for _, k := range []string{"url", "raw_url", "cookie", "token", "password", "username"} {
+		if _, ok := b[k]; ok {
+			t.Fatalf("unsafe key %s", k)
+		}
+	}
+}
+
+func TestDiagnosticStagePrecedence(t *testing.T) {
+	if got := ClassifyHTTPTransportError(errors.New("generic"), HTTPTransportDiagnostic{TLSStarted: true, TLSCompleted: false, ConnectStarted: true}); got != DiagnosticFailureTLSHandshake {
+		t.Fatalf("TLS precedence: %s", got)
+	}
+	if got := ClassifyHTTPTransportError(errors.New("generic"), HTTPTransportDiagnostic{RequestWritten: true}); got != DiagnosticFailureRoundTrip {
+		t.Fatalf("write fallback: %s", got)
+	}
+}
+
 func TestHTTPTransportDiagnosticContextIsRequestScoped(t *testing.T) {
 	a := &HTTPTransportDiagnostic{}
 	b := &HTTPTransportDiagnostic{}
