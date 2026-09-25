@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	"strings"
@@ -205,6 +206,25 @@ func (s *httpUpstreamService) DoWithRedirectPolicy(req *http.Request, proxyURL s
 }
 
 func (s *httpUpstreamService) doWithRedirectPolicy(req *http.Request, proxyURL string, accountID int64, accountConcurrency int, policy func(*http.Request, []*http.Request) error) (*http.Response, error) {
+	diag := service.HTTPTransportDiagnosticFromContext(req.Context())
+	if diag != nil {
+		diag.ProxyConfigured = strings.TrimSpace(proxyURL) != ""
+		if trimmed, parsed, parseErr := proxyurl.Parse(proxyURL); parseErr == nil && trimmed != "" && parsed != nil {
+			diag.ProxyScheme = strings.ToLower(parsed.Scheme)
+			diag.ProxyAuthConfigured = parsed.User != nil
+		}
+		trace := &httptrace.ClientTrace{
+			DNSStart:             func(httptrace.DNSStartInfo) { diag.DNSStarted = true },
+			DNSDone:              func(httptrace.DNSDoneInfo) { diag.DNSCompleted = true },
+			ConnectStart:         func(_, _ string) { diag.ConnectStarted = true },
+			ConnectDone:          func(_, _ string, err error) { diag.ConnectCompleted = err == nil },
+			TLSHandshakeStart:    func() { diag.TLSStarted = true },
+			TLSHandshakeDone:     func(_ tls.ConnectionState, err error) { diag.TLSCompleted = err == nil },
+			WroteRequest:         func(httptrace.WroteRequestInfo) { diag.RequestWritten = true },
+			GotFirstResponseByte: func() { diag.FirstResponseByte = true; diag.HTTPResponseReceived = true },
+		}
+		req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+	}
 	applyGrokCLIProxyHeaders(req)
 	if err := s.validateRequestHost(req); err != nil {
 		return nil, err
@@ -216,6 +236,25 @@ func (s *httpUpstreamService) doWithRedirectPolicy(req *http.Request, proxyURL s
 
 	proxyURL, err := resolveProviderUpstreamProxyURL(req, proxyURL)
 	if err != nil {
+		if diag != nil {
+			diag.FailureClass = service.ClassifyHTTPTransportError(err, *diag)
+			if errors.Is(err, context.DeadlineExceeded) {
+				diag.Timeout = true
+			}
+			if errors.Is(err, context.Canceled) {
+				diag.ContextCanceled = true
+			}
+			if diag.TLSStarted && !diag.TLSCompleted {
+				diag.Stage = service.DiagnosticStageTLSHandshake
+			} else if diag.ConnectStarted && !diag.ConnectCompleted {
+				diag.Stage = service.DiagnosticStageConnect
+			} else if diag.RequestWritten {
+				diag.Stage = service.DiagnosticStageWaitResponse
+			} else {
+				diag.Stage = service.DiagnosticStagePrepare
+			}
+			return nil, service.NewHTTPTransportDiagnosticError(*diag, err)
+		}
 		return nil, err
 	}
 	// 获取或创建对应的客户端，并标记请求占用
