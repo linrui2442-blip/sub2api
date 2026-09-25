@@ -242,22 +242,7 @@ func (s *httpUpstreamService) doWithRedirectPolicy(req *http.Request, proxyURL s
 	proxyURL, err := resolveProviderUpstreamProxyURL(req, proxyURL)
 	if err != nil {
 		if diag != nil {
-			diag.FailureClass = service.ClassifyHTTPTransportError(err, *diag)
-			if errors.Is(err, context.DeadlineExceeded) {
-				diag.Timeout = true
-			}
-			if errors.Is(err, context.Canceled) {
-				diag.ContextCanceled = true
-			}
-			if diag.TLSStarted && !diag.TLSCompleted {
-				diag.Stage = service.DiagnosticStageTLSHandshake
-			} else if diag.ConnectStarted && !diag.ConnectCompleted {
-				diag.Stage = service.DiagnosticStageConnect
-			} else if diag.RequestWritten {
-				diag.Stage = service.DiagnosticStageWaitResponse
-			} else {
-				diag.Stage = service.DiagnosticStagePrepare
-			}
+			service.FinalizeHTTPTransportDiagnostic(diag, err, false)
 			return nil, service.NewHTTPTransportDiagnosticError(*diag, err)
 		}
 		return nil, err
@@ -265,6 +250,10 @@ func (s *httpUpstreamService) doWithRedirectPolicy(req *http.Request, proxyURL s
 	// 获取或创建对应的客户端，并标记请求占用
 	entry, err := s.acquireClientWithProfile(proxyURL, accountID, accountConcurrency, profile)
 	if err != nil {
+		if diag != nil {
+			service.FinalizeHTTPTransportDiagnostic(diag, err, false)
+			return nil, service.NewHTTPTransportDiagnosticError(*diag, err)
+		}
 		return nil, err
 	}
 
@@ -272,7 +261,13 @@ func (s *httpUpstreamService) doWithRedirectPolicy(req *http.Request, proxyURL s
 	client := httpClientForUpstreamRequest(entry.client, req)
 	if policy != nil {
 		clientCopy := *client
-		clientCopy.CheckRedirect = policy
+		clientCopy.CheckRedirect = func(next *http.Request, via []*http.Request) error {
+			redirectErr := policy(next, via)
+			if redirectErr != nil && diag != nil {
+				diag.RedirectRejected = true
+			}
+			return redirectErr
+		}
 		client = &clientCopy
 	}
 	client = httpClientWithGrokAccessDeniedFallback(client)
@@ -282,9 +277,14 @@ func (s *httpUpstreamService) doWithRedirectPolicy(req *http.Request, proxyURL s
 		// 请求失败，立即减少计数
 		atomic.AddInt64(&entry.inFlight, -1)
 		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
+		if diag != nil {
+			service.FinalizeHTTPTransportDiagnostic(diag, err, false)
+			return nil, service.NewHTTPTransportDiagnosticError(*diag, err)
+		}
 		return nil, err
 	}
 	s.recordOpenAIHTTP2Success(profile, entry.protocolMode, entry.proxyKey)
+	service.FinalizeHTTPTransportDiagnostic(diag, nil, true)
 
 	// 如果上游返回了压缩内容，解压后再交给业务层
 	decompressResponseBody(resp)

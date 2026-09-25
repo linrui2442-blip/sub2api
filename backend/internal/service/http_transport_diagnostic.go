@@ -16,6 +16,7 @@ const (
 	DiagnosticStagePrepare          TransportDiagnosticStage = "PREPARE"
 	DiagnosticStageDNS              TransportDiagnosticStage = "DNS"
 	DiagnosticStageConnect          TransportDiagnosticStage = "CONNECT"
+	DiagnosticStageProxyNegotiation TransportDiagnosticStage = "PROXY_NEGOTIATION"
 	DiagnosticStageTLSHandshake     TransportDiagnosticStage = "TLS_HANDSHAKE"
 	DiagnosticStageRequestWrite     TransportDiagnosticStage = "REQUEST_WRITE"
 	DiagnosticStageWaitResponse     TransportDiagnosticStage = "WAIT_RESPONSE"
@@ -151,8 +152,47 @@ func ClassifyHTTPTransportError(err error, d HTTPTransportDiagnostic) TransportD
 	if d.TLSStarted && !d.TLSCompleted {
 		return DiagnosticFailureTLSHandshake
 	}
+	if d.ProxyConfigured && d.ConnectCompleted && !d.TLSStarted && !d.RequestWritten {
+		return DiagnosticFailureUnknown
+	}
 	if d.ConnectStarted && !d.ConnectCompleted {
+		if d.ProxyConfigured {
+			return DiagnosticFailureProxyConnect
+		}
 		return DiagnosticFailureTCPConnect
 	}
 	return DiagnosticFailureRoundTrip
+}
+
+func FinalizeHTTPTransportDiagnostic(d *HTTPTransportDiagnostic, err error, responseReceived bool) {
+	if d == nil {
+		return
+	}
+	if responseReceived {
+		d.HTTPResponseReceived = true
+		d.Stage = DiagnosticStageResponseReceived
+		d.FailureClass = ""
+		return
+	}
+	d.FailureClass = ClassifyHTTPTransportError(err, *d)
+	d.Timeout = errors.Is(err, context.DeadlineExceeded)
+	d.ContextCanceled = errors.Is(err, context.Canceled)
+	switch {
+	case d.RedirectRejected:
+		d.Stage, d.FailureClass = DiagnosticStageRedirectPolicy, DiagnosticFailureRedirectRejected
+	case d.FirstResponseByte:
+		d.Stage = DiagnosticStageResponseReceived
+	case d.TLSStarted && !d.TLSCompleted:
+		d.Stage = DiagnosticStageTLSHandshake
+	case d.ProxyConfigured && d.ConnectCompleted && !d.TLSStarted && !d.RequestWritten:
+		d.Stage = DiagnosticStageProxyNegotiation
+	case d.ConnectStarted && !d.ConnectCompleted:
+		d.Stage = DiagnosticStageConnect
+	case d.DNSStarted && !d.DNSCompleted:
+		d.Stage = DiagnosticStageDNS
+	case d.RequestWritten:
+		d.Stage = DiagnosticStageWaitResponse
+	default:
+		d.Stage = DiagnosticStagePrepare
+	}
 }

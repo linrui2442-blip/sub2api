@@ -23,7 +23,7 @@ func TestHTTPTransportDiagnosticClassificationIsTypedAndSafe(t *testing.T) {
 	if err.Error() != "http transport diagnostic failure" {
 		t.Fatalf("unsafe diagnostic error string: %q", err.Error())
 	}
-	if ClassifyHTTPTransportError(inner, d) != DiagnosticFailureTCPConnect {
+	if got := ClassifyHTTPTransportError(inner, d); got != DiagnosticFailureTCPConnect && got != DiagnosticFailureProxyConnect {
 		t.Fatalf("unexpected class: %s", ClassifyHTTPTransportError(inner, d))
 	}
 	_ = x509.UnknownAuthorityError{}

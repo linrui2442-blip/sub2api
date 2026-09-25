@@ -188,6 +188,8 @@ func (t *ConsumerWebHTTPTransport) do(ctx context.Context, account *Account, h *
 	if err != nil {
 		return nil, ErrConsumerWebProtocolDrift
 	}
+	diagnostic := &HTTPTransportDiagnostic{}
+	req = WithHTTPTransportDiagnostic(req, diagnostic)
 	req.Header.Set("User-Agent", "Mozilla/5.0")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml")
 	req.Header.Set("Referer", "https://gemini.google.com/")
@@ -209,7 +211,7 @@ func (t *ConsumerWebHTTPTransport) do(ctx context.Context, account *Account, h *
 		resp, err = t.upstream.Do(req, proxy, account.ID, account.Concurrency)
 	}
 	if err != nil {
-		if errors.Is(err, ErrConsumerWebRedirectRejected) {
+		if diagnostic.RedirectRejected || errors.Is(err, ErrConsumerWebRedirectRejected) {
 			return nil, ErrConsumerWebRedirectRejected
 		}
 		return nil, fmt.Errorf("%w: %w", ErrConsumerWebTransportTransient, err)
