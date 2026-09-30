@@ -271,6 +271,7 @@ func (s *httpUpstreamService) doWithRedirectPolicy(req *http.Request, proxyURL s
 		client = &clientCopy
 	}
 	client = httpClientWithGrokAccessDeniedFallback(client)
+	client = httpClientWithDispatchGuard(client, req)
 	resp, err := servertiming.Do(client, req)
 	if err != nil {
 		s.recordOpenAIHTTP2Failure(profile, entry.protocolMode, entry.proxyKey, err)
@@ -345,6 +346,7 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 
 	client := httpClientForUpstreamRequest(entry.client, req)
 	client = httpClientWithGrokAccessDeniedFallback(client)
+	client = httpClientWithDispatchGuard(client, req)
 	resp, err := servertiming.Do(client, req)
 	if err != nil {
 		atomic.AddInt64(&entry.inFlight, -1)

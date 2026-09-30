@@ -184,6 +184,16 @@ func (t *ConsumerWebHTTPTransport) do(ctx context.Context, account *Account, h *
 	}
 	reqCtx, cancel := context.WithTimeout(ctx, t.timeout)
 	defer cancel()
+	if guard, _ := HTTPUpstreamDispatchGuardFromContext(ctx); guard != nil {
+		switch raw {
+		case t.endpoints.app:
+			reqCtx = WithHTTPUpstreamDispatchRole(reqCtx, "APP")
+		case t.endpoints.otaq:
+			reqCtx = WithHTTPUpstreamDispatchRole(reqCtx, "OTAQ")
+		case t.endpoints.rotate:
+			reqCtx = WithHTTPUpstreamDispatchRole(reqCtx, "ROTATE")
+		}
+	}
 	req, err := http.NewRequestWithContext(reqCtx, method, raw, body)
 	if err != nil {
 		return nil, ErrConsumerWebProtocolDrift
