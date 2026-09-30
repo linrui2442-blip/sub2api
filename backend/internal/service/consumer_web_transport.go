@@ -93,7 +93,7 @@ func (t *ConsumerWebHTTPTransport) Bootstrap(ctx context.Context, account *Accou
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if err != nil {
-		return ConsumerWebBootstrapResult{}, ErrConsumerWebTransportTransient
+		return ConsumerWebBootstrapResult{}, fmt.Errorf("%w: %w", ErrConsumerWebTransportTransient, err)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return ConsumerWebBootstrapResult{}, mapConsumerWebStatus(resp.StatusCode)
@@ -135,7 +135,7 @@ func (t *ConsumerWebHTTPTransport) otAQ(ctx context.Context, account *Account, h
 	}
 	b, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if err != nil {
-		return ConsumerWebBootstrapResult{}, ErrConsumerWebTransportTransient
+		return ConsumerWebBootstrapResult{}, fmt.Errorf("%w: %w", ErrConsumerWebTransportTransient, err)
 	}
 	status, registry, err := parseConsumerWebOTAQ(string(b))
 	if err != nil {
@@ -183,7 +183,6 @@ func (t *ConsumerWebHTTPTransport) do(ctx context.Context, account *Account, h *
 		return nil, ErrConsumerWebTransportClosed
 	}
 	reqCtx, cancel := context.WithTimeout(ctx, t.timeout)
-	defer cancel()
 	if guard, _ := HTTPUpstreamDispatchGuardFromContext(ctx); guard != nil {
 		switch raw {
 		case t.endpoints.app:
@@ -196,6 +195,7 @@ func (t *ConsumerWebHTTPTransport) do(ctx context.Context, account *Account, h *
 	}
 	req, err := http.NewRequestWithContext(reqCtx, method, raw, body)
 	if err != nil {
+		cancel()
 		return nil, ErrConsumerWebProtocolDrift
 	}
 	diagnostic := &HTTPTransportDiagnostic{}
@@ -221,12 +221,39 @@ func (t *ConsumerWebHTTPTransport) do(ctx context.Context, account *Account, h *
 		resp, err = t.upstream.Do(req, proxy, account.ID, account.Concurrency)
 	}
 	if err != nil {
+		cancel()
 		if diagnostic.RedirectRejected || errors.Is(err, ErrConsumerWebRedirectRejected) {
 			return nil, ErrConsumerWebRedirectRejected
 		}
 		return nil, fmt.Errorf("%w: %w", ErrConsumerWebTransportTransient, err)
 	}
+	if resp == nil || resp.Body == nil {
+		cancel()
+		return nil, ErrConsumerWebTransportTransient
+	}
+	resp.Body = &consumerWebCancelOnBodyDone{ReadCloser: resp.Body, cancel: cancel}
 	return resp, nil
+}
+
+// The request context must outlive response headers: callers read the body after do returns.
+type consumerWebCancelOnBodyDone struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+	once   sync.Once
+}
+
+func (b *consumerWebCancelOnBodyDone) Read(p []byte) (int, error) {
+	n, err := b.ReadCloser.Read(p)
+	if err != nil {
+		b.once.Do(b.cancel)
+	}
+	return n, err
+}
+
+func (b *consumerWebCancelOnBodyDone) Close() error {
+	err := b.ReadCloser.Close()
+	b.once.Do(b.cancel)
+	return err
 }
 
 func (t *ConsumerWebHTTPTransport) redirectPolicy(next *http.Request, via []*http.Request) error {
