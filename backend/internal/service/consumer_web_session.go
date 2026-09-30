@@ -53,6 +53,9 @@ type ConsumerWebSessionTransport interface {
 	RotatePSIDTS(context.Context, *Account, ConsumerWebSessionHandle) (ConsumerWebRotationResult, error)
 	Close(context.Context, ConsumerWebSessionHandle) error
 }
+type consumerWebPreAuthRotator interface {
+	PreAuthRotatePSIDTS(context.Context, *Account, map[string]any) (ConsumerWebRotationResult, error)
+}
 type ConsumerWebSessionInvalidator interface {
 	InvalidateAccount(accountID int64)
 }
@@ -174,19 +177,48 @@ func (m *ConsumerWebSessionManager) AcquireSession(ctx context.Context, account 
 		m.fail(e, err)
 		return nil, err
 	}
-	result, err := m.transport.Bootstrap(ctx, account, snapshot.Credentials, snapshot.Revision)
+	bootstrapCtx, cancel := context.WithCancel(ctx)
+	stopClose := context.AfterFunc(m.root, cancel)
+	defer func() { stopClose(); cancel() }()
+	result, err := m.transport.Bootstrap(bootstrapCtx, account, snapshot.Credentials, snapshot.Revision)
+	if errors.Is(err, ErrConsumerWebAPPTokenMissing) && bootstrapCtx.Err() == nil {
+		if rotator, ok := m.transport.(consumerWebPreAuthRotator); ok {
+			rotation, rotateErr := rotator.PreAuthRotatePSIDTS(bootstrapCtx, account, snapshot.Credentials)
+			if rotateErr != nil {
+				err = rotateErr
+			} else if !rotation.Authenticated {
+				err = ErrConsumerWebAuthUnavailable
+			} else {
+				if rotation.PSIDTS != "" {
+					if m.persister == nil {
+						err = ErrConsumerWebPersistence
+					} else {
+						err = m.persister.PersistPSIDTS(bootstrapCtx, account.ID, snapshot.Revision, rotation.PSIDTS)
+					}
+				}
+				if err == nil || errors.Is(err, ErrConsumerWebAPPTokenMissing) {
+					snapshot, err = m.credentials.LoadCredentialSnapshot(bootstrapCtx, account.ID)
+					if err == nil && bootstrapCtx.Err() == nil {
+						result, err = m.transport.Bootstrap(withConsumerWebRecoveryRole(bootstrapCtx, "RETRY_APP"), account, snapshot.Credentials, snapshot.Revision)
+					}
+				}
+			}
+		}
+	}
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	if bootstrapCtx.Err() != nil || e.generation != startGen || e.state == ConsumerWebSessionClosed || e.state == ConsumerWebSessionEmpty {
+		if result.Session != nil {
+			_ = m.transport.Close(context.Background(), result.Session)
+		}
+		return nil, ErrConsumerWebAuthUnavailable
+	}
 	if err != nil {
 		e.state = ConsumerWebSessionDegraded
 		return nil, err
 	}
 	if !result.Authenticated || result.Session == nil {
 		e.state = ConsumerWebSessionUnauthenticated
-		return nil, ErrConsumerWebAuthUnavailable
-	}
-	if e.generation != startGen || e.state == ConsumerWebSessionEmpty {
-		_ = m.transport.Close(ctx, result.Session)
 		return nil, ErrConsumerWebAuthUnavailable
 	}
 	e.generation++
@@ -206,6 +238,9 @@ func (m *ConsumerWebSessionManager) acquireWait(ctx context.Context, e *consumer
 			return s, nil
 		}
 		if state == ConsumerWebSessionUnauthenticated {
+			return nil, ErrConsumerWebAuthUnavailable
+		}
+		if state == ConsumerWebSessionDegraded || state == ConsumerWebSessionClosed || state == ConsumerWebSessionEmpty {
 			return nil, ErrConsumerWebAuthUnavailable
 		}
 		select {

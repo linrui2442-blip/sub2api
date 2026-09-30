@@ -31,9 +31,15 @@ var (
 	ErrConsumerWebForbidden          = errors.New("consumer web forbidden")
 	ErrConsumerWebTransportClosed    = errors.New("consumer web transport closed")
 	ErrConsumerWebRedirectRejected   = errors.New("consumer web redirect rejected")
+	ErrConsumerWebAPPTokenMissing    = errors.New("consumer web app session token missing")
 )
 
 type consumerWebEndpointSet struct{ app, otaq, rotate string }
+type consumerWebRecoveryRoleKey struct{}
+
+func withConsumerWebRecoveryRole(ctx context.Context, role string) context.Context {
+	return context.WithValue(ctx, consumerWebRecoveryRoleKey{}, role)
+}
 
 // ConsumerWebEndpointSet is an internal test seam for local integration tests.
 // Production construction leaves it nil and uses the fixed Google endpoints.
@@ -83,9 +89,8 @@ func (t *ConsumerWebHTTPTransport) Bootstrap(ctx context.Context, account *Accou
 	if err != nil || psid == "" || psidts == "" {
 		return ConsumerWebBootstrapResult{}, ErrConsumerWebAuthLost
 	}
-	jar, _ := cookiejar.New(nil)
-	h := &consumerWebHTTPHandle{jar: jar, endpoints: t.endpoints, language: "en"}
-	jar.SetCookies(mustURL(t.endpoints.app), []*http.Cookie{{Name: "__Secure-1PSID", Value: psid, Domain: "gemini.google.com", Path: "/", Secure: true}, {Name: "__Secure-1PSIDTS", Value: psidts, Domain: "gemini.google.com", Path: "/", Secure: true}})
+	h := t.newCredentialHandle(psid, psidts)
+	jar := h.jar
 	resp, err := t.do(ctx, account, h, http.MethodGet, t.endpoints.app, nil, "text/html,application/xhtml+xml")
 	if err != nil {
 		return ConsumerWebBootstrapResult{}, err
@@ -104,7 +109,7 @@ func (t *ConsumerWebHTTPTransport) Bootstrap(ctx context.Context, account *Accou
 	runtime := parseConsumerWebRuntime(string(body))
 	h.snlm, h.build, h.sid, h.language = runtime.AuthToken, runtime.BuildLabel, runtime.SessionID, runtime.Language
 	if h.snlm == "" {
-		return ConsumerWebBootstrapResult{}, ErrConsumerWebAuthLost
+		return ConsumerWebBootstrapResult{}, ErrConsumerWebAPPTokenMissing
 	}
 	q, err := t.otAQ(ctx, account, h)
 	if err != nil {
@@ -149,25 +154,76 @@ func (t *ConsumerWebHTTPTransport) RotatePSIDTS(ctx context.Context, account *Ac
 	if !ok || h.closed.Load() {
 		return ConsumerWebRotationResult{}, ErrConsumerWebTransportClosed
 	}
-	resp, err := t.do(ctx, account, h, http.MethodPost, h.endpoints.rotate, strings.NewReader(`[000,"-0000000000000000000"]`), "application/json")
+	psidts, err := t.rotate(ctx, account, h)
 	if err != nil {
 		return ConsumerWebRotationResult{}, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return ConsumerWebRotationResult{}, mapConsumerWebStatus(resp.StatusCode)
-	}
-	var psidts string
-	for _, c := range resp.Cookies() {
-		if c.Name == "__Secure-1PSIDTS" && c.Value != "" {
-			psidts = c.Value
-			h.jar.SetCookies(mustURL(h.endpoints.app), []*http.Cookie{c})
-		}
 	}
 	if psidts == "" {
 		return ConsumerWebRotationResult{}, ErrConsumerWebProtocolDrift
 	}
 	return ConsumerWebRotationResult{Authenticated: true, PSIDTS: psidts, Session: h}, nil
+}
+
+// PreAuthRotatePSIDTS uses only the durable cookie pair; it does not publish an
+// authenticated session. The Manager owns conditional persistence and retry.
+func (t *ConsumerWebHTTPTransport) PreAuthRotatePSIDTS(ctx context.Context, account *Account, credentials map[string]any) (ConsumerWebRotationResult, error) {
+	if account == nil || t.upstream == nil {
+		return ConsumerWebRotationResult{}, ErrConsumerWebTransportTransient
+	}
+	psid, psidts, err := DecryptConsumerWebCredentials(t.encryptor, credentials)
+	if err != nil || psid == "" {
+		return ConsumerWebRotationResult{}, ErrConsumerWebAuthLost
+	}
+	h := t.newCredentialHandle(psid, psidts)
+	rotateCookies := []*http.Cookie{{Name: "__Secure-1PSID", Value: psid}}
+	if psidts != "" {
+		rotateCookies = append(rotateCookies, &http.Cookie{Name: "__Secure-1PSIDTS", Value: psidts})
+	}
+	setConsumerWebCredentialCookies(h.jar, t.endpoints.rotate, rotateCookies)
+	replacement, err := t.rotate(withConsumerWebRecoveryRole(ctx, "PREAUTH_ROTATE"), account, h)
+	if err != nil {
+		return ConsumerWebRotationResult{}, err
+	}
+	return ConsumerWebRotationResult{Authenticated: true, PSIDTS: replacement}, nil
+}
+
+func (t *ConsumerWebHTTPTransport) newCredentialHandle(psid, psidts string) *consumerWebHTTPHandle {
+	jar, _ := cookiejar.New(nil)
+	h := &consumerWebHTTPHandle{jar: jar, endpoints: t.endpoints, language: "en"}
+	cookies := []*http.Cookie{{Name: "__Secure-1PSID", Value: psid, Path: "/"}}
+	if psidts != "" {
+		cookies = append(cookies, &http.Cookie{Name: "__Secure-1PSIDTS", Value: psidts, Path: "/"})
+	}
+	setConsumerWebCredentialCookies(jar, t.endpoints.app, cookies)
+	return h
+}
+
+func setConsumerWebCredentialCookies(jar http.CookieJar, rawURL string, cookies []*http.Cookie) {
+	u := mustURL(rawURL)
+	for _, cookie := range cookies {
+		jar.SetCookies(u, []*http.Cookie{{Name: cookie.Name, Value: cookie.Value, Path: "/", Secure: u.Scheme == "https"}})
+	}
+}
+
+// rotate is the single RotateCookies wire implementation for both lifecycle paths.
+func (t *ConsumerWebHTTPTransport) rotate(ctx context.Context, account *Account, h *consumerWebHTTPHandle) (string, error) {
+	resp, err := t.do(ctx, account, h, http.MethodPost, h.endpoints.rotate, strings.NewReader(`[000,"-0000000000000000000"]`), "application/json")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", mapConsumerWebStatus(resp.StatusCode)
+	}
+	var psidts string
+	for _, c := range resp.Cookies() {
+		if c.Name == "__Secure-1PSIDTS" && c.Value != "" {
+			psidts = c.Value
+			replacement := []*http.Cookie{{Name: c.Name, Value: c.Value}}
+			setConsumerWebCredentialCookies(h.jar, h.endpoints.app, replacement)
+		}
+	}
+	return psidts, nil
 }
 
 func (t *ConsumerWebHTTPTransport) Close(_ context.Context, session ConsumerWebSessionHandle) error {
@@ -184,13 +240,22 @@ func (t *ConsumerWebHTTPTransport) do(ctx context.Context, account *Account, h *
 	}
 	reqCtx, cancel := context.WithTimeout(ctx, t.timeout)
 	if guard, _ := HTTPUpstreamDispatchGuardFromContext(ctx); guard != nil {
+		role, _ := ctx.Value(consumerWebRecoveryRoleKey{}).(string)
 		switch raw {
 		case t.endpoints.app:
-			reqCtx = WithHTTPUpstreamDispatchRole(reqCtx, "APP")
+			if role == "RETRY_APP" {
+				reqCtx = WithHTTPUpstreamDispatchRole(reqCtx, role)
+			} else {
+				reqCtx = WithHTTPUpstreamDispatchRole(reqCtx, "APP")
+			}
 		case t.endpoints.otaq:
 			reqCtx = WithHTTPUpstreamDispatchRole(reqCtx, "OTAQ")
 		case t.endpoints.rotate:
-			reqCtx = WithHTTPUpstreamDispatchRole(reqCtx, "ROTATE")
+			if role == "PREAUTH_ROTATE" {
+				reqCtx = WithHTTPUpstreamDispatchRole(reqCtx, role)
+			} else {
+				reqCtx = WithHTTPUpstreamDispatchRole(reqCtx, "ROTATE")
+			}
 		}
 	}
 	req, err := http.NewRequestWithContext(reqCtx, method, raw, body)

@@ -202,7 +202,7 @@ func consumerWebTestCreds() map[string]any {
 func TestConsumerWebBootstrapMissingSNlM0eDoesNotCallOTAQ(t *testing.T) {
 	u := &consumerWebTestUpstream{responses: []*http.Response{consumerWebResp(200, `"qKIAYe":"p" "cfb2h":"b"`)}}
 	_, err := consumerWebTestTransport(u).Bootstrap(context.Background(), consumerWebTestAccount(), consumerWebTestCreds(), nil)
-	if !errors.Is(err, ErrConsumerWebAuthLost) || len(u.requests) != 1 {
+	if !errors.Is(err, ErrConsumerWebAPPTokenMissing) || len(u.requests) != 1 {
 		t.Fatalf("missing auth token must stop before otaq")
 	}
 }
@@ -247,6 +247,80 @@ func TestConsumerWebRotateRequiresReplacementPSIDTS(t *testing.T) {
 	u.responses = []*http.Response{consumerWebResp(200, "", &http.Cookie{Name: "PSIDCC", Value: "only"})}
 	if _, err := tx.RotatePSIDTS(context.Background(), consumerWebTestAccount(), h); !errors.Is(err, ErrConsumerWebProtocolDrift) {
 		t.Fatal("PSIDCC-only rotation accepted")
+	}
+}
+
+func TestConsumerWebPreAuthRotateUsesDurableCookiesAndAccountProxy(t *testing.T) {
+	u := &consumerWebTestUpstream{responses: []*http.Response{consumerWebResp(200, "")}}
+	tx := consumerWebTestTransport(u)
+	acct := consumerWebTestAccount()
+	acct.Proxy = &Proxy{Protocol: "http", Host: "proxy.test", Port: 8080, Status: StatusActive}
+	result, err := tx.PreAuthRotatePSIDTS(context.Background(), acct, consumerWebTestCreds())
+	if err != nil || !result.Authenticated || result.PSIDTS != "" || len(u.requests) != 1 {
+		t.Fatalf("preauth no-replacement rotation: %v", err)
+	}
+	if u.requests[0].URL.String() != tx.endpoints.rotate || u.requests[0].Method != http.MethodPost || u.proxies[0] != acct.Proxy.URL() {
+		t.Fatal("preauth rotation changed endpoint, method, or account proxy")
+	}
+	for _, name := range []string{"__Secure-1PSID", "__Secure-1PSIDTS"} {
+		if _, err := u.requests[0].Cookie(name); err != nil {
+			t.Fatalf("durable cookie %s absent from Rotate request", name)
+		}
+	}
+}
+
+func TestConsumerWebPreAuthRotateCrossAccountIsolation(t *testing.T) {
+	u := &consumerWebTestUpstream{responses: []*http.Response{consumerWebResp(200, ""), consumerWebResp(200, "")}}
+	tx := consumerWebTestTransport(u)
+	a := consumerWebTestAccount()
+	a.ID = 1
+	a.Proxy = &Proxy{Protocol: "http", Host: "proxy-a.test", Port: 8080, Status: StatusActive}
+	b := consumerWebTestAccount()
+	b.ID = 2
+	b.Proxy = &Proxy{Protocol: "http", Host: "proxy-b.test", Port: 8080, Status: StatusActive}
+	ac := map[string]any{ConsumerWebCredentialNamespace: map[string]any{ConsumerWebPSIDCiphertextKey: "enc:account-a", ConsumerWebPSIDTSCiphertextKey: "enc:ts-a"}}
+	bc := map[string]any{ConsumerWebCredentialNamespace: map[string]any{ConsumerWebPSIDCiphertextKey: "enc:account-b", ConsumerWebPSIDTSCiphertextKey: "enc:ts-b"}}
+	if _, err := tx.PreAuthRotatePSIDTS(context.Background(), a, ac); err != nil {
+		t.Fatal("first rotation failed")
+	}
+	if _, err := tx.PreAuthRotatePSIDTS(context.Background(), b, bc); err != nil {
+		t.Fatal("second rotation failed")
+	}
+	if len(u.requests) != 2 || u.proxies[0] != a.Proxy.URL() || u.proxies[1] != b.Proxy.URL() || u.proxies[0] == u.proxies[1] {
+		t.Fatal("proxy affinity/isolation failed")
+	}
+	ca, ea := u.requests[0].Cookie("__Secure-1PSID")
+	cb, eb := u.requests[1].Cookie("__Secure-1PSID")
+	if ea != nil || eb != nil || ca.Value != "account-a" || cb.Value != "account-b" {
+		t.Fatal("cookie isolation failed")
+	}
+}
+
+func TestConsumerWebOTAQFailuresDoNotTriggerAPPRecovery(t *testing.T) {
+	for _, tc := range []struct{ name, body string }{
+		{"drift", ")]}'\n[\"wrb.fr\",\"otAQ7b\",\"not-json\"]\n"},
+		{"unauthenticated", consumerWebFullEnvelopeBody(float64(1016))},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			u := &consumerWebTestUpstream{responses: []*http.Response{consumerWebResp(200, `"SNlM0e":"fixture-token"`), consumerWebResp(200, tc.body)}}
+			_, err := consumerWebTestTransport(u).Bootstrap(context.Background(), consumerWebTestAccount(), consumerWebTestCreds(), nil)
+			if err == nil || errors.Is(err, ErrConsumerWebAPPTokenMissing) || len(u.requests) != 2 {
+				t.Fatal("otAQ failure was misclassified as APP token missing")
+			}
+		})
+	}
+}
+
+func TestConsumerWebPreAuthRecoveryErrorDoesNotExposeCookies(t *testing.T) {
+	u := &consumerWebTestUpstream{responses: []*http.Response{consumerWebResp(403, "")}}
+	tx := consumerWebTestTransport(u)
+	creds := map[string]any{ConsumerWebCredentialNamespace: map[string]any{
+		ConsumerWebPSIDCiphertextKey:   "enc:synthetic-private-psid-marker",
+		ConsumerWebPSIDTSCiphertextKey: "enc:synthetic-private-psidts-marker",
+	}}
+	_, err := tx.PreAuthRotatePSIDTS(context.Background(), consumerWebTestAccount(), creds)
+	if err == nil || strings.Contains(err.Error(), "synthetic-private") || strings.Contains(err.Error(), "Cookie") {
+		t.Fatal("secret-bearing recovery error")
 	}
 }
 
