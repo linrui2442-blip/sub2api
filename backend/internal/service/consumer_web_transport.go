@@ -325,51 +325,70 @@ func parseConsumerWebOTAQ(body string) (int, []ConsumerWebModel, error) {
 		if !strings.HasPrefix(line, "[") {
 			continue
 		}
-		var frame []any
+		var root []any
 		if _, err := strconv.Atoi(line); err == nil {
 			continue
 		}
-		if json.Unmarshal([]byte(line), &frame) != nil || len(frame) < 3 || frame[0] != "wrb.fr" || frame[1] != "otAQ7b" {
+		if json.Unmarshal([]byte(line), &root) != nil {
 			continue
 		}
-		payload, ok := frame[2].(string)
-		if !ok || payload == "" {
-			return 0, nil, ErrConsumerWebProtocolDrift
-		}
-		var inner []any
-		if json.Unmarshal([]byte(payload), &inner) != nil {
-			return 0, nil, ErrConsumerWebProtocolDrift
-		}
-		if len(inner) <= 14 {
-			return 0, nil, ErrConsumerWebProtocolDrift
-		}
-		switch v := inner[14].(type) {
-		case nil:
-			// Primary reference uses nil at [14] for an available session.
-			status = 1000
-		case float64:
-			status = int(v)
-			if status != 1000 && status != 1016 {
-				return 0, nil, ErrConsumerWebProtocolDrift
-			}
-		default:
-			return 0, nil, ErrConsumerWebProtocolDrift
-		}
-		if len(inner) > 15 {
-			if arr, ok := inner[15].([]any); ok {
-				for _, v := range arr {
-					if m, ok := v.(map[string]any); ok {
-						id, _ := m["id"].(string)
-						display, _ := m["display"].(string)
-						tier, _ := m["tier"].(string)
-						if id != "" {
-							registry = append(registry, ConsumerWebModel{ID: id, Display: display, Tier: tier})
-						}
+		var frames [][]any
+		if len(root) > 0 {
+			if kind, ok := root[0].(string); ok && kind == "wrb.fr" {
+				// Historical direct-frame responses remain supported.
+				frames = append(frames, root)
+			} else {
+				// Batchexecute line root contains immediate child frames.
+				for _, item := range root {
+					if frame, ok := item.([]any); ok {
+						frames = append(frames, frame)
 					}
 				}
 			}
 		}
-		return status, registry, nil
+		for _, frame := range frames {
+			if len(frame) < 3 || frame[0] != "wrb.fr" || frame[1] != "otAQ7b" {
+				continue
+			}
+			payload, ok := frame[2].(string)
+			if !ok || payload == "" {
+				return 0, nil, ErrConsumerWebProtocolDrift
+			}
+			var inner []any
+			if json.Unmarshal([]byte(payload), &inner) != nil {
+				return 0, nil, ErrConsumerWebProtocolDrift
+			}
+			if len(inner) <= 14 {
+				return 0, nil, ErrConsumerWebProtocolDrift
+			}
+			switch v := inner[14].(type) {
+			case nil:
+				// Primary reference uses nil at [14] for an available session.
+				status = 1000
+			case float64:
+				status = int(v)
+				if status != 1000 && status != 1016 {
+					return 0, nil, ErrConsumerWebProtocolDrift
+				}
+			default:
+				return 0, nil, ErrConsumerWebProtocolDrift
+			}
+			if len(inner) > 15 {
+				if arr, ok := inner[15].([]any); ok {
+					for _, v := range arr {
+						if m, ok := v.(map[string]any); ok {
+							id, _ := m["id"].(string)
+							display, _ := m["display"].(string)
+							tier, _ := m["tier"].(string)
+							if id != "" {
+								registry = append(registry, ConsumerWebModel{ID: id, Display: display, Tier: tier})
+							}
+						}
+					}
+				}
+			}
+			return status, registry, nil
+		}
 	}
 	return 0, nil, ErrConsumerWebProtocolDrift
 }

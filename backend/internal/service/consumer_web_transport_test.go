@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -101,6 +102,68 @@ func TestConsumerWebOTAQMultiframeAndMalformedNoise(t *testing.T) {
 	status, _, err := parseConsumerWebOTAQ(body)
 	if err != nil || status != 1000 {
 		t.Fatalf("status=%d err=%v", status, err)
+	}
+}
+
+func consumerWebFullEnvelopeBody(status any, extraFrames ...[]any) string {
+	inner := make([]any, 16)
+	inner[14] = status
+	inner[15] = []any{map[string]any{"id": "synthetic-model", "display": "Synthetic", "tier": "pro"}}
+	payload, _ := json.Marshal(inner)
+	frames := append(extraFrames, []any{"wrb.fr", "otAQ7b", string(payload), nil, nil, nil, "generic"})
+	outer, _ := json.Marshal(frames)
+	return ")]}'\n" + strconv.Itoa(len(outer)) + "\n" + string(outer) + "\n"
+}
+
+func TestConsumerWebOTAQFullEnvelope(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		value any
+		want  int
+	}{
+		{"available_null", nil, 1000},
+		{"available_numeric", float64(1000), 1000},
+		{"unauthenticated", float64(1016), 1016},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, registry, err := parseConsumerWebOTAQ(consumerWebFullEnvelopeBody(tc.value))
+			if err != nil || got != tc.want || len(registry) != 1 {
+				t.Fatal("full-envelope normalization failed")
+			}
+		})
+	}
+	got, _, err := parseConsumerWebOTAQ(consumerWebFullEnvelopeBody(nil, []any{"wrb.fr", "other", "[]"}, []any{"di", 123}))
+	if err != nil || got != 1000 {
+		t.Fatal("matching frame after unrelated frames was not selected")
+	}
+	got, _, err = parseConsumerWebOTAQ("noise\n[malformed\n" + consumerWebFullEnvelopeBody(nil))
+	if err != nil || got != 1000 {
+		t.Fatal("malformed unrelated line was not ignored")
+	}
+	for _, body := range []string{
+		")]}'\n[[\"wrb.fr\",\"otAQ7b\"]]",
+		")]}'\n[[\"wrb.fr\",\"otAQ7b\",{}]]",
+		")]}'\n[[\"other\",\"otAQ7b\",\"[]\"]]",
+		")]}'\n[[\"wrb.fr\",\"wrong\",\"[]\"]]",
+		")]}'\n[[[\"wrb.fr\",\"otAQ7b\",\"[]\"]]]",
+	} {
+		if _, _, err := parseConsumerWebOTAQ(body); !errors.Is(err, ErrConsumerWebProtocolDrift) {
+			t.Fatal("malformed or unsupported envelope must fail closed")
+		}
+	}
+}
+
+func TestConsumerWebOTAQA3GSafeShapeReconstruction(t *testing.T) {
+	inner := make([]any, 16)
+	inner[14] = nil
+	payload, _ := json.Marshal(inner)
+	line1, _ := json.Marshal([]any{[]any{"wrb.fr", "otAQ7b", string(payload), nil, nil, nil, "generic"}})
+	line2, _ := json.Marshal([]any{[]any{"di", 1}, []any{"af.httprm", 1, "synthetic", 0}})
+	line3, _ := json.Marshal([]any{[]any{"e", 4, nil, nil, 0}})
+	body := ")]}'\n" + strconv.Itoa(len(line1)) + "\n" + string(line1) + "\n" + strconv.Itoa(len(line2)) + "\n" + string(line2) + "\n" + strconv.Itoa(len(line3)) + "\n" + string(line3)
+	status, _, err := parseConsumerWebOTAQ(body)
+	if err != nil || status != 1000 {
+		t.Fatal("A3G safe-shape synthetic envelope was not normalized")
 	}
 }
 
