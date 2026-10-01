@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
+	"github.com/stretchr/testify/require"
 )
 
 type consumerWebTransportEncryptor struct{}
@@ -97,6 +98,26 @@ func TestConsumerWebTransportProductionEndpointsAndOTAQParser(t *testing.T) {
 	if err != nil || status != 1000 || len(registry) != 1 || registry[0].ID != "m" {
 		t.Fatalf("parser: status=%d registry=%v err=%v", status, registry, err)
 	}
+}
+
+func TestConsumerWebOTAQPositionalAuthenticatedRegistry(t *testing.T) {
+	entry := make([]any, 20)
+	entry[0] = "current-pro-selector"
+	entry[1] = "Pro"
+	entry[4] = 2
+	entry[11] = "3.1 Pro"
+	inner := make([]any, 16)
+	inner[14] = nil
+	inner[15] = []any{entry}
+	payload, _ := json.Marshal(inner)
+	frame, _ := json.Marshal([]any{"wrb.fr", "otAQ7b", string(payload)})
+	status, registry, err := parseConsumerWebOTAQ(")]}'\n" + string(frame) + "\n")
+	require.NoError(t, err)
+	require.Equal(t, 1000, status)
+	require.Equal(t, []ConsumerWebModel{{ID: "current-pro-selector", Display: "3.1 Pro", Tier: "2"}}, registry)
+	selected, err := resolveConsumerWebVideoModel(registry)
+	require.NoError(t, err)
+	require.Equal(t, "current-pro-selector", selected)
 }
 
 func TestConsumerWebOTAQStatusNormalizationAndProtocolDrift(t *testing.T) {

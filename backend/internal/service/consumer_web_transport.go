@@ -501,13 +501,8 @@ func parseConsumerWebOTAQ(body string) (int, []ConsumerWebModel, error) {
 			if len(inner) > 15 {
 				if arr, ok := inner[15].([]any); ok {
 					for _, v := range arr {
-						if m, ok := v.(map[string]any); ok {
-							id, _ := m["id"].(string)
-							display, _ := m["display"].(string)
-							tier, _ := m["tier"].(string)
-							if id != "" {
-								registry = append(registry, ConsumerWebModel{ID: id, Display: display, Tier: tier})
-							}
+						if model, ok := consumerWebRegistryModel(v); ok {
+							registry = append(registry, model)
 						}
 					}
 				}
@@ -516,4 +511,39 @@ func parseConsumerWebOTAQ(body string) (int, []ConsumerWebModel, error) {
 		}
 	}
 	return 0, nil, ErrConsumerWebProtocolDrift
+}
+
+func consumerWebRegistryModel(value any) (ConsumerWebModel, bool) {
+	if entry, ok := value.([]any); ok {
+		// Authenticated otAQ entries use positional metadata: ID [0],
+		// primary name [1], tier [4], and display name [11].
+		if len(entry) <= 11 {
+			return ConsumerWebModel{}, false
+		}
+		id, _ := entry[0].(string)
+		display, _ := entry[11].(string)
+		if display == "" {
+			display, _ = entry[1].(string)
+		}
+		if id == "" || display == "" {
+			return ConsumerWebModel{}, false
+		}
+		tier := ""
+		switch typed := entry[4].(type) {
+		case string:
+			tier = typed
+		case float64:
+			tier = strconv.FormatFloat(typed, 'f', -1, 64)
+		}
+		return ConsumerWebModel{ID: id, Display: display, Tier: tier}, true
+	}
+	if entry, ok := value.(map[string]any); ok {
+		id, _ := entry["id"].(string)
+		display, _ := entry["display"].(string)
+		tier, _ := entry["tier"].(string)
+		if id != "" && display != "" {
+			return ConsumerWebModel{ID: id, Display: display, Tier: tier}, true
+		}
+	}
+	return ConsumerWebModel{}, false
 }
