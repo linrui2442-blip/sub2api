@@ -323,7 +323,16 @@ func personalUnifiedRouterMiddleware(
 ) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		apiKey, ok := middleware.GetAPIKeyFromContext(c)
-		if !ok || apiKey == nil || apiKey.GroupID != nil || c.Request == nil || c.Request.Method == http.MethodGet {
+		if !ok || apiKey == nil || apiKey.GroupID != nil || c.Request == nil {
+			c.Next()
+			return
+		}
+		if c.Request.Method == http.MethodGet {
+			// Video status and content have no request model to resolve. Their
+			// provider was fixed and account-bound when the task was created.
+			if endpointPlatform == "" && strings.HasPrefix(c.Request.URL.Path, "/v1/videos/") {
+				middleware.SetForcePlatform(c, service.PlatformAntigravity)
+			}
 			c.Next()
 			return
 		}

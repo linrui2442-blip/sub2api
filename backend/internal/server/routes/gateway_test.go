@@ -110,6 +110,30 @@ func TestPersonalUnifiedKeyRoutesAcrossProvidersWhilePinnedKeyCannotOverrideGrou
 
 func ptrInt64(v int64) *int64 { return &v }
 
+func TestPersonalUnifiedVideoGETRetainsProviderForUngroupedKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, tt := range []struct {
+		path, wantPlatform string
+	}{
+		{path: "/v1/videos/video_test", wantPlatform: service.PlatformAntigravity},
+		{path: "/v1/videos/video_test/content", wantPlatform: service.PlatformAntigravity},
+		{path: "/v1/usage", wantPlatform: ""},
+	} {
+		router := gin.New()
+		router.GET(tt.path, func(c *gin.Context) {
+			c.Set(string(servermiddleware.ContextKeyAPIKey), &service.APIKey{})
+			c.Next()
+		}, personalUnifiedRouterMiddleware("", nil, openAICompatibleRoutingErrorWriter), func(c *gin.Context) {
+			platform, _ := servermiddleware.GetForcePlatformFromContext(c)
+			require.Equal(t, tt.wantPlatform, platform)
+			c.Status(http.StatusOK)
+		})
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tt.path, nil))
+		require.Equal(t, http.StatusOK, rec.Code)
+	}
+}
+
 func buildMultipartModelBody(t *testing.T, model string) ([]byte, string) {
 	t.Helper()
 	var body bytes.Buffer
