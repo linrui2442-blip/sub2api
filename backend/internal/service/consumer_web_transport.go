@@ -18,9 +18,11 @@ import (
 )
 
 const (
-	consumerWebAppURL    = "https://gemini.google.com/app"
-	consumerWebOTAQURL   = "https://gemini.google.com/_/BardChatUi/data/batchexecute"
-	consumerWebRotateURL = "https://accounts.google.com/RotateCookies"
+	consumerWebGooglePreflightURL = "https://www.google.com/"
+	consumerWebGeminiPrimeURL     = "https://gemini.google.com/?hl=en"
+	consumerWebAppURL             = "https://gemini.google.com/app"
+	consumerWebOTAQURL            = "https://gemini.google.com/_/BardChatUi/data/batchexecute"
+	consumerWebRotateURL          = "https://accounts.google.com/RotateCookies"
 )
 
 var (
@@ -34,7 +36,7 @@ var (
 	ErrConsumerWebAPPTokenMissing    = errors.New("consumer web app session token missing")
 )
 
-type consumerWebEndpointSet struct{ app, otaq, rotate string }
+type consumerWebEndpointSet struct{ googlePreflight, geminiPrime, app, otaq, rotate string }
 type consumerWebRecoveryRoleKey struct{}
 
 func withConsumerWebRecoveryRole(ctx context.Context, role string) context.Context {
@@ -43,7 +45,7 @@ func withConsumerWebRecoveryRole(ctx context.Context, role string) context.Conte
 
 // ConsumerWebEndpointSet is an internal test seam for local integration tests.
 // Production construction leaves it nil and uses the fixed Google endpoints.
-type ConsumerWebEndpointSet struct{ App, OTAQ, Rotate string }
+type ConsumerWebEndpointSet struct{ GooglePreflight, GeminiPrime, App, OTAQ, Rotate string }
 type consumerWebHTTPHandle struct {
 	jar                        http.CookieJar
 	endpoints                  consumerWebEndpointSet
@@ -69,11 +71,11 @@ type ConsumerWebHTTPTransport struct {
 }
 
 func NewConsumerWebHTTPTransport(o ConsumerWebHTTPTransportOptions) *ConsumerWebHTTPTransport {
-	e := consumerWebEndpointSet{app: consumerWebAppURL, otaq: consumerWebOTAQURL, rotate: consumerWebRotateURL}
+	e := consumerWebEndpointSet{googlePreflight: consumerWebGooglePreflightURL, geminiPrime: consumerWebGeminiPrimeURL, app: consumerWebAppURL, otaq: consumerWebOTAQURL, rotate: consumerWebRotateURL}
 	if o.Endpoints != nil {
 		e = *o.Endpoints
 	} else if o.TestEndpoints != nil {
-		e = consumerWebEndpointSet{app: o.TestEndpoints.App, otaq: o.TestEndpoints.OTAQ, rotate: o.TestEndpoints.Rotate}
+		e = consumerWebEndpointSet{googlePreflight: o.TestEndpoints.GooglePreflight, geminiPrime: o.TestEndpoints.GeminiPrime, app: o.TestEndpoints.App, otaq: o.TestEndpoints.OTAQ, rotate: o.TestEndpoints.Rotate}
 	}
 	if o.Timeout <= 0 {
 		o.Timeout = 30 * time.Second
@@ -91,7 +93,25 @@ func (t *ConsumerWebHTTPTransport) Bootstrap(ctx context.Context, account *Accou
 	}
 	h := t.newCredentialHandle(psid, psidts)
 	jar := h.jar
-	resp, err := t.do(ctx, account, h, http.MethodGet, t.endpoints.app, nil, "text/html,application/xhtml+xml")
+	// Both navigation steps are bounded, best-effort cookie priming. The
+	// durable authenticated pair always wins over response auxiliary cookies.
+	for _, endpoint := range []string{t.endpoints.googlePreflight, t.endpoints.geminiPrime} {
+		if endpoint == "" { // Older local endpoint fixtures intentionally omit navigation.
+			continue
+		}
+		prime, primeErr := t.do(ctx, account, h, http.MethodGet, endpoint, nil, "")
+		if primeErr != nil {
+			if ctx.Err() != nil {
+				return ConsumerWebBootstrapResult{}, primeErr
+			}
+			continue
+		}
+		if prime.StatusCode == http.StatusOK {
+			mergeConsumerWebAuxiliaryCookies(jar, endpoint, prime.Cookies())
+		}
+		_ = prime.Body.Close()
+	}
+	resp, err := t.do(ctx, account, h, http.MethodGet, t.endpoints.app, nil, "")
 	if err != nil {
 		return ConsumerWebBootstrapResult{}, err
 	}
@@ -103,9 +123,7 @@ func (t *ConsumerWebHTTPTransport) Bootstrap(ctx context.Context, account *Accou
 	if resp.StatusCode != http.StatusOK {
 		return ConsumerWebBootstrapResult{}, mapConsumerWebStatus(resp.StatusCode)
 	}
-	for _, c := range resp.Cookies() {
-		jar.SetCookies(mustURL(t.endpoints.app), []*http.Cookie{c})
-	}
+	mergeConsumerWebAuxiliaryCookies(jar, t.endpoints.app, resp.Cookies())
 	runtime := parseConsumerWebRuntime(string(body))
 	h.snlm, h.build, h.sid, h.language = runtime.AuthToken, runtime.BuildLabel, runtime.SessionID, runtime.Language
 	if h.snlm == "" {
@@ -195,7 +213,23 @@ func (t *ConsumerWebHTTPTransport) newCredentialHandle(psid, psidts string) *con
 		cookies = append(cookies, &http.Cookie{Name: "__Secure-1PSIDTS", Value: psidts, Path: "/"})
 	}
 	setConsumerWebCredentialCookies(jar, t.endpoints.app, cookies)
+	if t.endpoints.googlePreflight != "" {
+		setConsumerWebCredentialCookies(jar, t.endpoints.googlePreflight, cookies)
+	}
+	if t.endpoints.geminiPrime != "" {
+		setConsumerWebCredentialCookies(jar, t.endpoints.geminiPrime, cookies)
+	}
 	return h
+}
+
+func mergeConsumerWebAuxiliaryCookies(jar http.CookieJar, rawURL string, cookies []*http.Cookie) {
+	u := mustURL(rawURL)
+	for _, cookie := range cookies {
+		if cookie.Name == "__Secure-1PSID" || cookie.Name == "__Secure-1PSIDTS" {
+			continue
+		}
+		jar.SetCookies(u, []*http.Cookie{cookie})
+	}
 }
 
 func setConsumerWebCredentialCookies(jar http.CookieJar, rawURL string, cookies []*http.Cookie) {
@@ -242,6 +276,18 @@ func (t *ConsumerWebHTTPTransport) do(ctx context.Context, account *Account, h *
 	if guard, _ := HTTPUpstreamDispatchGuardFromContext(ctx); guard != nil {
 		role, _ := ctx.Value(consumerWebRecoveryRoleKey{}).(string)
 		switch raw {
+		case t.endpoints.googlePreflight:
+			if role == "RETRY_APP" {
+				reqCtx = WithHTTPUpstreamDispatchRole(reqCtx, "RETRY_GOOGLE_PREFLIGHT")
+			} else {
+				reqCtx = WithHTTPUpstreamDispatchRole(reqCtx, "GOOGLE_PREFLIGHT")
+			}
+		case t.endpoints.geminiPrime:
+			if role == "RETRY_APP" {
+				reqCtx = WithHTTPUpstreamDispatchRole(reqCtx, "RETRY_GEMINI_PRIME")
+			} else {
+				reqCtx = WithHTTPUpstreamDispatchRole(reqCtx, "GEMINI_PRIME")
+			}
 		case t.endpoints.app:
 			if role == "RETRY_APP" {
 				reqCtx = WithHTTPUpstreamDispatchRole(reqCtx, role)
@@ -267,7 +313,21 @@ func (t *ConsumerWebHTTPTransport) do(ctx context.Context, account *Account, h *
 	req = WithHTTPTransportDiagnostic(req, diagnostic)
 	req.Header.Set("User-Agent", "Mozilla/5.0")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml")
-	req.Header.Set("Referer", "https://gemini.google.com/")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
+	if method == http.MethodGet {
+		req.Header.Set("Cache-Control", "no-cache")
+		req.Header.Set("Sec-Fetch-Dest", "document")
+		req.Header.Set("Sec-Fetch-Mode", "navigate")
+		req.Header.Set("Sec-Fetch-Site", "none")
+		req.Header.Set("Sec-Fetch-User", "?1")
+		req.Header.Set("Upgrade-Insecure-Requests", "1")
+	} else if raw == t.endpoints.otaq {
+		req.Header.Set("Origin", "https://gemini.google.com")
+		req.Header.Set("X-Same-Domain", "1")
+	}
+	if raw != t.endpoints.googlePreflight {
+		req.Header.Set("Referer", "https://gemini.google.com/")
+	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}
@@ -326,7 +386,7 @@ func (t *ConsumerWebHTTPTransport) redirectPolicy(next *http.Request, via []*htt
 		return ErrConsumerWebRedirectRejected
 	}
 	host := strings.ToLower(next.URL.Hostname())
-	if !strings.EqualFold(next.URL.Scheme, "https") || (host != "gemini.google.com" && host != "accounts.google.com") {
+	if !strings.EqualFold(next.URL.Scheme, "https") || (host != "gemini.google.com" && host != "accounts.google.com" && host != "www.google.com" && host != "google.com") {
 		return ErrConsumerWebRedirectRejected
 	}
 	if len(via) > 0 {
