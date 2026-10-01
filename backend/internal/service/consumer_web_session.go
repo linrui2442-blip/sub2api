@@ -170,12 +170,12 @@ func (m *ConsumerWebSessionManager) AcquireSession(ctx context.Context, account 
 		e.mu.Lock()
 		e.state = ConsumerWebSessionDegraded
 		e.mu.Unlock()
-		return nil, ErrConsumerWebAuthUnavailable
+		return nil, &ConsumerWebAcquireError{Cause: ConsumerWebAcquireSessionInitFailed, Err: ErrConsumerWebAuthUnavailable}
 	}
 	snapshot, err := m.credentials.LoadCredentialSnapshot(ctx, account.ID)
 	if err != nil {
 		m.fail(e, err)
-		return nil, err
+		return nil, wrapConsumerWebAcquireError(err)
 	}
 	bootstrapCtx, cancel := context.WithCancel(ctx)
 	stopClose := context.AfterFunc(m.root, cancel)
@@ -215,7 +215,7 @@ func (m *ConsumerWebSessionManager) AcquireSession(ctx context.Context, account 
 	}
 	if err != nil {
 		e.state = ConsumerWebSessionDegraded
-		return nil, err
+		return nil, wrapConsumerWebAcquireError(err)
 	}
 	if !result.Authenticated || result.Session == nil {
 		e.state = ConsumerWebSessionUnauthenticated

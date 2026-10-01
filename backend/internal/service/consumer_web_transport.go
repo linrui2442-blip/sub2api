@@ -85,11 +85,18 @@ func NewConsumerWebHTTPTransport(o ConsumerWebHTTPTransportOptions) *ConsumerWeb
 
 func (t *ConsumerWebHTTPTransport) Bootstrap(ctx context.Context, account *Account, credentials map[string]any, _ any) (ConsumerWebBootstrapResult, error) {
 	if account == nil || t.upstream == nil {
-		return ConsumerWebBootstrapResult{}, ErrConsumerWebTransportTransient
+		return ConsumerWebBootstrapResult{}, &ConsumerWebAcquireError{Cause: ConsumerWebAcquireSessionInitFailed, Err: ErrConsumerWebTransportTransient}
+	}
+	status := ConsumerWebCredentialsStatus(credentials)
+	if !status.HasSecure1PSID || !status.HasSecure1PSIDTS {
+		return ConsumerWebBootstrapResult{}, &ConsumerWebAcquireError{Cause: ConsumerWebAcquireCredentialNamespaceMissing, Err: ErrConsumerWebAuthLost}
 	}
 	psid, psidts, err := DecryptConsumerWebCredentials(t.encryptor, credentials)
-	if err != nil || psid == "" || psidts == "" {
-		return ConsumerWebBootstrapResult{}, ErrConsumerWebAuthLost
+	if err != nil {
+		return ConsumerWebBootstrapResult{}, &ConsumerWebAcquireError{Cause: ConsumerWebAcquireCredentialDecryptFailed, Err: ErrConsumerWebAuthLost}
+	}
+	if psid == "" || psidts == "" {
+		return ConsumerWebBootstrapResult{}, &ConsumerWebAcquireError{Cause: ConsumerWebAcquireAccountNotReady, Err: ErrConsumerWebAuthLost}
 	}
 	h := t.newCredentialHandle(psid, psidts)
 	jar := h.jar

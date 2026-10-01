@@ -18,12 +18,14 @@ const (
 )
 
 type ConsumerWebVideoTaskSnapshot struct {
-	ID        string                    `json:"id"`
-	Status    ConsumerWebVideoTaskState `json:"status"`
-	Model     string                    `json:"model"`
-	AccountID int64                     `json:"-"`
-	MIME      string                    `json:"mime_type,omitempty"`
-	Error     string                    `json:"error,omitempty"`
+	ID                  string                    `json:"id"`
+	Status              ConsumerWebVideoTaskState `json:"status"`
+	Model               string                    `json:"model"`
+	AccountID           int64                     `json:"-"`
+	MIME                string                    `json:"mime_type,omitempty"`
+	Error               string                    `json:"error,omitempty"`
+	AcquireSessionCause ConsumerWebAcquireCause   `json:"-"`
+	AcquireSessionError error                     `json:"-"`
 }
 
 type consumerWebVideoTask struct {
@@ -117,6 +119,10 @@ func (s *ConsumerWebVideoTaskService) run(task *consumerWebVideoTask, prompt str
 	defer cancel()
 	session, err := s.manager.AcquireSession(ctx, task.account)
 	if err != nil {
+		task.mu.Lock()
+		task.snapshot.AcquireSessionCause = consumerWebAcquireCause(err)
+		task.snapshot.AcquireSessionError = wrapConsumerWebAcquireError(err)
+		task.mu.Unlock()
 		s.fail(task, "AUTH_REQUIRED")
 		return
 	}
