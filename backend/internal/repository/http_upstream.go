@@ -219,12 +219,14 @@ func (s *httpUpstreamService) doWithRedirectPolicy(req *http.Request, proxyURL s
 			diag.ProxyAuthConfigured = parsed.User != nil
 		}
 		trace := &httptrace.ClientTrace{
-			DNSStart:             func(httptrace.DNSStartInfo) { diag.DNSStarted = true },
-			DNSDone:              func(httptrace.DNSDoneInfo) { diag.DNSCompleted = true },
-			ConnectStart:         func(_, _ string) { diag.ConnectStarted = true },
-			ConnectDone:          func(_, _ string, err error) { diag.ConnectCompleted = err == nil },
-			TLSHandshakeStart:    func() { diag.TLSStarted = true },
-			TLSHandshakeDone:     func(_ tls.ConnectionState, err error) { diag.TLSCompleted = err == nil },
+			DNSStart:          func(httptrace.DNSStartInfo) { diag.DNSStarted = true },
+			DNSDone:           func(httptrace.DNSDoneInfo) { diag.DNSCompleted = true },
+			ConnectStart:      func(_, _ string) { diag.ConnectStarted = true },
+			ConnectDone:       func(_, _ string, err error) { diag.ConnectCompleted = err == nil },
+			TLSHandshakeStart: func() { diag.TLSStarted = true },
+			TLSHandshakeDone: func(_ tls.ConnectionState, err error) {
+				service.RecordTLSHandshakeDiagnostic(diag, err)
+			},
 			WroteRequest:         func(httptrace.WroteRequestInfo) { diag.RequestWritten = true },
 			GotFirstResponseByte: func() { diag.FirstResponseByte = true; diag.HTTPResponseReceived = true },
 		}

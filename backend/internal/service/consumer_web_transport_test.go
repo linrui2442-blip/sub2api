@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -11,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 )
@@ -26,6 +28,41 @@ type consumerWebTestUpstream struct {
 	responses []*http.Response
 	requests  []*http.Request
 	proxies   []string
+}
+
+type consumerWebTLSFailureUpstream struct{ err error }
+
+func (u consumerWebTLSFailureUpstream) Do(*http.Request, string, int64, int) (*http.Response, error) {
+	return nil, u.err
+}
+func (u consumerWebTLSFailureUpstream) DoWithTLS(r *http.Request, p string, id int64, c int, _ *tlsfingerprint.Profile) (*http.Response, error) {
+	return u.Do(r, p, id, c)
+}
+
+func TestConsumerWebTLSCauseSurvivesManagerWrapping(t *testing.T) {
+	const secret = "synthetic-cookie-and-proxy-marker"
+	root := fmt.Errorf("%s: %w", secret, io.EOF)
+	d := HTTPTransportDiagnostic{TLSStarted: true, TLSCompleted: false, TLSCauseCode: ClassifyTLSCause(root)}
+	FinalizeHTTPTransportDiagnostic(&d, root, false)
+	upstream := consumerWebTLSFailureUpstream{err: NewHTTPTransportDiagnosticError(d, root)}
+	tr := NewConsumerWebHTTPTransport(ConsumerWebHTTPTransportOptions{
+		HTTPUpstream: upstream, Encryptor: consumerWebTransportEncryptor{},
+		Endpoints: &consumerWebEndpointSet{app: "http://local.invalid/app", otaq: "http://local.invalid/otaq", rotate: "http://local.invalid/rotate"},
+	})
+	creds := &sessionFakeCredentials{values: map[string]any{ConsumerWebCredentialNamespace: map[string]any{
+		ConsumerWebPSIDCiphertextKey: "enc:synthetic-psid", ConsumerWebPSIDTSCiphertextKey: "enc:synthetic-psidts",
+	}}}
+	m := NewConsumerWebSessionManager(ConsumerWebSessionManagerOptions{Transport: tr, Credentials: creds, RefreshInterval: time.Hour})
+	defer m.Close()
+	_, err := m.AcquireSession(context.Background(), testSessionAccount(9753))
+	var carrier *TLSCauseDiagnosticError
+	var diagnostic *HTTPTransportDiagnosticError
+	if err == nil || !errors.As(err, &carrier) || carrier.Code != TLSCauseEOF || !errors.As(err, &diagnostic) {
+		t.Fatal("safe TLS cause did not survive Consumer Web and manager wrapping")
+	}
+	if strings.Contains(err.Error(), secret) || strings.Contains(fmt.Sprint(errors.Unwrap(err)), secret) {
+		t.Fatal("raw error leaked through manager wrapping")
+	}
 }
 
 func (u *consumerWebTestUpstream) Do(r *http.Request, proxy string, _ int64, _ int) (*http.Response, error) {

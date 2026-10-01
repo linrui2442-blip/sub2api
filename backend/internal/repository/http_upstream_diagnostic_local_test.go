@@ -80,6 +80,10 @@ func TestLocalProxyAuthDiagnostic(t *testing.T) {
 	if d.Stage != service.DiagnosticStageProxyNegotiation || d.ConnectionRole != "PROXY" || !d.ProxyAuthConfigured || originHits.Load() != 0 {
 		t.Fatalf("unexpected 407 diagnostic: %+v; hits=%d", d, originHits.Load())
 	}
+	var proxyCause *service.TLSCauseDiagnosticError
+	if errors.As(err, &proxyCause) {
+		t.Fatal("CONNECT failure was incorrectly classified as TLS failure")
+	}
 	for _, value := range []string{err.Error(), fmt.Sprintf("%v", err), fmt.Sprintf("%+v", err), fmt.Sprint(service.SafeTransportDiagnostic(d)), fmt.Sprint(errors.Unwrap(err))} {
 		if strings.Contains(value, "proxy-user-secret") || strings.Contains(value, "proxy-password-secret") || strings.Contains(value, "Proxy-Authorization") {
 			t.Fatal("proxy credential leak")
@@ -95,6 +99,14 @@ func TestLocalTLSTrustDiagnostic(t *testing.T) {
 	d := diagnosticError(t, err)
 	if !d.TLSStarted || d.TLSCompleted || d.HTTPResponseReceived || d.Stage != service.DiagnosticStageTLSHandshake || d.FailureClass != service.DiagnosticFailureTLSTrust {
 		t.Fatalf("unexpected TLS diagnostic: %+v", d)
+	}
+	var cause *service.TLSCauseDiagnosticError
+	if !errors.As(err, &cause) || cause.Code != service.TLSCauseX509UnknownAuthority {
+		t.Fatal("typed TLS cause missing after real local RoundTrip")
+	}
+	var rawCert x509.UnknownAuthorityError
+	if errors.As(err, &rawCert) {
+		t.Fatal("raw certificate cause escaped diagnostic boundary")
 	}
 	var certErr x509.UnknownAuthorityError
 	_ = certErr

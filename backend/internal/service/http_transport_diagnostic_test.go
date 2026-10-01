@@ -2,11 +2,17 @@ package service
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"runtime"
+	"strings"
 	"sync"
+	"syscall"
 	"testing"
 )
 
@@ -91,4 +97,96 @@ func TestHTTPTransportDiagnosticContextIsRequestScoped(t *testing.T) {
 		t.Fatal("request diagnostics not independently writable")
 	}
 	_ = context.Background()
+}
+
+func TestTLSCauseCodeTypedFixtures(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want TLSCauseCode
+	}{
+		{"context_deadline", context.DeadlineExceeded, TLSCauseContextDeadline},
+		{"context_canceled", context.Canceled, TLSCauseContextCanceled},
+		{"net_timeout", &net.DNSError{Err: "synthetic", IsTimeout: true}, TLSCauseTimeout},
+		{"eof", io.EOF, TLSCauseEOF},
+		{"unexpected_eof", io.ErrUnexpectedEOF, TLSCauseUnexpectedEOF},
+		{"x509_unknown_authority", x509.UnknownAuthorityError{}, TLSCauseX509UnknownAuthority},
+		{"x509_hostname", x509.HostnameError{}, TLSCauseX509Hostname},
+		{"x509_cert_invalid", x509.CertificateInvalidError{}, TLSCauseX509CertInvalid},
+		{"protocol", &tls.RecordHeaderError{}, TLSCauseProtocol},
+		{"handshake_alert", tls.AlertError(40), TLSCauseHandshakeAlert},
+		{"unknown", errors.New("opaque synthetic error"), TLSCauseUnknown},
+	}
+	if runtime.GOOS == "windows" {
+		cases = append(cases,
+			struct {
+				name string
+				err  error
+				want TLSCauseCode
+			}{"connection_reset", &net.OpError{Op: "read", Err: syscall.Errno(10054)}, TLSCauseConnectionReset},
+			struct {
+				name string
+				err  error
+				want TLSCauseCode
+			}{"connection_aborted", &net.OpError{Op: "read", Err: syscall.Errno(10053)}, TLSCauseConnectionAborted},
+		)
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ClassifyTLSCause(fmt.Errorf("wrapped: %w", tc.err)); got != tc.want {
+				t.Fatalf("got %s want %s", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTLSCauseCodeSafeCarrierAndContextCompatibility(t *testing.T) {
+	marker := "synthetic-proxy-secret-marker"
+	root := fmt.Errorf("%s: %w", marker, syscall.Errno(10054))
+	d := HTTPTransportDiagnostic{TLSStarted: true, TLSCauseCode: ClassifyTLSCause(root)}
+	err := fmt.Errorf("consumer web transport transient failure: %w", NewHTTPTransportDiagnosticError(d, root))
+	var carrier *TLSCauseDiagnosticError
+	want := TLSCauseUnknown
+	if runtime.GOOS == "windows" {
+		want = TLSCauseConnectionReset
+	}
+	if !errors.As(err, &carrier) || carrier.Code != want {
+		t.Fatal("bounded cause did not survive wrapping")
+	}
+	var errno syscall.Errno
+	if errors.As(err, &errno) {
+		t.Fatal("raw syscall cause escaped diagnostic boundary")
+	}
+	for _, safe := range []string{err.Error(), fmt.Sprint(errors.Unwrap(err)), carrier.Error(), fmt.Sprint(SafeTransportDiagnostic(d))} {
+		if strings.Contains(safe, marker) {
+			t.Fatal("raw error leaked")
+		}
+	}
+	deadline := NewHTTPTransportDiagnosticError(HTTPTransportDiagnostic{TLSStarted: true, TLSCauseCode: TLSCauseContextDeadline}, fmt.Errorf("%s: %w", marker, context.DeadlineExceeded))
+	if !errors.Is(deadline, context.DeadlineExceeded) || !errors.As(deadline, &carrier) || carrier.Code != TLSCauseContextDeadline {
+		t.Fatal("context compatibility or carrier lost")
+	}
+	if strings.Contains(deadline.Error(), marker) {
+		t.Fatal("raw deadline error leaked")
+	}
+	malicious := NewHTTPTransportDiagnosticError(HTTPTransportDiagnostic{TLSStarted: true, TLSCauseCode: TLSCauseCode(marker)}, root)
+	if !errors.As(malicious, &carrier) || carrier.Code != TLSCauseUnknown {
+		t.Fatal("unbounded code was not normalized")
+	}
+}
+
+func TestRecordTLSHandshakeDiagnosticKeepsOnlyBoundedCode(t *testing.T) {
+	marker := "synthetic-private-endpoint-and-cookie"
+	d := &HTTPTransportDiagnostic{TLSStarted: true}
+	RecordTLSHandshakeDiagnostic(d, fmt.Errorf("%s: %w", marker, io.ErrUnexpectedEOF))
+	if d.TLSCompleted || d.TLSCauseCode != TLSCauseUnexpectedEOF {
+		t.Fatal("callback cause not captured")
+	}
+	if strings.Contains(fmt.Sprint(SafeTransportDiagnostic(*d)), marker) {
+		t.Fatal("callback leaked raw error")
+	}
+	RecordTLSHandshakeDiagnostic(d, nil)
+	if !d.TLSCompleted {
+		t.Fatal("successful callback not preserved")
+	}
 }
