@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -62,15 +63,15 @@ func (h *GatewayHandler) CreateConsumerWebVideo(c *gin.Context) {
 		consumerWebVideoError(c, http.StatusServiceUnavailable, "No available video account")
 		return
 	}
-	account := selection.Account
-	if account.Platform != service.PlatformAntigravity || account.GetMappedModel(request.Model) == "" {
-		if selection.ReleaseFunc != nil {
-			selection.ReleaseFunc()
-		}
-		consumerWebVideoError(c, http.StatusBadRequest, "Selected account cannot serve video model")
-		return
+	groupID := key.GroupID
+	if groupID != nil {
+		id := *groupID
+		groupID = &id
 	}
-	task, err := h.consumerWebVideoTasks.Start(key.ID, account, request.Model, request.Prompt, image, selection.ReleaseFunc)
+	selectNext := func(ctx context.Context, excluded map[int64]struct{}) (*service.AccountSelectionResult, error) {
+		return h.gatewayService.SelectAccountWithLoadAwareness(ctx, groupID, sessionHash, request.Model, excluded, "", 0)
+	}
+	task, err := h.consumerWebVideoTasks.StartWithSelector(key.ID, selection, selectNext, request.Model, request.Prompt, image)
 	if err != nil {
 		consumerWebVideoError(c, http.StatusServiceUnavailable, "Video task unavailable")
 		return

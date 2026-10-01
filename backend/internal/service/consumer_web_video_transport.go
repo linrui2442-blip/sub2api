@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
@@ -30,6 +31,13 @@ type ConsumerWebVideoUpload struct {
 }
 
 type consumerWebUploadedFile struct{ ID, Name string }
+
+// ConsumerWebVideoUploadError marks a failure before StreamGenerate. It does
+// not imply the provider accepted a video task or established a conversation.
+type ConsumerWebVideoUploadError struct{ Err error }
+
+func (e *ConsumerWebVideoUploadError) Error() string { return "consumer web video upload failed" }
+func (e *ConsumerWebVideoUploadError) Unwrap() error { return e.Err }
 
 func consumerWebVideoRequestID() string {
 	var data [16]byte
@@ -188,9 +196,10 @@ func (t *ConsumerWebHTTPTransport) GenerateVideo(ctx context.Context, account *A
 	var uploaded *consumerWebUploadedFile
 	var err error
 	if image != nil {
+		slog.Info("consumer_web_video_upload_attempt", "account_id", account.ID)
 		uploaded, err = t.uploadVideoInput(ctx, account, h, *image)
 		if err != nil {
-			return nil, err
+			return nil, &ConsumerWebVideoUploadError{Err: err}
 		}
 	}
 	requestID := consumerWebVideoRequestID()
@@ -218,11 +227,13 @@ func (t *ConsumerWebHTTPTransport) GenerateVideo(ctx context.Context, account *A
 	// Source-aligned request metadata is injected by the request-scoped helper;
 	// no account identity or credential is placed in the metadata header.
 	generateRaw := consumerWebGenerateURL + "?" + q.Encode()
+	slog.Info("consumer_web_video_streamgenerate_attempt", "account_id", account.ID)
 	resp, err := t.videoGenerateRequest(ctx, account, h, generateRaw, form.Encode(), requestID, uploaded != nil)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
+	slog.Info("consumer_web_video_streamgenerate_response", "account_id", account.ID, "status", resp.StatusCode)
 	if resp.StatusCode != http.StatusOK {
 		return nil, mapConsumerWebStatus(resp.StatusCode)
 	}
