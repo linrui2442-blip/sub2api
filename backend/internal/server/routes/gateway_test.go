@@ -341,12 +341,19 @@ func TestPersonalGatewayNonCoreMediaAndSearchSurfaceIsAbsent(t *testing.T) {
 	routes := registeredGatewayRoutes(newGatewayRoutesTestRouter(service.PlatformGrok))
 	for _, route := range []string{
 		"POST /v1/images/generations/async",
-		"GET /v1/images/tasks/:task_id", "POST /v1/videos", "POST /v1/videos/generations",
-		"GET /v1/videos/:request_id", "POST /v1/audio/speech", "POST /v1/audio/transcriptions",
+		"GET /v1/images/tasks/:task_id", "POST /v1/videos/generations",
+		"POST /v1/audio/speech", "POST /v1/audio/transcriptions",
 		"POST /v1/tts", "POST /v1/stt", "POST /v1/custom-voices", "POST /v1/search",
 		"POST /v1/x_search", "POST /v1/alpha/search", "POST /v1/live",
 	} {
 		require.False(t, routes[route], "%s must not be exposed by Personal Edition", route)
+	}
+}
+
+func TestPersonalConsumerWebVideoTaskSurface(t *testing.T) {
+	routes := registeredGatewayRoutes(newGatewayRoutesTestRouter(service.PlatformAntigravity))
+	for _, route := range []string{"POST /v1/videos", "GET /v1/videos/:request_id", "GET /v1/videos/:request_id/content"} {
+		require.True(t, routes[route], "%s must be registered", route)
 	}
 }
 

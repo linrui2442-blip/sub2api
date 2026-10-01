@@ -47,11 +47,11 @@ func withConsumerWebRecoveryRole(ctx context.Context, role string) context.Conte
 // Production construction leaves it nil and uses the fixed Google endpoints.
 type ConsumerWebEndpointSet struct{ GooglePreflight, GeminiPrime, App, OTAQ, Rotate string }
 type consumerWebHTTPHandle struct {
-	jar                        http.CookieJar
-	endpoints                  consumerWebEndpointSet
-	language, build, sid, snlm string
-	closed                     atomic.Bool
-	reqID                      atomic.Uint64
+	jar                              http.CookieJar
+	endpoints                        consumerWebEndpointSet
+	language, build, sid, snlm, push string
+	closed                           atomic.Bool
+	reqID                            atomic.Uint64
 }
 
 type ConsumerWebHTTPTransportOptions struct {
@@ -125,7 +125,7 @@ func (t *ConsumerWebHTTPTransport) Bootstrap(ctx context.Context, account *Accou
 	}
 	mergeConsumerWebAuxiliaryCookies(jar, t.endpoints.app, resp.Cookies())
 	runtime := parseConsumerWebRuntime(string(body))
-	h.snlm, h.build, h.sid, h.language = runtime.AuthToken, runtime.BuildLabel, runtime.SessionID, runtime.Language
+	h.snlm, h.build, h.sid, h.language, h.push = runtime.AuthToken, runtime.BuildLabel, runtime.SessionID, runtime.Language, runtime.PushID
 	if h.snlm == "" {
 		return ConsumerWebBootstrapResult{}, ErrConsumerWebAPPTokenMissing
 	}

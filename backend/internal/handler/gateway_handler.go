@@ -38,6 +38,7 @@ var gatewayCompatibilityMetricsLogCounter atomic.Uint64
 
 // GatewayHandler handles API gateway requests
 type GatewayHandler struct {
+	consumerWebVideoTasks     *service.ConsumerWebVideoTaskService
 	gatewayService            *service.GatewayService
 	openAIGatewayService      *service.OpenAIGatewayService
 	geminiCompatService       *service.GeminiMessagesCompatService

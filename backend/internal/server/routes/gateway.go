@@ -167,6 +167,9 @@ func RegisterGatewayRoutes(
 		// thin adapter backed by the existing Gemini transport.
 		gateway.POST("/images/generations", personalImages)
 		gateway.POST("/images/edits", personalImages)
+		gateway.POST("/videos", h.Gateway.CreateConsumerWebVideo)
+		gateway.GET("/videos/:request_id", h.Gateway.GetConsumerWebVideo)
+		gateway.GET("/videos/:request_id/content", h.Gateway.GetConsumerWebVideoContent)
 		gateway.POST("/embeddings", textBodyLimit, func(c *gin.Context) {
 			if !isOpenAIOnlyEndpointGatewayPlatform(c) {
 				service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonLocalFeatureGate)

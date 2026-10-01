@@ -24,11 +24,14 @@ func ProvideGatewayHandler(
 	cfg *config.Config,
 	settingService *service.SettingService,
 	coordinator *securityaudit.Coordinator,
+	consumerWebManager *service.ConsumerWebSessionManager,
+	consumerWebTransport service.ConsumerWebSessionTransport,
 ) *GatewayHandler {
 	h := NewGatewayHandler(gatewayService, openAIGatewayService, geminiCompatService, antigravityGatewayService,
 		userService, concurrencyService, requestEligibility, usageService, apiKeyService, usageRecordWorkerPool,
 		errorPassthroughService, userMsgQueueService, cfg, settingService)
 	h.securityAuditCoordinator = coordinator
+	h.consumerWebVideoTasks = service.NewConsumerWebVideoTaskService(consumerWebManager, consumerWebTransport)
 	return h
 }
 

@@ -361,3 +361,15 @@ func (m *ConsumerWebSessionManager) State(id int64) ConsumerWebSessionState {
 	defer e.mu.Unlock()
 	return e.state
 }
+
+// Registry returns an isolated copy of the authenticated account's current
+// model registry. Callers must first acquire that account's session.
+func (m *ConsumerWebSessionManager) Registry(id int64) []ConsumerWebModel {
+	e := m.entry(id)
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.state != ConsumerWebSessionAuthenticated {
+		return nil
+	}
+	return append([]ConsumerWebModel(nil), e.registry...)
+}
