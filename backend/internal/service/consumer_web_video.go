@@ -15,6 +15,55 @@ type consumerWebGeneratedVideo struct {
 	MIME  string
 }
 
+// ConsumerWebVideoFailureCause contains only a bounded, secret-free stage.
+type ConsumerWebVideoFailureCause string
+
+const (
+	ConsumerWebVideoFailureNone            ConsumerWebVideoFailureCause = "NONE"
+	ConsumerWebVideoFailurePrepare         ConsumerWebVideoFailureCause = "PREPARE_FAILED"
+	ConsumerWebVideoFailureModelResolution ConsumerWebVideoFailureCause = "MODEL_RESOLUTION_FAILED"
+	ConsumerWebVideoFailureRequestBuild    ConsumerWebVideoFailureCause = "STREAMGENERATE_REQUEST_BUILD_FAILED"
+	ConsumerWebVideoFailureTransport       ConsumerWebVideoFailureCause = "STREAMGENERATE_TRANSPORT_FAILED"
+	ConsumerWebVideoFailureHTTP            ConsumerWebVideoFailureCause = "STREAMGENERATE_HTTP_FAILED"
+	ConsumerWebVideoFailureBodyRead        ConsumerWebVideoFailureCause = "STREAMGENERATE_BODY_READ_FAILED"
+	ConsumerWebVideoFailureParse           ConsumerWebVideoFailureCause = "STREAMGENERATE_PARSE_FAILED"
+	ConsumerWebVideoFailureProviderBlock   ConsumerWebVideoFailureCause = "STREAMGENERATE_PROVIDER_ERROR_BLOCK"
+	ConsumerWebVideoFailureNoVideo         ConsumerWebVideoFailureCause = "STREAMGENERATE_NO_VIDEO"
+	ConsumerWebVideoFailureSlotParse       ConsumerWebVideoFailureCause = "STREAMGENERATE_VIDEO_SLOT_PARSE_FAILED"
+	ConsumerWebVideoFailureURLMissing      ConsumerWebVideoFailureCause = "STREAMGENERATE_VIDEO_URL_MISSING"
+	ConsumerWebVideoFailureMediaNotReady   ConsumerWebVideoFailureCause = "MEDIA_NOT_READY"
+	ConsumerWebVideoFailureMediaDownload   ConsumerWebVideoFailureCause = "MEDIA_DOWNLOAD_FAILED"
+	ConsumerWebVideoFailureUnknown         ConsumerWebVideoFailureCause = "UNKNOWN"
+)
+
+// ConsumerWebVideoAttemptDiagnostic is safe to log. Provider identifiers and
+// response text are represented only by presence/shape, never by their value.
+type ConsumerWebVideoAttemptDiagnostic struct {
+	Cause                                                         ConsumerWebVideoFailureCause
+	RequestBuilt, Sent, ResponseReceived                          bool
+	HTTPStatus                                                    int
+	BodyNonempty, ParsePass, ProviderErrorBlock                   bool
+	ConversationIDPresent, ResponseIDPresent, ChoiceIDPresent     bool
+	TextPresent                                                   bool
+	TextLengthBucket                                              string
+	CandidateCount                                                int
+	MediaContainerPresent, VideoKey60Present, SlotRootShapeValid  bool
+	VideoMetadataCount, VideoURLVariantCount, VideoExtractedCount int
+}
+
+func consumerWebTextLengthBucket(n int) string {
+	switch {
+	case n == 0:
+		return "NONE"
+	case n < 100:
+		return "LT_100"
+	case n < 1000:
+		return "100_TO_999"
+	default:
+		return "GE_1000"
+	}
+}
+
 var errConsumerWebVideoResponse = errors.New("consumer web generated video response is invalid")
 
 func consumerWebTrustedVideoURL(raw string) bool {
@@ -67,8 +116,15 @@ func consumerWebListAt(value any, indexes ...int) any {
 // entries. The source-backed video slot is a map keyed "60" somewhere within
 // candidate[12]; its position is not stable.
 func parseConsumerWebGeneratedVideos(body []byte) ([]consumerWebGeneratedVideo, error) {
+	videos, _, err := parseConsumerWebGeneratedVideosDetailed(body)
+	return videos, err
+}
+
+func parseConsumerWebGeneratedVideosDetailed(body []byte) ([]consumerWebGeneratedVideo, ConsumerWebVideoAttemptDiagnostic, error) {
+	d := ConsumerWebVideoAttemptDiagnostic{Cause: ConsumerWebVideoFailureParse, BodyNonempty: len(body) > 0, TextLengthBucket: "NONE"}
 	seen := make(map[string]struct{})
 	result := make([]consumerWebGeneratedVideo, 0)
+	validFrame := false
 	for _, line := range strings.Split(string(body), "\n") {
 		line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), ")]}'"))
 		if !strings.HasPrefix(line, "[") {
@@ -91,28 +147,64 @@ func parseConsumerWebGeneratedVideos(body []byte) ([]consumerWebGeneratedVideo, 
 			if json.Unmarshal([]byte(payloadText), &payload) != nil {
 				continue
 			}
+			validFrame = true
+			if ids, ok := consumerWebListAt(payload, 1).([]any); ok {
+				if len(ids) > 0 {
+					if id, ok := ids[0].(string); ok && id != "" {
+						d.ConversationIDPresent = true
+					}
+				}
+				if len(ids) > 1 {
+					if id, ok := ids[1].(string); ok && id != "" {
+						d.ResponseIDPresent = true
+					}
+				}
+			}
 			candidates, ok := consumerWebListAt(payload, 4).([]any)
 			if !ok {
 				continue
 			}
 			for _, rawCandidate := range candidates {
+				d.CandidateCount++
+				if choice, ok := consumerWebListAt(rawCandidate, 0).(string); ok && choice != "" {
+					d.ChoiceIDPresent = true
+				}
+				if textParts, ok := consumerWebListAt(rawCandidate, 1).([]any); ok {
+					for _, rawText := range textParts {
+						if text, ok := rawText.(string); ok && text != "" {
+							d.TextPresent = true
+							d.TextLengthBucket = consumerWebTextLengthBucket(len(text))
+							break
+						}
+					}
+				}
 				media, ok := consumerWebListAt(rawCandidate, 12).([]any)
 				if !ok {
 					continue
 				}
+				d.MediaContainerPresent = true
 				for _, rawEntry := range media {
 					entry, ok := rawEntry.(map[string]any)
 					if !ok {
 						continue
 					}
+					if _, exists := entry["60"]; !exists {
+						continue
+					}
+					d.VideoKey60Present = true
 					group, ok := consumerWebListAt(entry["60"], 0, 0, 0).([]any)
 					if !ok {
 						continue
 					}
+					d.SlotRootShapeValid = true
 					for _, rawMeta := range group {
+						d.VideoMetadataCount++
 						meta, ok := rawMeta.([]any)
 						if !ok || len(meta) <= 7 {
 							continue
+						}
+						if urls, ok := meta[7].([]any); ok {
+							d.VideoURLVariantCount += len(urls)
 						}
 						videoURL := consumerWebVideoURL(meta[7])
 						if videoURL == "" {
@@ -137,8 +229,29 @@ func parseConsumerWebGeneratedVideos(body []byte) ([]consumerWebGeneratedVideo, 
 			}
 		}
 	}
+	d.ParsePass = validFrame
+	d.VideoExtractedCount = len(result)
 	if len(result) == 0 {
-		return nil, errConsumerWebVideoResponse
+		switch {
+		case !validFrame:
+			d.Cause = ConsumerWebVideoFailureParse
+		case d.VideoKey60Present && !d.SlotRootShapeValid:
+			d.Cause = ConsumerWebVideoFailureSlotParse
+		case d.VideoKey60Present && d.VideoMetadataCount > 0:
+			d.Cause = ConsumerWebVideoFailureURLMissing
+		case d.VideoKey60Present:
+			d.Cause = ConsumerWebVideoFailureSlotParse
+		default:
+			d.Cause = ConsumerWebVideoFailureNoVideo
+		}
+		// A provider error marker is meaningful only when no normal candidate
+		// was parsed; successful terminal frames may also contain error metadata.
+		if d.CandidateCount == 0 && strings.Contains(string(body), "BardErrorInfo") {
+			d.ProviderErrorBlock = true
+			d.Cause = ConsumerWebVideoFailureProviderBlock
+		}
+		return nil, d, errConsumerWebVideoResponse
 	}
-	return result, nil
+	d.Cause = ConsumerWebVideoFailureNone
+	return result, d, nil
 }

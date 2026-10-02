@@ -19,14 +19,15 @@ const (
 )
 
 type ConsumerWebVideoTaskSnapshot struct {
-	ID                  string                    `json:"id"`
-	Status              ConsumerWebVideoTaskState `json:"status"`
-	Model               string                    `json:"model"`
-	AccountID           int64                     `json:"-"`
-	MIME                string                    `json:"mime_type,omitempty"`
-	Error               string                    `json:"error,omitempty"`
-	AcquireSessionCause ConsumerWebAcquireCause   `json:"-"`
-	AcquireSessionError error                     `json:"-"`
+	ID                  string                            `json:"id"`
+	Status              ConsumerWebVideoTaskState         `json:"status"`
+	Model               string                            `json:"model"`
+	AccountID           int64                             `json:"-"`
+	MIME                string                            `json:"mime_type,omitempty"`
+	Error               string                            `json:"error,omitempty"`
+	AcquireSessionCause ConsumerWebAcquireCause           `json:"-"`
+	AcquireSessionError error                             `json:"-"`
+	AttemptDiagnostic   ConsumerWebVideoAttemptDiagnostic `json:"-"`
 }
 
 type consumerWebVideoTask struct {
@@ -89,8 +90,8 @@ func (s *ConsumerWebVideoTaskService) Start(ownerID int64, account *Account, pub
 	return s.StartWithSelector(ownerID, &AccountSelectionResult{Account: account, ReleaseFunc: release}, nil, publicModel, prompt, image)
 }
 
-// StartWithSelector keeps the first scheduler result provisional. Only a
-// successful provider video result creates the immutable account binding.
+// StartWithSelector keeps the first scheduler result provisional. A stable
+// provider identity or a usable video result creates the immutable binding.
 func (s *ConsumerWebVideoTaskService) StartWithSelector(ownerID int64, first *AccountSelectionResult, selectNext ConsumerWebVideoAccountSelector, publicModel, prompt string, image *ConsumerWebVideoUpload) (ConsumerWebVideoTaskSnapshot, error) {
 	if s == nil || s.manager == nil || s.driver == nil || first == nil || first.Account == nil || ownerID <= 0 || strings.TrimSpace(prompt) == "" {
 		if first != nil && first.ReleaseFunc != nil {
@@ -155,7 +156,8 @@ func (s *ConsumerWebVideoTaskService) run(task *consumerWebVideoTask, prompt str
 			}
 			continue
 		}
-		model, err := resolveConsumerWebVideoModel(s.manager.Registry(account.ID))
+		registry := s.manager.Registry(account.ID)
+		model, err := resolveConsumerWebVideoModel(registry)
 		if err != nil {
 			releaseVideoSelection(selection)
 			if !s.nextVideoCandidate(ctx, task, account.ID, excluded, &selection, "MODEL_NOT_AVAILABLE") {
@@ -163,7 +165,51 @@ func (s *ConsumerWebVideoTaskService) run(task *consumerWebVideoTask, prompt str
 			}
 			continue
 		}
-		videos, err := s.driver.GenerateVideo(ctx, account, session, model, prompt, image)
+		runtimeDisplay := ""
+		for _, entry := range registry {
+			if entry.ID == model {
+				runtimeDisplay = entry.Display
+				break
+			}
+		}
+		var videos []consumerWebGeneratedVideo
+		var diagnostic ConsumerWebVideoAttemptDiagnostic
+		if detailed, ok := s.driver.(interface {
+			GenerateVideoDetailed(context.Context, *Account, ConsumerWebSessionHandle, string, string, *ConsumerWebVideoUpload) ([]consumerWebGeneratedVideo, ConsumerWebVideoAttemptDiagnostic, error)
+		}); ok {
+			videos, diagnostic, err = detailed.GenerateVideoDetailed(ctx, account, session, model, prompt, image)
+		} else {
+			videos, err = s.driver.GenerateVideo(ctx, account, session, model, prompt, image)
+			diagnostic.Cause = ConsumerWebVideoFailureUnknown
+		}
+		task.mu.Lock()
+		task.snapshot.AttemptDiagnostic = diagnostic
+		if diagnostic.ConversationIDPresent || diagnostic.ResponseIDPresent {
+			// The provider established a stable conversation identity even if it
+			// returned no usable video. This account is now permanently bound.
+			task.account = account
+			task.snapshot.AccountID = account.ID
+		}
+		task.mu.Unlock()
+		slog.Info("consumer_web_video_attempt_diagnostic",
+			"task_id", task.snapshot.ID, "account_id", account.ID,
+			"public_model", task.snapshot.Model, "mapped_model", account.GetMappedModel(task.snapshot.Model),
+			"runtime_model_id", model, "runtime_model_display", runtimeDisplay, "cause", diagnostic.Cause,
+			"request_built", diagnostic.RequestBuilt, "sent", diagnostic.Sent,
+			"http_status", diagnostic.HTTPStatus, "response_received", diagnostic.ResponseReceived,
+			"body_nonempty", diagnostic.BodyNonempty, "parse_pass", diagnostic.ParsePass,
+			"provider_error_block", diagnostic.ProviderErrorBlock,
+			"conversation_id_present", diagnostic.ConversationIDPresent,
+			"response_id_present", diagnostic.ResponseIDPresent, "choice_id_present", diagnostic.ChoiceIDPresent,
+			"text_present", diagnostic.TextPresent, "text_length_bucket", diagnostic.TextLengthBucket,
+			"candidate_count", diagnostic.CandidateCount,
+			"media_container_present", diagnostic.MediaContainerPresent,
+			"video_key_60_present", diagnostic.VideoKey60Present,
+			"video_slot_root_shape_valid", diagnostic.SlotRootShapeValid,
+			"video_metadata_count", diagnostic.VideoMetadataCount,
+			"video_url_variant_count", diagnostic.VideoURLVariantCount,
+			"video_url_present", diagnostic.VideoExtractedCount > 0,
+			"video_extracted_count", diagnostic.VideoExtractedCount)
 		releaseVideoSelection(selection)
 		var uploadError *ConsumerWebVideoUploadError
 		if errors.As(err, &uploadError) && (errors.Is(err, ErrConsumerWebAuthLost) || errors.Is(err, ErrConsumerWebForbidden)) {

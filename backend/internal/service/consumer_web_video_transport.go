@@ -36,6 +36,8 @@ type consumerWebUploadedFile struct{ ID, Name string }
 // not imply the provider accepted a video task or established a conversation.
 type ConsumerWebVideoUploadError struct{ Err error }
 
+type consumerWebVideoAttemptDiagnosticKey struct{}
+
 func (e *ConsumerWebVideoUploadError) Error() string { return "consumer web video upload failed" }
 func (e *ConsumerWebVideoUploadError) Unwrap() error { return e.Err }
 
@@ -120,6 +122,9 @@ func (t *ConsumerWebHTTPTransport) videoRequest(ctx context.Context, account *Ac
 	if !ok {
 		return nil, ErrConsumerWebRedirectRejected
 	}
+	if diagnostic, ok := ctx.Value(consumerWebVideoAttemptDiagnosticKey{}).(*ConsumerWebVideoAttemptDiagnostic); ok {
+		diagnostic.Sent = true
+	}
 	resp, err := redirector.DoWithRedirectPolicy(req, proxy, account.ID, account.Concurrency, policy)
 	if err != nil || resp == nil || resp.Body == nil {
 		return nil, ErrConsumerWebTransportTransient
@@ -187,9 +192,17 @@ func (t *ConsumerWebHTTPTransport) uploadVideoInput(ctx context.Context, account
 }
 
 func (t *ConsumerWebHTTPTransport) GenerateVideo(ctx context.Context, account *Account, session ConsumerWebSessionHandle, model, prompt string, image *ConsumerWebVideoUpload) ([]consumerWebGeneratedVideo, error) {
+	videos, _, err := t.GenerateVideoDetailed(ctx, account, session, model, prompt, image)
+	return videos, err
+}
+
+// GenerateVideoDetailed follows the same wire path as GenerateVideo while
+// returning bounded stage metadata for the task worker.
+func (t *ConsumerWebHTTPTransport) GenerateVideoDetailed(ctx context.Context, account *Account, session ConsumerWebSessionHandle, model, prompt string, image *ConsumerWebVideoUpload) ([]consumerWebGeneratedVideo, ConsumerWebVideoAttemptDiagnostic, error) {
+	d := ConsumerWebVideoAttemptDiagnostic{Cause: ConsumerWebVideoFailurePrepare, TextLengthBucket: "NONE"}
 	h, ok := session.(*consumerWebHTTPHandle)
 	if !ok || h.closed.Load() || strings.TrimSpace(model) == "" || strings.TrimSpace(prompt) == "" {
-		return nil, ErrConsumerWebProtocolDrift
+		return nil, d, ErrConsumerWebProtocolDrift
 	}
 	ctx, cancel := context.WithTimeout(ctx, 9*time.Minute)
 	defer cancel()
@@ -199,17 +212,19 @@ func (t *ConsumerWebHTTPTransport) GenerateVideo(ctx context.Context, account *A
 		slog.Info("consumer_web_video_upload_attempt", "account_id", account.ID)
 		uploaded, err = t.uploadVideoInput(ctx, account, h, *image)
 		if err != nil {
-			return nil, &ConsumerWebVideoUploadError{Err: err}
+			return nil, d, &ConsumerWebVideoUploadError{Err: err}
 		}
 	}
 	requestID := consumerWebVideoRequestID()
 	inner, err := json.Marshal(consumerWebVideoGenerateInner(prompt, model, h.language, requestID, uploaded))
 	if err != nil {
-		return nil, ErrConsumerWebProtocolDrift
+		d.Cause = ConsumerWebVideoFailureRequestBuild
+		return nil, d, ErrConsumerWebProtocolDrift
 	}
 	outer, err := json.Marshal([]any{nil, string(inner)})
 	if err != nil {
-		return nil, ErrConsumerWebProtocolDrift
+		d.Cause = ConsumerWebVideoFailureRequestBuild
+		return nil, d, ErrConsumerWebProtocolDrift
 	}
 	form := url.Values{"at": {h.snlm}, "f.req": {string(outer)}}
 	q := url.Values{"at": {h.snlm}}
@@ -227,21 +242,35 @@ func (t *ConsumerWebHTTPTransport) GenerateVideo(ctx context.Context, account *A
 	// Source-aligned request metadata is injected by the request-scoped helper;
 	// no account identity or credential is placed in the metadata header.
 	generateRaw := consumerWebGenerateURL + "?" + q.Encode()
+	d.RequestBuilt = true
 	slog.Info("consumer_web_video_streamgenerate_attempt", "account_id", account.ID)
+	ctx = context.WithValue(ctx, consumerWebVideoAttemptDiagnosticKey{}, &d)
 	resp, err := t.videoGenerateRequest(ctx, account, h, generateRaw, form.Encode(), requestID, uploaded != nil)
 	if err != nil {
-		return nil, err
+		if d.Sent {
+			d.Cause = ConsumerWebVideoFailureTransport
+		} else {
+			d.Cause = ConsumerWebVideoFailureRequestBuild
+		}
+		return nil, d, err
 	}
 	defer resp.Body.Close()
+	d.ResponseReceived = true
+	d.HTTPStatus = resp.StatusCode
 	slog.Info("consumer_web_video_streamgenerate_response", "account_id", account.ID, "status", resp.StatusCode)
 	if resp.StatusCode != http.StatusOK {
-		return nil, mapConsumerWebStatus(resp.StatusCode)
+		d.Cause = ConsumerWebVideoFailureHTTP
+		return nil, d, mapConsumerWebStatus(resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20+1))
 	if err != nil || len(body) > 8<<20 {
-		return nil, ErrConsumerWebProtocolDrift
+		d.Cause = ConsumerWebVideoFailureBodyRead
+		return nil, d, ErrConsumerWebProtocolDrift
 	}
-	return parseConsumerWebGeneratedVideos(body)
+	parsed, parsedDiagnostic, err := parseConsumerWebGeneratedVideosDetailed(body)
+	parsedDiagnostic.RequestBuilt, parsedDiagnostic.Sent = d.RequestBuilt, d.Sent
+	parsedDiagnostic.ResponseReceived, parsedDiagnostic.HTTPStatus = d.ResponseReceived, d.HTTPStatus
+	return parsed, parsedDiagnostic, err
 }
 
 func (t *ConsumerWebHTTPTransport) videoGenerateRequest(ctx context.Context, account *Account, h *consumerWebHTTPHandle, raw, form, requestID string, hasUpload bool) (*http.Response, error) {
