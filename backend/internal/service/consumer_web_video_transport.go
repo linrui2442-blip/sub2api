@@ -49,6 +49,18 @@ func consumerWebVideoRequestID() string {
 	return strings.ToUpper(hex.EncodeToString(data[:]))
 }
 
+func consumerWebClientSessionID() string {
+	var data [16]byte
+	if _, err := rand.Read(data[:]); err != nil {
+		return consumerWebVideoRequestID()
+	}
+	// The Consumer Web client session component is a UUID-shaped identifier.
+	data[6] = (data[6] & 0x0f) | 0x40
+	data[8] = (data[8] & 0x3f) | 0x80
+	hexID := strings.ToUpper(hex.EncodeToString(data[:]))
+	return hexID[:8] + "-" + hexID[8:12] + "-" + hexID[12:16] + "-" + hexID[16:20] + "-" + hexID[20:]
+}
+
 // videoRequest stays on the existing account proxy and authenticated in-memory
 // cookie jar. It intentionally does not reuse the short APP/otAQ timeout.
 func (t *ConsumerWebHTTPTransport) videoRequest(ctx context.Context, account *Account, h *consumerWebHTTPHandle, method, raw string, body io.Reader, contentType string) (*http.Response, error) {
@@ -85,9 +97,9 @@ func (t *ConsumerWebHTTPTransport) videoRequest(ctx context.Context, account *Ac
 	}
 	if metadata, ok := ctx.Value(consumerWebVideoHeaderKey{}).(consumerWebVideoHeaders); ok && host == "gemini.google.com" {
 		req.Header.Set("x-goog-ext-525001261-jspb", metadata.extra)
-		if metadata.hasUpload {
-			req.Header.Set("x-goog-ext-525005358-jspb", fmt.Sprintf(`["%s",1]`, metadata.requestID))
-		}
+		req.Header.Set("x-goog-ext-73010989-jspb", "[0]")
+		req.Header.Set("x-goog-ext-73010990-jspb", "[0,0,0]")
+		req.Header.Set("x-goog-ext-525005358-jspb", fmt.Sprintf(`["%s",1]`, metadata.requestID))
 	}
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
@@ -132,21 +144,37 @@ func (t *ConsumerWebHTTPTransport) videoRequest(ctx context.Context, account *Ac
 	return resp, nil
 }
 
-func consumerWebVideoGenerateInner(prompt, model, language, requestID string, file *consumerWebUploadedFile) []any {
-	message := []any{prompt}
+func consumerWebVideoGenerateInner(prompt, language, requestID string, modelNumber int, file *consumerWebUploadedFile) []any {
+	message := []any{prompt, 0, nil, nil, nil, nil, 0}
 	if file != nil {
 		message = []any{prompt, 0, nil, []any{[]any{[]any{file.ID}, file.Name}}, nil, nil, 0}
 	}
-	inner := make([]any, 69)
+	inner := make([]any, 81)
 	inner[0] = message
 	inner[1] = []any{language}
 	inner[2] = []any{"", "", "", nil, nil, nil, nil, nil, nil, ""}
-	inner[3] = model
 	inner[6] = []any{1}
 	inner[7], inner[10], inner[11] = 1, 1, 0
 	inner[17], inner[18], inner[27], inner[30] = []any{[]any{0}}, 0, 1, []any{4}
-	inner[41], inner[53], inner[59], inner[61], inner[68] = []any{1}, 0, requestID, []any{}, 2
+	inner[41], inner[53], inner[59], inner[61], inner[68] = []any{1}, 0, requestID, []any{}, 1
+	inner[79], inner[80] = modelNumber, 1
 	return inner
+}
+
+func consumerWebVideoModelHeader(model ConsumerWebModel, sessionID string) (string, error) {
+	if !model.ProfilePresent || model.ID == "" || model.ModelNumber <= 0 || model.Capacity <= 0 || (model.CapacityField != 12 && model.CapacityField != 13) || sessionID == "" {
+		return "", ErrConsumerWebProtocolDrift
+	}
+	header := []any{1, nil, nil, nil, model.ID, nil, nil, 0, []int{4, 5, 6, 8}, nil, nil}
+	if model.CapacityField == 13 {
+		header = append(header, nil)
+	}
+	header = append(header, model.Capacity, nil, nil, model.ModelNumber, 1, sessionID)
+	data, err := json.Marshal(header)
+	if err != nil {
+		return "", ErrConsumerWebProtocolDrift
+	}
+	return string(data), nil
 }
 
 func (t *ConsumerWebHTTPTransport) uploadVideoInput(ctx context.Context, account *Account, h *consumerWebHTTPHandle, file ConsumerWebVideoUpload) (*consumerWebUploadedFile, error) {
@@ -199,45 +227,60 @@ func (t *ConsumerWebHTTPTransport) GenerateVideo(ctx context.Context, account *A
 // GenerateVideoDetailed follows the same wire path as GenerateVideo while
 // returning bounded stage metadata for the task worker.
 func (t *ConsumerWebHTTPTransport) GenerateVideoDetailed(ctx context.Context, account *Account, session ConsumerWebSessionHandle, model, prompt string, image *ConsumerWebVideoUpload) ([]consumerWebGeneratedVideo, ConsumerWebVideoAttemptDiagnostic, error) {
+	videos, diagnostic, _, err := t.GenerateVideoAttempt(ctx, account, session, model, prompt, image)
+	return videos, diagnostic, err
+}
+
+// GenerateVideoAttempt additionally hands the accepted provider identity to
+// the live task only. Its value is never sent through the public status API.
+func (t *ConsumerWebHTTPTransport) GenerateVideoAttempt(ctx context.Context, account *Account, session ConsumerWebSessionHandle, model, prompt string, image *ConsumerWebVideoUpload) ([]consumerWebGeneratedVideo, ConsumerWebVideoAttemptDiagnostic, consumerWebVideoIdentity, error) {
 	d := ConsumerWebVideoAttemptDiagnostic{Cause: ConsumerWebVideoFailurePrepare, TextLengthBucket: "NONE"}
+	noIdentity := consumerWebVideoIdentity{}
 	h, ok := session.(*consumerWebHTTPHandle)
 	if !ok || h.closed.Load() || strings.TrimSpace(model) == "" || strings.TrimSpace(prompt) == "" {
-		return nil, d, ErrConsumerWebProtocolDrift
+		return nil, d, noIdentity, ErrConsumerWebProtocolDrift
 	}
+	var selected ConsumerWebModel
+	for _, entry := range h.registry {
+		if entry.ID == model {
+			selected = entry
+			break
+		}
+	}
+	modelHeader, err := consumerWebVideoModelHeader(selected, h.clientSessionID)
+	if err != nil {
+		d.Cause = ConsumerWebVideoFailureModelResolution
+		return nil, d, noIdentity, err
+	}
+	slog.Info("consumer_web_video_model_profile", "account_id", account.ID, "capacity", selected.Capacity, "capacity_field", selected.CapacityField, "model_number", selected.ModelNumber, "header_dynamic", true)
 	ctx, cancel := context.WithTimeout(ctx, 9*time.Minute)
 	defer cancel()
 	var uploaded *consumerWebUploadedFile
-	var err error
 	if image != nil {
 		slog.Info("consumer_web_video_upload_attempt", "account_id", account.ID)
 		uploaded, err = t.uploadVideoInput(ctx, account, h, *image)
 		if err != nil {
-			return nil, d, &ConsumerWebVideoUploadError{Err: err}
+			return nil, d, noIdentity, &ConsumerWebVideoUploadError{Err: err}
 		}
 	}
 	requestID := consumerWebVideoRequestID()
-	inner, err := json.Marshal(consumerWebVideoGenerateInner(prompt, model, h.language, requestID, uploaded))
+	inner, err := json.Marshal(consumerWebVideoGenerateInner(prompt, h.language, requestID, selected.ModelNumber, uploaded))
 	if err != nil {
 		d.Cause = ConsumerWebVideoFailureRequestBuild
-		return nil, d, ErrConsumerWebProtocolDrift
+		return nil, d, noIdentity, ErrConsumerWebProtocolDrift
 	}
 	outer, err := json.Marshal([]any{nil, string(inner)})
 	if err != nil {
 		d.Cause = ConsumerWebVideoFailureRequestBuild
-		return nil, d, ErrConsumerWebProtocolDrift
+		return nil, d, noIdentity, ErrConsumerWebProtocolDrift
 	}
 	form := url.Values{"at": {h.snlm}, "f.req": {string(outer)}}
-	q := url.Values{"at": {h.snlm}}
-	if uploaded != nil {
-		q.Set("hl", h.language)
-		q.Set("rt", "c")
-		q.Set("_reqid", strconv.FormatUint(h.reqID.Add(1), 10))
-		if h.build != "" {
-			q.Set("bl", h.build)
-		}
-		if h.sid != "" {
-			q.Set("f.sid", h.sid)
-		}
+	q := url.Values{"hl": {h.language}, "rt": {"c"}, "_reqid": {strconv.FormatUint(h.reqID.Add(1), 10)}}
+	if h.build != "" {
+		q.Set("bl", h.build)
+	}
+	if h.sid != "" {
+		q.Set("f.sid", h.sid)
 	}
 	// Source-aligned request metadata is injected by the request-scoped helper;
 	// no account identity or credential is placed in the metadata header.
@@ -245,14 +288,14 @@ func (t *ConsumerWebHTTPTransport) GenerateVideoDetailed(ctx context.Context, ac
 	d.RequestBuilt = true
 	slog.Info("consumer_web_video_streamgenerate_attempt", "account_id", account.ID)
 	ctx = context.WithValue(ctx, consumerWebVideoAttemptDiagnosticKey{}, &d)
-	resp, err := t.videoGenerateRequest(ctx, account, h, generateRaw, form.Encode(), requestID, uploaded != nil)
+	resp, err := t.videoGenerateRequest(ctx, account, h, generateRaw, form.Encode(), requestID, modelHeader)
 	if err != nil {
 		if d.Sent {
 			d.Cause = ConsumerWebVideoFailureTransport
 		} else {
 			d.Cause = ConsumerWebVideoFailureRequestBuild
 		}
-		return nil, d, err
+		return nil, d, noIdentity, err
 	}
 	defer resp.Body.Close()
 	d.ResponseReceived = true
@@ -260,33 +303,30 @@ func (t *ConsumerWebHTTPTransport) GenerateVideoDetailed(ctx context.Context, ac
 	slog.Info("consumer_web_video_streamgenerate_response", "account_id", account.ID, "status", resp.StatusCode)
 	if resp.StatusCode != http.StatusOK {
 		d.Cause = ConsumerWebVideoFailureHTTP
-		return nil, d, mapConsumerWebStatus(resp.StatusCode)
+		return nil, d, noIdentity, mapConsumerWebStatus(resp.StatusCode)
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20+1))
 	if err != nil || len(body) > 8<<20 {
 		d.Cause = ConsumerWebVideoFailureBodyRead
-		return nil, d, ErrConsumerWebProtocolDrift
+		return nil, d, noIdentity, ErrConsumerWebProtocolDrift
 	}
-	parsed, parsedDiagnostic, err := parseConsumerWebGeneratedVideosDetailed(body)
+	parsed, parsedDiagnostic, identity, err := parseConsumerWebGeneratedVideoAttempt(body)
 	parsedDiagnostic.RequestBuilt, parsedDiagnostic.Sent = d.RequestBuilt, d.Sent
 	parsedDiagnostic.ResponseReceived, parsedDiagnostic.HTTPStatus = d.ResponseReceived, d.HTTPStatus
-	return parsed, parsedDiagnostic, err
+	return parsed, parsedDiagnostic, identity, err
 }
 
-func (t *ConsumerWebHTTPTransport) videoGenerateRequest(ctx context.Context, account *Account, h *consumerWebHTTPHandle, raw, form, requestID string, hasUpload bool) (*http.Response, error) {
+func (t *ConsumerWebHTTPTransport) videoGenerateRequest(ctx context.Context, account *Account, h *consumerWebHTTPHandle, raw, form, requestID, modelHeader string) (*http.Response, error) {
 	// The generic videoRequest owns proxy, cookies and redirect security. The
 	// frozen source's supplemental header is carried via the explicit request
 	// context only for this generation call.
-	traceID := strings.ToLower(consumerWebVideoRequestID())[:16]
-	extra := fmt.Sprintf(`[1,null,null,null,"%s",null,null,0,[4,5,6,8],null,null,2,null,null,6,1,"%s"]`, traceID, consumerWebVideoRequestID())
-	ctx = context.WithValue(ctx, consumerWebVideoHeaderKey{}, consumerWebVideoHeaders{requestID: requestID, hasUpload: hasUpload, extra: extra})
+	ctx = context.WithValue(ctx, consumerWebVideoHeaderKey{}, consumerWebVideoHeaders{requestID: requestID, extra: modelHeader})
 	return t.videoRequest(ctx, account, h, http.MethodPost, raw, strings.NewReader(form), "application/x-www-form-urlencoded;charset=UTF-8")
 }
 
 type consumerWebVideoHeaderKey struct{}
 type consumerWebVideoHeaders struct {
 	requestID string
-	hasUpload bool
 	extra     string
 }
 

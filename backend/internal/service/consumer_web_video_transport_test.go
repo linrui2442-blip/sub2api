@@ -42,7 +42,7 @@ func videoFixtureHandle(t *testing.T) *consumerWebHTTPHandle {
 	}
 	u, _ := url.Parse(consumerWebAppURL)
 	jar.SetCookies(u, []*http.Cookie{{Name: "__Secure-1PSID", Value: "synthetic", Domain: ".google.com", Path: "/", Secure: true}})
-	return &consumerWebHTTPHandle{jar: jar, snlm: "synthetic-at", language: "en"}
+	return &consumerWebHTTPHandle{jar: jar, snlm: "synthetic-at", language: "en", clientSessionID: "synthetic-session", registry: []ConsumerWebModel{{ID: "current-pro", Display: "Pro", Capacity: 2, CapacityField: 12, ModelNumber: 3, ProfilePresent: true}, {ID: "synthetic-model", Display: "Pro", Capacity: 2, CapacityField: 12, ModelNumber: 3, ProfilePresent: true}}}
 }
 
 func TestConsumerWebVideoGenerateAndMediaReadinessTransport(t *testing.T) {

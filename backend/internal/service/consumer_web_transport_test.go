@@ -114,7 +114,7 @@ func TestConsumerWebOTAQPositionalAuthenticatedRegistry(t *testing.T) {
 	status, registry, err := parseConsumerWebOTAQ(")]}'\n" + string(frame) + "\n")
 	require.NoError(t, err)
 	require.Equal(t, 1000, status)
-	require.Equal(t, []ConsumerWebModel{{ID: "current-pro-selector", Display: "3.1 Pro", Tier: "2"}}, registry)
+	require.Equal(t, []ConsumerWebModel{{ID: "current-pro-selector", Display: "3.1 Pro", Tier: "2", ModelNumber: 1}}, registry)
 	selected, err := resolveConsumerWebVideoModel(registry)
 	require.NoError(t, err)
 	require.Equal(t, "current-pro-selector", selected)

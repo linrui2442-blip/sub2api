@@ -15,6 +15,10 @@ type consumerWebGeneratedVideo struct {
 	MIME  string
 }
 
+// Provider identity is held only in the live task/session. It is never
+// serialized into public task status, logs or acceptance evidence.
+type consumerWebVideoIdentity struct{ CID, RID, RCID string }
+
 // ConsumerWebVideoFailureCause contains only a bounded, secret-free stage.
 type ConsumerWebVideoFailureCause string
 
@@ -29,6 +33,9 @@ const (
 	ConsumerWebVideoFailureParse           ConsumerWebVideoFailureCause = "STREAMGENERATE_PARSE_FAILED"
 	ConsumerWebVideoFailureProviderBlock   ConsumerWebVideoFailureCause = "STREAMGENERATE_PROVIDER_ERROR_BLOCK"
 	ConsumerWebVideoFailureNoVideo         ConsumerWebVideoFailureCause = "STREAMGENERATE_NO_VIDEO"
+	ConsumerWebVideoAcceptedPending        ConsumerWebVideoFailureCause = "STREAMGENERATE_ACCEPTED_PENDING"
+	ConsumerWebVideoRecoveryTimeout        ConsumerWebVideoFailureCause = "CONVERSATION_RECOVERY_TIMEOUT"
+	ConsumerWebVideoRecoveryUnavailable    ConsumerWebVideoFailureCause = "CONVERSATION_RECOVERY_UNAVAILABLE"
 	ConsumerWebVideoFailureSlotParse       ConsumerWebVideoFailureCause = "STREAMGENERATE_VIDEO_SLOT_PARSE_FAILED"
 	ConsumerWebVideoFailureURLMissing      ConsumerWebVideoFailureCause = "STREAMGENERATE_VIDEO_URL_MISSING"
 	ConsumerWebVideoFailureMediaNotReady   ConsumerWebVideoFailureCause = "MEDIA_NOT_READY"
@@ -121,10 +128,70 @@ func parseConsumerWebGeneratedVideos(body []byte) ([]consumerWebGeneratedVideo, 
 }
 
 func parseConsumerWebGeneratedVideosDetailed(body []byte) ([]consumerWebGeneratedVideo, ConsumerWebVideoAttemptDiagnostic, error) {
+	videos, diagnostic, _, err := parseConsumerWebGeneratedVideoAttempt(body)
+	return videos, diagnostic, err
+}
+
+func consumerWebCandidateVideos(rawCandidate any, diagnostic *ConsumerWebVideoAttemptDiagnostic, seen map[string]struct{}) []consumerWebGeneratedVideo {
+	result := make([]consumerWebGeneratedVideo, 0)
+	media, ok := consumerWebListAt(rawCandidate, 12).([]any)
+	if !ok {
+		return result
+	}
+	diagnostic.MediaContainerPresent = true
+	for _, rawEntry := range media {
+		entry, ok := rawEntry.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, exists := entry["60"]; !exists {
+			continue
+		}
+		diagnostic.VideoKey60Present = true
+		group, ok := consumerWebListAt(entry["60"], 0, 0, 0).([]any)
+		if !ok {
+			continue
+		}
+		diagnostic.SlotRootShapeValid = true
+		for _, rawMeta := range group {
+			diagnostic.VideoMetadataCount++
+			meta, ok := rawMeta.([]any)
+			if !ok || len(meta) <= 7 {
+				continue
+			}
+			if urls, ok := meta[7].([]any); ok {
+				diagnostic.VideoURLVariantCount += len(urls)
+			}
+			videoURL := consumerWebVideoURL(meta[7])
+			if videoURL == "" {
+				continue
+			}
+			if _, exists := seen[videoURL]; exists {
+				continue
+			}
+			seen[videoURL] = struct{}{}
+			video := consumerWebGeneratedVideo{URL: videoURL, MIME: "video/mp4"}
+			if title, ok := meta[2].(string); ok {
+				video.Title = title
+			}
+			if len(meta) > 11 {
+				if mime, ok := meta[11].(string); ok && strings.HasPrefix(mime, "video/") {
+					video.MIME = mime
+				}
+			}
+			result = append(result, video)
+		}
+	}
+	return result
+}
+
+func parseConsumerWebGeneratedVideoAttempt(body []byte) ([]consumerWebGeneratedVideo, ConsumerWebVideoAttemptDiagnostic, consumerWebVideoIdentity, error) {
 	d := ConsumerWebVideoAttemptDiagnostic{Cause: ConsumerWebVideoFailureParse, BodyNonempty: len(body) > 0, TextLengthBucket: "NONE"}
+	identity := consumerWebVideoIdentity{}
 	seen := make(map[string]struct{})
 	result := make([]consumerWebGeneratedVideo, 0)
 	validFrame := false
+	completedCandidate := false
 	for _, line := range strings.Split(string(body), "\n") {
 		line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), ")]}'"))
 		if !strings.HasPrefix(line, "[") {
@@ -151,11 +218,13 @@ func parseConsumerWebGeneratedVideosDetailed(body []byte) ([]consumerWebGenerate
 			if ids, ok := consumerWebListAt(payload, 1).([]any); ok {
 				if len(ids) > 0 {
 					if id, ok := ids[0].(string); ok && id != "" {
+						identity.CID = id
 						d.ConversationIDPresent = true
 					}
 				}
 				if len(ids) > 1 {
 					if id, ok := ids[1].(string); ok && id != "" {
+						identity.RID = id
 						d.ResponseIDPresent = true
 					}
 				}
@@ -167,7 +236,11 @@ func parseConsumerWebGeneratedVideosDetailed(body []byte) ([]consumerWebGenerate
 			for _, rawCandidate := range candidates {
 				d.CandidateCount++
 				if choice, ok := consumerWebListAt(rawCandidate, 0).(string); ok && choice != "" {
+					identity.RCID = choice
 					d.ChoiceIDPresent = true
+				}
+				if status, ok := consumerWebListAt(rawCandidate, 8, 0).(float64); ok && status == 2 {
+					completedCandidate = true
 				}
 				if textParts, ok := consumerWebListAt(rawCandidate, 1).([]any); ok {
 					for _, rawText := range textParts {
@@ -178,54 +251,7 @@ func parseConsumerWebGeneratedVideosDetailed(body []byte) ([]consumerWebGenerate
 						}
 					}
 				}
-				media, ok := consumerWebListAt(rawCandidate, 12).([]any)
-				if !ok {
-					continue
-				}
-				d.MediaContainerPresent = true
-				for _, rawEntry := range media {
-					entry, ok := rawEntry.(map[string]any)
-					if !ok {
-						continue
-					}
-					if _, exists := entry["60"]; !exists {
-						continue
-					}
-					d.VideoKey60Present = true
-					group, ok := consumerWebListAt(entry["60"], 0, 0, 0).([]any)
-					if !ok {
-						continue
-					}
-					d.SlotRootShapeValid = true
-					for _, rawMeta := range group {
-						d.VideoMetadataCount++
-						meta, ok := rawMeta.([]any)
-						if !ok || len(meta) <= 7 {
-							continue
-						}
-						if urls, ok := meta[7].([]any); ok {
-							d.VideoURLVariantCount += len(urls)
-						}
-						videoURL := consumerWebVideoURL(meta[7])
-						if videoURL == "" {
-							continue
-						}
-						if _, exists := seen[videoURL]; exists {
-							continue
-						}
-						seen[videoURL] = struct{}{}
-						video := consumerWebGeneratedVideo{URL: videoURL, MIME: "video/mp4"}
-						if title, ok := meta[2].(string); ok {
-							video.Title = title
-						}
-						if len(meta) > 11 {
-							if mime, ok := meta[11].(string); ok && strings.HasPrefix(mime, "video/") {
-								video.MIME = mime
-							}
-						}
-						result = append(result, video)
-					}
-				}
+				result = append(result, consumerWebCandidateVideos(rawCandidate, &d, seen)...)
 			}
 		}
 	}
@@ -241,6 +267,8 @@ func parseConsumerWebGeneratedVideosDetailed(body []byte) ([]consumerWebGenerate
 			d.Cause = ConsumerWebVideoFailureURLMissing
 		case d.VideoKey60Present:
 			d.Cause = ConsumerWebVideoFailureSlotParse
+		case validFrame && identity.CID != "" && identity.RID != "" && !completedCandidate:
+			d.Cause = ConsumerWebVideoAcceptedPending
 		default:
 			d.Cause = ConsumerWebVideoFailureNoVideo
 		}
@@ -250,8 +278,11 @@ func parseConsumerWebGeneratedVideosDetailed(body []byte) ([]consumerWebGenerate
 			d.ProviderErrorBlock = true
 			d.Cause = ConsumerWebVideoFailureProviderBlock
 		}
-		return nil, d, errConsumerWebVideoResponse
+		if d.Cause == ConsumerWebVideoAcceptedPending {
+			return nil, d, identity, nil
+		}
+		return nil, d, identity, errConsumerWebVideoResponse
 	}
 	d.Cause = ConsumerWebVideoFailureNone
-	return result, d, nil
+	return result, d, identity, nil
 }

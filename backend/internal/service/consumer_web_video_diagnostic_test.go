@@ -54,6 +54,9 @@ func TestConsumerWebVideoDiagnosticParserStages(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			candidate := make([]any, 13)
 			candidate[12] = tc.media
+			if tc.name == "no slot" {
+				candidate[8] = []any{2}
+			}
 			videos, d, err := parseConsumerWebGeneratedVideosDetailed(videoDiagnosticFixture(t, candidate, true))
 			if d.Cause != tc.want || d.VideoKey60Present != tc.slot || (len(videos) > 0) != tc.extracted || d.ConversationIDPresent != true || d.ResponseIDPresent != true {
 				t.Fatalf("cause=%s slot=%t extracted=%d err=%v", d.Cause, d.VideoKey60Present, len(videos), err)
@@ -68,6 +71,7 @@ func TestConsumerWebVideoDiagnosticParserStages(t *testing.T) {
 func TestConsumerWebVideoDiagnosticTextOnlyAndProviderBlock(t *testing.T) {
 	candidate := make([]any, 13)
 	candidate[1] = []any{"Synthetic provider text; do not log this value."}
+	candidate[8] = []any{2}
 	_, d, err := parseConsumerWebGeneratedVideosDetailed(videoDiagnosticFixture(t, candidate, true))
 	if err == nil || d.Cause != ConsumerWebVideoFailureNoVideo || !d.TextPresent || d.TextLengthBucket == "NONE" || !d.ParsePass || d.VideoKey60Present {
 		t.Fatalf("text-only diagnostic mismatch: %+v", d)

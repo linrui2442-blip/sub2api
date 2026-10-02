@@ -13,8 +13,8 @@ type ConsumerWebVideoTaskState string
 
 const (
 	ConsumerWebVideoQueued    ConsumerWebVideoTaskState = "queued"
-	ConsumerWebVideoRunning   ConsumerWebVideoTaskState = "running"
-	ConsumerWebVideoSucceeded ConsumerWebVideoTaskState = "succeeded"
+	ConsumerWebVideoRunning   ConsumerWebVideoTaskState = "processing"
+	ConsumerWebVideoSucceeded ConsumerWebVideoTaskState = "completed"
 	ConsumerWebVideoFailed    ConsumerWebVideoTaskState = "failed"
 )
 
@@ -28,6 +28,10 @@ type ConsumerWebVideoTaskSnapshot struct {
 	AcquireSessionCause ConsumerWebAcquireCause           `json:"-"`
 	AcquireSessionError error                             `json:"-"`
 	AttemptDiagnostic   ConsumerWebVideoAttemptDiagnostic `json:"-"`
+	RecoveryStarted     bool                              `json:"-"`
+	RecoveryReadCount   int                               `json:"-"`
+	RecoveryTargetFound []bool                            `json:"-"`
+	RecoveryVideoFound  bool                              `json:"-"`
 }
 
 type consumerWebVideoTask struct {
@@ -35,6 +39,7 @@ type consumerWebVideoTask struct {
 	snapshot   ConsumerWebVideoTaskSnapshot
 	ownerID    int64
 	account    *Account
+	identity   consumerWebVideoIdentity
 	first      *AccountSelectionResult
 	selectNext ConsumerWebVideoAccountSelector
 	video      consumerWebGeneratedVideo
@@ -124,7 +129,9 @@ func (s *ConsumerWebVideoTaskService) run(task *consumerWebVideoTask, prompt str
 	task.mu.Lock()
 	task.snapshot.Status = ConsumerWebVideoRunning
 	task.mu.Unlock()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	// Allow the bounded generation phase (up to nine minutes) and the separate
+	// eight-minute accepted-turn recovery window to both complete.
+	ctx, cancel := context.WithTimeout(context.Background(), 18*time.Minute)
 	defer cancel()
 	selection := task.first
 	excluded := make(map[int64]struct{})
@@ -174,7 +181,12 @@ func (s *ConsumerWebVideoTaskService) run(task *consumerWebVideoTask, prompt str
 		}
 		var videos []consumerWebGeneratedVideo
 		var diagnostic ConsumerWebVideoAttemptDiagnostic
+		var identity consumerWebVideoIdentity
 		if detailed, ok := s.driver.(interface {
+			GenerateVideoAttempt(context.Context, *Account, ConsumerWebSessionHandle, string, string, *ConsumerWebVideoUpload) ([]consumerWebGeneratedVideo, ConsumerWebVideoAttemptDiagnostic, consumerWebVideoIdentity, error)
+		}); ok {
+			videos, diagnostic, identity, err = detailed.GenerateVideoAttempt(ctx, account, session, model, prompt, image)
+		} else if detailed, ok := s.driver.(interface {
 			GenerateVideoDetailed(context.Context, *Account, ConsumerWebSessionHandle, string, string, *ConsumerWebVideoUpload) ([]consumerWebGeneratedVideo, ConsumerWebVideoAttemptDiagnostic, error)
 		}); ok {
 			videos, diagnostic, err = detailed.GenerateVideoDetailed(ctx, account, session, model, prompt, image)
@@ -188,6 +200,7 @@ func (s *ConsumerWebVideoTaskService) run(task *consumerWebVideoTask, prompt str
 			// The provider established a stable conversation identity even if it
 			// returned no usable video. This account is now permanently bound.
 			task.account = account
+			task.identity = identity
 			task.snapshot.AccountID = account.ID
 		}
 		task.mu.Unlock()
@@ -211,6 +224,10 @@ func (s *ConsumerWebVideoTaskService) run(task *consumerWebVideoTask, prompt str
 			"video_url_present", diagnostic.VideoExtractedCount > 0,
 			"video_extracted_count", diagnostic.VideoExtractedCount)
 		releaseVideoSelection(selection)
+		if diagnostic.Cause == ConsumerWebVideoAcceptedPending && err == nil && identity.CID != "" && identity.RID != "" {
+			s.recoverPendingVideo(ctx, task, account, identity)
+			return
+		}
 		var uploadError *ConsumerWebVideoUploadError
 		if errors.As(err, &uploadError) && (errors.Is(err, ErrConsumerWebAuthLost) || errors.Is(err, ErrConsumerWebForbidden)) {
 			if !s.nextVideoCandidate(ctx, task, account.ID, excluded, &selection, "UPSTREAM_VIDEO_UNAVAILABLE") {
@@ -232,6 +249,86 @@ func (s *ConsumerWebVideoTaskService) run(task *consumerWebVideoTask, prompt str
 		return
 	}
 	s.fail(task, "AUTH_REQUIRED")
+}
+
+func (s *ConsumerWebVideoTaskService) recoverPendingVideo(parent context.Context, task *consumerWebVideoTask, account *Account, identity consumerWebVideoIdentity) {
+	reader, ok := s.driver.(interface {
+		ReadVideoConversation(context.Context, *Account, ConsumerWebSessionHandle, consumerWebVideoIdentity) (consumerWebVideoRecoveryResult, error)
+	})
+	if !ok {
+		s.failPendingVideo(task, ConsumerWebVideoRecoveryUnavailable)
+		return
+	}
+	ctx, cancel := context.WithTimeout(parent, 8*time.Minute)
+	defer cancel()
+	task.mu.Lock()
+	task.snapshot.RecoveryStarted = true
+	task.mu.Unlock()
+	for ctx.Err() == nil {
+		session, err := s.manager.AcquireSession(ctx, account)
+		if err != nil {
+			s.failPendingVideo(task, ConsumerWebVideoRecoveryUnavailable)
+			return
+		}
+		result, err := reader.ReadVideoConversation(ctx, account, session, identity)
+		task.mu.Lock()
+		task.snapshot.RecoveryReadCount++
+		task.snapshot.RecoveryTargetFound = append(task.snapshot.RecoveryTargetFound, result.TargetFound)
+		readCount := task.snapshot.RecoveryReadCount
+		task.mu.Unlock()
+		slog.Info("consumer_web_video_recovery_read", "task_id", task.snapshot.ID, "account_id", account.ID,
+			"read_count", readCount, "target_found", result.TargetFound, "candidate_count", result.CandidateCount,
+			"video_found", len(result.Videos) > 0, "state", result.State, "error_class", consumerWebVideoRecoveryErrorClass(err))
+		if err != nil {
+			s.failPendingVideo(task, ConsumerWebVideoRecoveryUnavailable)
+			return
+		}
+		switch result.State {
+		case consumerWebVideoRecoveryVideo:
+			if len(result.Videos) == 0 {
+				s.failPendingVideo(task, ConsumerWebVideoRecoveryUnavailable)
+				return
+			}
+			task.mu.Lock()
+			task.video = result.Videos[0]
+			task.snapshot.MIME = result.Videos[0].MIME
+			task.snapshot.RecoveryVideoFound = true
+			task.snapshot.AttemptDiagnostic.Cause = ConsumerWebVideoFailureNone
+			task.mu.Unlock()
+			return
+		case consumerWebVideoRecoveryNoVideo:
+			s.failPendingVideo(task, ConsumerWebVideoFailureNoVideo)
+			return
+		case consumerWebVideoRecoveryRefusal:
+			s.failPendingVideo(task, ConsumerWebVideoFailureProviderBlock)
+			return
+		}
+		select {
+		case <-ctx.Done():
+		case <-time.After(10 * time.Second):
+		}
+	}
+	s.failPendingVideo(task, ConsumerWebVideoRecoveryTimeout)
+}
+
+func consumerWebVideoRecoveryErrorClass(err error) string {
+	if err == nil {
+		return "NONE"
+	}
+	if errors.Is(err, ErrConsumerWebAuthLost) {
+		return "AUTH"
+	}
+	if errors.Is(err, ErrConsumerWebTransportTransient) {
+		return "TRANSPORT"
+	}
+	return "PROTOCOL"
+}
+
+func (s *ConsumerWebVideoTaskService) failPendingVideo(task *consumerWebVideoTask, cause ConsumerWebVideoFailureCause) {
+	task.mu.Lock()
+	task.snapshot.AttemptDiagnostic.Cause = cause
+	task.mu.Unlock()
+	s.fail(task, "UPSTREAM_VIDEO_UNAVAILABLE")
 }
 
 func releaseVideoSelection(selection *AccountSelectionResult) {

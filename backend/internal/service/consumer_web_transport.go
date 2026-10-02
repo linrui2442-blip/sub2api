@@ -50,6 +50,8 @@ type consumerWebHTTPHandle struct {
 	jar                              http.CookieJar
 	endpoints                        consumerWebEndpointSet
 	language, build, sid, snlm, push string
+	clientSessionID                  string
+	registry                         []ConsumerWebModel
 	closed                           atomic.Bool
 	reqID                            atomic.Uint64
 }
@@ -143,6 +145,7 @@ func (t *ConsumerWebHTTPTransport) Bootstrap(ctx context.Context, account *Accou
 	if !q.Authenticated {
 		return ConsumerWebBootstrapResult{}, ErrConsumerWebAuthLost
 	}
+	h.registry = append([]ConsumerWebModel(nil), q.Registry...)
 	return ConsumerWebBootstrapResult{Authenticated: true, BuildLabel: h.build, SessionID: h.sid, Language: h.language, Session: h, Registry: q.Registry}, nil
 }
 
@@ -214,7 +217,7 @@ func (t *ConsumerWebHTTPTransport) PreAuthRotatePSIDTS(ctx context.Context, acco
 
 func (t *ConsumerWebHTTPTransport) newCredentialHandle(psid, psidts string) *consumerWebHTTPHandle {
 	jar, _ := cookiejar.New(nil)
-	h := &consumerWebHTTPHandle{jar: jar, endpoints: t.endpoints, language: "en"}
+	h := &consumerWebHTTPHandle{jar: jar, endpoints: t.endpoints, language: "en", clientSessionID: consumerWebClientSessionID()}
 	cookies := []*http.Cookie{{Name: "__Secure-1PSID", Value: psid, Path: "/"}}
 	if psidts != "" {
 		cookies = append(cookies, &http.Cookie{Name: "__Secure-1PSIDTS", Value: psidts, Path: "/"})
@@ -506,9 +509,13 @@ func parseConsumerWebOTAQ(body string) (int, []ConsumerWebModel, error) {
 				return 0, nil, ErrConsumerWebProtocolDrift
 			}
 			if len(inner) > 15 {
+				capacity, capacityField, profilePresent := consumerWebModelCapacity(inner)
 				if arr, ok := inner[15].([]any); ok {
 					for _, v := range arr {
 						if model, ok := consumerWebRegistryModel(v); ok {
+							if profilePresent {
+								model.Capacity, model.CapacityField, model.ProfilePresent = capacity, capacityField, true
+							}
 							registry = append(registry, model)
 						}
 					}
@@ -518,6 +525,41 @@ func parseConsumerWebOTAQ(body string) (int, []ConsumerWebModel, error) {
 		}
 	}
 	return 0, nil, ErrConsumerWebProtocolDrift
+}
+
+// The authenticated otAQ payload carries account tier and capability flags
+// at [16] and [17]. This priority is the frozen Consumer Web source contract.
+func consumerWebModelCapacity(inner []any) (capacity, field int, present bool) {
+	if len(inner) <= 17 {
+		return 0, 0, false
+	}
+	tiers, tiersOK := inner[16].([]any)
+	capabilities, capabilitiesOK := inner[17].([]any)
+	if !tiersOK || !capabilitiesOK {
+		return 0, 0, false
+	}
+	has := func(items []any, want int) bool {
+		for _, item := range items {
+			if number, ok := item.(float64); ok && int(number) == want && number == float64(want) {
+				return true
+			}
+		}
+		return false
+	}
+	switch {
+	case has(tiers, 21):
+		return 1, 13, true
+	case has(tiers, 22):
+		return 2, 13, true
+	case has(capabilities, 115):
+		return 4, 12, true
+	case has(tiers, 16) || has(capabilities, 106):
+		return 3, 12, true
+	case has(tiers, 8) || has(capabilities, 19):
+		return 2, 12, true
+	default:
+		return 1, 12, true
+	}
 }
 
 func consumerWebRegistryModel(value any) (ConsumerWebModel, bool) {
@@ -542,7 +584,16 @@ func consumerWebRegistryModel(value any) (ConsumerWebModel, bool) {
 		case float64:
 			tier = strconv.FormatFloat(typed, 'f', -1, 64)
 		}
-		return ConsumerWebModel{ID: id, Display: display, Tier: tier}, true
+		modelNumber := 1
+		for _, index := range []int{17, 9} {
+			if len(entry) > index {
+				if number, ok := entry[index].(float64); ok && number >= 0 && number == float64(int(number)) {
+					modelNumber = int(number)
+					break
+				}
+			}
+		}
+		return ConsumerWebModel{ID: id, Display: display, Tier: tier, ModelNumber: modelNumber}, true
 	}
 	if entry, ok := value.(map[string]any); ok {
 		id, _ := entry["id"].(string)

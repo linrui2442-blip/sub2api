@@ -71,7 +71,15 @@ type ConsumerWebRotationResult struct {
 	PSIDTS        string
 	Session       ConsumerWebSessionHandle
 }
-type ConsumerWebModel struct{ ID, Display, Tier string }
+
+// ConsumerWebModel is session-scoped otAQ metadata. Its transport profile is
+// never persisted as an account mapping or credential.
+type ConsumerWebModel struct {
+	ID, Display, Tier       string
+	Capacity, CapacityField int
+	ModelNumber             int
+	ProfilePresent          bool
+}
 
 type ConsumerWebSessionClock interface {
 	Now() time.Time
