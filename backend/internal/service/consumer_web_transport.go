@@ -137,6 +137,7 @@ func (t *ConsumerWebHTTPTransport) Bootstrap(ctx context.Context, account *Accou
 	runtime := parseConsumerWebRuntime(string(body))
 	consumerWebBootstrapTraceFromContext(ctx).updateLast(ConsumerWebStageGeminiAPP, func(s *ConsumerWebBootstrapStep) {
 		s.APPTokenPresent = runtime.AuthToken != ""
+		s.APPTokenSource = runtime.AuthTokenSource
 		for _, present := range []bool{runtime.BuildLabel != "", runtime.SessionID != "", runtime.Language != "", runtime.PushID != ""} {
 			if present {
 				s.APPInitMarkerCount++
@@ -459,7 +460,7 @@ func mapConsumerWebStatus(code int) error {
 }
 func mustURL(s string) *url.URL { u, _ := url.Parse(s); return u }
 
-type consumerWebRuntimeFields struct{ AuthToken, PushID, BuildLabel, SessionID, Language string }
+type consumerWebRuntimeFields struct{ AuthToken, AuthTokenSource, PushID, BuildLabel, SessionID, Language string }
 
 func parseConsumerWebRuntime(body string) consumerWebRuntimeFields {
 	// These patterns mirror the frozen reference's explicit regex declarations.
@@ -474,7 +475,15 @@ func parseConsumerWebRuntime(body string) consumerWebRuntimeFields {
 		}
 		return m[2]
 	}
-	return consumerWebRuntimeFields{AuthToken: value("SNlM0e"), PushID: defaultString(value("qKIAYe"), "feeds/mcudyrk2a4khkz"), BuildLabel: value("cfb2h"), SessionID: value("FdrFJe"), Language: defaultString(value("TuX5cc"), "en")}
+	// Both page keys carry the same Gemini form `at` token. Keep the original
+	// key authoritative when both are present, and never log either value.
+	token, source := value("SNlM0e"), "NONE"
+	if token != "" {
+		source = "SNLM0E"
+	} else if token = value("thykhd"); token != "" {
+		source = "THYKHD"
+	}
+	return consumerWebRuntimeFields{AuthToken: token, AuthTokenSource: source, PushID: defaultString(value("qKIAYe"), "feeds/mcudyrk2a4khkz"), BuildLabel: value("cfb2h"), SessionID: value("FdrFJe"), Language: defaultString(value("TuX5cc"), "en")}
 }
 
 func defaultString(value, fallback string) string {

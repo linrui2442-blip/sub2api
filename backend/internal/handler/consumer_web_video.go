@@ -33,7 +33,9 @@ func safeConsumerWebBootstrapSteps(steps []service.ConsumerWebBootstrapStep) []g
 			"stage":                      step.Stage,
 			"attempt_ordinal":            step.AttemptOrdinal,
 			"http_status":                step.HTTPStatus,
-			"app_snlm0e_present":         step.APPTokenPresent,
+			"app_snlm0e_present":         step.APPTokenPresent && step.APPTokenSource == "SNLM0E",
+			"at_token_present":           step.APPTokenPresent,
+			"at_token_source":            step.APPTokenSource,
 			"rotate_replacement_present": step.RotateReplacementPresent,
 			"rotate_persist_attempted":   step.RotatePersistAttempted,
 			"rotate_persist_result":      step.RotatePersistResult,
@@ -113,6 +115,8 @@ func (h *GatewayHandler) ConsumerWebAuthProbe(c *gin.Context) {
 		"app_status":                        0,
 		"app_response_received":             false,
 		"app_snlm0e_present":                false,
+		"at_token_present":                  false,
+		"at_token_source":                   "NONE",
 		"rotate_count":                      0,
 		"rotate_status":                     0,
 		"rotate_replacement_psidts_present": false,
@@ -133,7 +137,9 @@ func (h *GatewayHandler) ConsumerWebAuthProbe(c *gin.Context) {
 		case service.ConsumerWebStageGeminiAPP:
 			response["app_status"] = step.HTTPStatus
 			response["app_response_received"] = step.HTTPResponseReceived
-			response["app_snlm0e_present"] = step.APPTokenPresent
+			response["app_snlm0e_present"] = step.APPTokenPresent && step.APPTokenSource == "SNLM0E"
+			response["at_token_present"] = step.APPTokenPresent
+			response["at_token_source"] = step.APPTokenSource
 		case service.ConsumerWebStageRotateCookies:
 			response["rotate_count"] = response["rotate_count"].(int) + 1
 			response["rotate_status"] = step.HTTPStatus

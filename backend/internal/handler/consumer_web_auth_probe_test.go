@@ -48,14 +48,14 @@ func TestConsumerWebAuthProbeSafeBootstrapSequence(t *testing.T) {
 	steps := []service.ConsumerWebBootstrapStep{
 		{Stage: service.ConsumerWebStageGeminiAPP, AttemptOrdinal: 1, HTTPStatus: 200, APPTokenPresent: false},
 		{Stage: service.ConsumerWebStageRotateCookies, AttemptOrdinal: 1, HTTPStatus: 200, RotatePersistResult: "NOT_ATTEMPTED_NO_REPLACEMENT"},
-		{Stage: service.ConsumerWebStageGeminiAPP, AttemptOrdinal: 2, HTTPStatus: 200, APPTokenPresent: true},
+		{Stage: service.ConsumerWebStageGeminiAPP, AttemptOrdinal: 2, HTTPStatus: 200, APPTokenPresent: true, APPTokenSource: "THYKHD"},
 	}
 	encoded, err := json.Marshal(safeConsumerWebBootstrapSteps(steps))
 	if err != nil {
 		t.Fatal(err)
 	}
 	text := string(encoded)
-	for _, required := range []string{`"attempt_ordinal":1`, `"attempt_ordinal":2`, `"rotate_persist_result":"NOT_ATTEMPTED_NO_REPLACEMENT"`} {
+	for _, required := range []string{`"attempt_ordinal":1`, `"attempt_ordinal":2`, `"rotate_persist_result":"NOT_ATTEMPTED_NO_REPLACEMENT"`, `"at_token_source":"THYKHD"`, `"app_snlm0e_present":false`} {
 		if !strings.Contains(text, required) {
 			t.Fatalf("missing safe sequence field: %s", required)
 		}

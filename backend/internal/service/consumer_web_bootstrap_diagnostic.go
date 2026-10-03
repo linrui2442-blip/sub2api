@@ -50,6 +50,7 @@ type ConsumerWebBootstrapStep struct {
 	TLSCause                 TLSCauseCode
 	ProxyUsed                bool
 	APPTokenPresent          bool
+	APPTokenSource           string // bounded enum: SNLM0E, THYKHD, or NONE
 	APPInitMarkerCount       int
 	APPFinalHostClass        string
 	APPFinalPathClass        string
