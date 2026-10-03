@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,6 +22,26 @@ func (f *authProbeResolverFixture) ResolvePersonalProvider(_ context.Context, mo
 		return "", "", service.ErrPersonalRouteUnsupported
 	}
 	return service.PlatformAntigravity, model, nil
+}
+
+func TestConsumerWebAuthProbeSafeCausePropagation(t *testing.T) {
+	steps := []service.ConsumerWebBootstrapStep{{Stage: service.ConsumerWebStageOTAQ, HTTPStatus: 200, BootstrapSafeCause: service.ConsumerWebBootstrapOTAQPayloadJSONInvalid}}
+	got := consumerWebProbeFailureCause(service.ErrConsumerWebProtocolDrift, steps)
+	if got != "OTAQ_PAYLOAD_JSON_INVALID" {
+		t.Fatalf("safe cause=%q", got)
+	}
+	encoded, err := json.Marshal(gin.H{"safe_cause": got, "bootstrap_steps": safeConsumerWebBootstrapSteps(steps)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, secret := range []string{"secret-cookie", "raw_payload", "response_body"} {
+		if strings.Contains(string(encoded), secret) {
+			t.Fatal("unsafe probe output")
+		}
+	}
+	if consumerWebProbeFailureCause(errors.New("synthetic-secret-cookie"), nil) != "UNKNOWN" {
+		t.Fatal("unexpected fallback")
+	}
 }
 
 func TestConsumerWebAuthProbeMatchesVideoUnifiedProviderContext(t *testing.T) {

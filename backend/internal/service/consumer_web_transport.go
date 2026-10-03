@@ -178,10 +178,30 @@ func (t *ConsumerWebHTTPTransport) otAQ(ctx context.Context, account *Account, h
 	}
 	b, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if err != nil {
-		consumerWebBootstrapTraceFromContext(ctx).updateLast(ConsumerWebStageOTAQ, func(s *ConsumerWebBootstrapStep) { s.TransportCause = ConsumerWebCauseBodyReadFailure })
+		consumerWebBootstrapTraceFromContext(ctx).updateLast(ConsumerWebStageOTAQ, func(s *ConsumerWebBootstrapStep) {
+			s.TransportCause = ConsumerWebCauseBodyReadFailure
+			s.BootstrapSafeCause = ConsumerWebBootstrapOTAQBodyReadFailed
+		})
 		return ConsumerWebBootstrapResult{}, &ConsumerWebBootstrapStageError{Stage: ConsumerWebStageOTAQ, Err: fmt.Errorf("%w: %w", ErrConsumerWebTransportTransient, err)}
 	}
-	status, registry, err := parseConsumerWebOTAQ(string(b))
+	var parsed ConsumerWebBootstrapStep
+	parsed.OTAQBodyReadOK = true
+	status, registry, err := parseConsumerWebOTAQWithDiagnostic(string(b), &parsed)
+	consumerWebBootstrapTraceFromContext(ctx).updateLast(ConsumerWebStageOTAQ, func(s *ConsumerWebBootstrapStep) {
+		s.OTAQBodyReadOK = parsed.OTAQBodyReadOK
+		s.OTAQProtocolScanOK = parsed.OTAQProtocolScanOK
+		s.OTAQWRBFRFound = parsed.OTAQWRBFRFound
+		s.OTAQRPCIDMatched = parsed.OTAQRPCIDMatched
+		s.OTAQEncodedPayloadPresent = parsed.OTAQEncodedPayloadPresent
+		s.OTAQPayloadJSONDecoded = parsed.OTAQPayloadJSONDecoded
+		s.OTAQModelRowsPresent = parsed.OTAQModelRowsPresent
+		s.OTAQModelRowCountClass = parsed.OTAQModelRowCountClass
+		s.OTAQModelCatalogParsed = parsed.OTAQModelCatalogParsed
+		s.OTAQAccountStatusParsed = parsed.OTAQAccountStatusParsed
+		s.OTAQAccountStatusCode = parsed.OTAQAccountStatusCode
+		s.OTAQAccountStatusAccepted = parsed.OTAQAccountStatusAccepted
+		s.BootstrapSafeCause = parsed.BootstrapSafeCause
+	})
 	if err != nil {
 		return ConsumerWebBootstrapResult{}, err
 	}
@@ -494,6 +514,15 @@ func defaultString(value, fallback string) string {
 }
 
 func parseConsumerWebOTAQ(body string) (int, []ConsumerWebModel, error) {
+	return parseConsumerWebOTAQWithDiagnostic(body, nil)
+}
+
+func parseConsumerWebOTAQWithDiagnostic(body string, diagnostic *ConsumerWebBootstrapStep) (int, []ConsumerWebModel, error) {
+	if diagnostic == nil {
+		diagnostic = &ConsumerWebBootstrapStep{}
+	}
+	diagnostic.OTAQModelRowCountClass = "ZERO"
+	diagnostic.BootstrapSafeCause = ConsumerWebBootstrapOTAQEnvelopeInvalid
 	body = strings.TrimSpace(body)
 	if strings.HasPrefix(body, ")]}'") {
 		body = strings.TrimSpace(strings.TrimPrefix(body, ")]}'"))
@@ -512,6 +541,7 @@ func parseConsumerWebOTAQ(body string) (int, []ConsumerWebModel, error) {
 		if json.Unmarshal([]byte(line), &root) != nil {
 			continue
 		}
+		diagnostic.OTAQProtocolScanOK = true
 		var frames [][]any
 		if len(root) > 0 {
 			if kind, ok := root[0].(string); ok && kind == "wrb.fr" {
@@ -527,18 +557,36 @@ func parseConsumerWebOTAQ(body string) (int, []ConsumerWebModel, error) {
 			}
 		}
 		for _, frame := range frames {
-			if len(frame) < 3 || frame[0] != "wrb.fr" || frame[1] != "otAQ7b" {
+			if len(frame) < 1 || frame[0] != "wrb.fr" {
 				continue
+			}
+			diagnostic.OTAQWRBFRFound = true
+			if len(frame) < 2 || frame[1] != "otAQ7b" {
+				continue
+			}
+			diagnostic.OTAQRPCIDMatched = true
+			if len(frame) < 3 {
+				diagnostic.BootstrapSafeCause = ConsumerWebBootstrapOTAQPayloadJSONInvalid
+				continue
+			}
+			if frame[2] == nil {
+				diagnostic.BootstrapSafeCause = "OTAQ_PAYLOAD_JSON_INVALID"
+				return 0, nil, ErrConsumerWebProtocolDrift
 			}
 			payload, ok := frame[2].(string)
 			if !ok || payload == "" {
+				diagnostic.BootstrapSafeCause = "OTAQ_PAYLOAD_JSON_INVALID"
 				return 0, nil, ErrConsumerWebProtocolDrift
 			}
+			diagnostic.OTAQEncodedPayloadPresent = true
 			var inner []any
 			if json.Unmarshal([]byte(payload), &inner) != nil {
+				diagnostic.BootstrapSafeCause = "OTAQ_PAYLOAD_JSON_INVALID"
 				return 0, nil, ErrConsumerWebProtocolDrift
 			}
+			diagnostic.OTAQPayloadJSONDecoded = true
 			if len(inner) <= 14 {
+				diagnostic.BootstrapSafeCause = ConsumerWebBootstrapOTAQPayloadJSONInvalid
 				return 0, nil, ErrConsumerWebProtocolDrift
 			}
 			switch v := inner[14].(type) {
@@ -547,15 +595,33 @@ func parseConsumerWebOTAQ(body string) (int, []ConsumerWebModel, error) {
 				status = 1000
 			case float64:
 				status = int(v)
+				diagnostic.OTAQAccountStatusParsed = true
+				diagnostic.OTAQAccountStatusCode = status
 				if status != 1000 && status != 1016 {
+					diagnostic.BootstrapSafeCause = "OTAQ_ACCOUNT_STATUS_REJECTED"
 					return 0, nil, ErrConsumerWebProtocolDrift
 				}
 			default:
+				diagnostic.BootstrapSafeCause = ConsumerWebBootstrapOTAQPayloadJSONInvalid
 				return 0, nil, ErrConsumerWebProtocolDrift
+			}
+			diagnostic.OTAQAccountStatusParsed = true
+			diagnostic.OTAQAccountStatusCode = status
+			diagnostic.OTAQAccountStatusAccepted = status == 1000
+			if status != 1000 {
+				diagnostic.BootstrapSafeCause = "OTAQ_ACCOUNT_STATUS_REJECTED"
+			} else {
+				diagnostic.BootstrapSafeCause = "NONE"
 			}
 			if len(inner) > 15 {
 				capacity, capacityField, profilePresent := consumerWebModelCapacity(inner)
 				if arr, ok := inner[15].([]any); ok {
+					diagnostic.OTAQModelRowsPresent = true
+					if len(arr) == 1 {
+						diagnostic.OTAQModelRowCountClass = "ONE"
+					} else if len(arr) > 1 {
+						diagnostic.OTAQModelRowCountClass = "MULTIPLE"
+					}
 					for _, v := range arr {
 						if model, ok := consumerWebRegistryModel(v); ok {
 							if profilePresent {
@@ -564,10 +630,14 @@ func parseConsumerWebOTAQ(body string) (int, []ConsumerWebModel, error) {
 							registry = append(registry, model)
 						}
 					}
+					diagnostic.OTAQModelCatalogParsed = len(registry) > 0
 				}
 			}
 			return status, registry, nil
 		}
+	}
+	if diagnostic.OTAQWRBFRFound && !diagnostic.OTAQRPCIDMatched {
+		diagnostic.BootstrapSafeCause = "OTAQ_RPC_RECORD_MISSING"
 	}
 	return 0, nil, ErrConsumerWebProtocolDrift
 }

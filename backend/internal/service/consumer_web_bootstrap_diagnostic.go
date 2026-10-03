@@ -13,6 +13,19 @@ import (
 // ConsumerWebBootstrapStage names a fixed lifecycle hop, never a request URL.
 type ConsumerWebBootstrapStage string
 
+// ConsumerWebBootstrapSafeCause is a bounded, secret-free diagnostic enum.
+type ConsumerWebBootstrapSafeCause = string
+
+const (
+	ConsumerWebBootstrapOTAQBodyReadFailed        ConsumerWebBootstrapSafeCause = "OTAQ_BODY_READ_FAILED"
+	ConsumerWebBootstrapOTAQEnvelopeInvalid       ConsumerWebBootstrapSafeCause = "OTAQ_ENVELOPE_INVALID"
+	ConsumerWebBootstrapOTAQRPCRecordMissing      ConsumerWebBootstrapSafeCause = "OTAQ_RPC_RECORD_MISSING"
+	ConsumerWebBootstrapOTAQPayloadJSONInvalid    ConsumerWebBootstrapSafeCause = "OTAQ_PAYLOAD_JSON_INVALID"
+	ConsumerWebBootstrapOTAQModelCatalogInvalid   ConsumerWebBootstrapSafeCause = "OTAQ_MODEL_CATALOG_INVALID"
+	ConsumerWebBootstrapOTAQAccountStatusRejected ConsumerWebBootstrapSafeCause = "OTAQ_ACCOUNT_STATUS_REJECTED"
+	ConsumerWebBootstrapOTAQOtherFailure          ConsumerWebBootstrapSafeCause = "OTAQ_OTHER_BOOTSTRAP_FAILURE"
+)
+
 const (
 	ConsumerWebStageGooglePreflight ConsumerWebBootstrapStage = "GOOGLE_PREFLIGHT"
 	ConsumerWebStageGeminiPrime     ConsumerWebBootstrapStage = "GEMINI_PRIME"
@@ -41,23 +54,36 @@ const (
 
 // ConsumerWebBootstrapStep contains bounded, secret-free observations only.
 type ConsumerWebBootstrapStep struct {
-	Stage                    ConsumerWebBootstrapStage
-	AttemptOrdinal           int
-	RequestSent              bool
-	HTTPResponseReceived     bool
-	HTTPStatus               int
-	TransportCause           ConsumerWebTransportCause
-	TLSCause                 TLSCauseCode
-	ProxyUsed                bool
-	APPTokenPresent          bool
-	APPTokenSource           string // bounded enum: SNLM0E, THYKHD, or NONE
-	APPInitMarkerCount       int
-	APPFinalHostClass        string
-	APPFinalPathClass        string
-	RotateReplacementPresent bool
-	RotatePersistAttempted   bool
-	RotatePersistResult      string
-	RotateCASConflict        bool
+	Stage                     ConsumerWebBootstrapStage
+	AttemptOrdinal            int
+	RequestSent               bool
+	HTTPResponseReceived      bool
+	HTTPStatus                int
+	TransportCause            ConsumerWebTransportCause
+	TLSCause                  TLSCauseCode
+	ProxyUsed                 bool
+	APPTokenPresent           bool
+	APPTokenSource            string // bounded enum: SNLM0E, THYKHD, or NONE
+	APPInitMarkerCount        int
+	APPFinalHostClass         string
+	APPFinalPathClass         string
+	RotateReplacementPresent  bool
+	RotatePersistAttempted    bool
+	RotatePersistResult       string
+	RotateCASConflict         bool
+	OTAQBodyReadOK            bool
+	OTAQProtocolScanOK        bool
+	OTAQWRBFRFound            bool
+	OTAQRPCIDMatched          bool
+	OTAQEncodedPayloadPresent bool
+	OTAQPayloadJSONDecoded    bool
+	OTAQModelRowsPresent      bool
+	OTAQModelRowCountClass    string
+	OTAQModelCatalogParsed    bool
+	OTAQAccountStatusParsed   bool
+	OTAQAccountStatusCode     int
+	OTAQAccountStatusAccepted bool
+	BootstrapSafeCause        string
 }
 
 // ConsumerWebBootstrapTrace is request-scoped. It is not a second error system

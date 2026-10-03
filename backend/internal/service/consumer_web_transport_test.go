@@ -425,3 +425,55 @@ func TestConsumerWebTransportCookieIsolation(t *testing.T) {
 }
 
 func jsonMarshal(v any) ([]byte, error) { return json.Marshal(v) }
+
+func TestConsumerWebOTAQSafeDiagnosticClasses(t *testing.T) {
+	frame := func(payload any) string {
+		b, _ := json.Marshal([]any{"wrb.fr", "otAQ7b", payload})
+		return ")]}'\n" + string(b)
+	}
+	inner := make([]any, 16)
+	inner[14] = float64(1016)
+	b, _ := json.Marshal(inner)
+	inner[14] = float64(42)
+	unknown, _ := json.Marshal(inner)
+	for _, tc := range []struct{ name, body, cause string }{
+		{"envelope", ")]}'\nnot-json", "OTAQ_ENVELOPE_INVALID"},
+		{"rpc", `[["wrb.fr","other","[]"]]`, "OTAQ_RPC_RECORD_MISSING"},
+		{"payload", frame("not-json"), "OTAQ_PAYLOAD_JSON_INVALID"},
+		{"account", frame(string(b)), "OTAQ_ACCOUNT_STATUS_REJECTED"},
+		{"unknown account code", frame(string(unknown)), "OTAQ_ACCOUNT_STATUS_REJECTED"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := &ConsumerWebBootstrapStep{}
+			_, _, _ = parseConsumerWebOTAQWithDiagnostic(tc.body, d)
+			if d.BootstrapSafeCause != tc.cause {
+				t.Fatalf("cause=%q want=%q", d.BootstrapSafeCause, tc.cause)
+			}
+			if tc.name == "account" && (!d.OTAQAccountStatusParsed || d.OTAQAccountStatusCode != 1016 || d.OTAQAccountStatusAccepted) {
+				t.Fatal("rejected status was not reported as a safe scalar")
+			}
+			if tc.name == "unknown account code" && (!d.OTAQAccountStatusParsed || d.OTAQAccountStatusCode != 42) {
+				t.Fatal("unknown numeric status code was not retained safely")
+			}
+		})
+	}
+}
+
+type consumerWebFailingReader struct{}
+
+func (consumerWebFailingReader) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
+
+func TestConsumerWebOTAQBodyReadSafeCause(t *testing.T) {
+	otaq := consumerWebResp(200, "")
+	otaq.Body = io.NopCloser(consumerWebFailingReader{})
+	u := &consumerWebTestUpstream{responses: []*http.Response{consumerWebResp(200, `"SNlM0e":"synthetic"`), otaq}}
+	trace := &ConsumerWebBootstrapTrace{}
+	_, err := consumerWebTestTransport(u).Bootstrap(WithConsumerWebBootstrapTrace(context.Background(), trace), consumerWebTestAccount(), consumerWebTestCreds(), nil)
+	if err == nil {
+		t.Fatal("expected body read error")
+	}
+	steps := trace.Steps()
+	if len(steps) != 2 || steps[1].BootstrapSafeCause != ConsumerWebBootstrapOTAQBodyReadFailed || steps[1].OTAQBodyReadOK {
+		t.Fatal("safe otAQ body-read cause not captured")
+	}
+}

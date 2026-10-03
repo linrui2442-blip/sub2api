@@ -44,6 +44,19 @@ func safeConsumerWebBootstrapSteps(steps []service.ConsumerWebBootstrapStep) []g
 	return result
 }
 
+func consumerWebProbeFailureCause(err error, steps []service.ConsumerWebBootstrapStep) string {
+	for i := len(steps) - 1; i >= 0; i-- {
+		if steps[i].Stage == service.ConsumerWebStageOTAQ && steps[i].BootstrapSafeCause != "" && steps[i].BootstrapSafeCause != "NONE" {
+			return steps[i].BootstrapSafeCause
+		}
+	}
+	var typed *service.ConsumerWebAcquireError
+	if errors.As(err, &typed) {
+		return string(typed.Cause)
+	}
+	return "UNKNOWN"
+}
+
 // The ungrouped Personal key receives this context from the unified router on
 // /v1/videos. The standalone probe must apply the same resolver decision.
 func prepareConsumerWebProbePlatform(c *gin.Context, key *service.APIKey, resolver consumerWebProbeResolver) error {
@@ -147,15 +160,35 @@ func (h *GatewayHandler) ConsumerWebAuthProbe(c *gin.Context) {
 			response["rotate_persist_result"] = step.RotatePersistResult
 		case service.ConsumerWebStageOTAQ:
 			response["otaq_status"] = step.HTTPStatus
+			response["otaq_body_read_ok"] = step.OTAQBodyReadOK
+			response["otaq_protocol_scan_ok"] = step.OTAQProtocolScanOK
+			response["otaq_wrb_fr_found"] = step.OTAQWRBFRFound
+			response["otaq_rpc_id_matched"] = step.OTAQRPCIDMatched
+			response["otaq_encoded_payload_present"] = step.OTAQEncodedPayloadPresent
+			response["otaq_payload_json_decoded"] = step.OTAQPayloadJSONDecoded
+			response["otaq_model_rows_present"] = step.OTAQModelRowsPresent
+			response["otaq_model_row_count_class"] = step.OTAQModelRowCountClass
+			response["otaq_model_catalog_parsed"] = step.OTAQModelCatalogParsed
+			response["otaq_account_status_parsed"] = step.OTAQAccountStatusParsed
+			response["otaq_account_status_accepted"] = step.OTAQAccountStatusAccepted
+			response["bootstrap_failure_stage"] = step.Stage
+			response["bootstrap_safe_cause"] = step.BootstrapSafeCause
+			if step.OTAQAccountStatusParsed {
+				response["otaq_account_status_safe_code"] = step.OTAQAccountStatusCode
+				if step.OTAQAccountStatusCode == 1000 {
+					response["otaq_account_status_safe_class"] = "AVAILABLE"
+				} else if step.OTAQAccountStatusCode == 1016 {
+					response["otaq_account_status_safe_class"] = "UNAUTHENTICATED"
+				} else {
+					response["otaq_account_status_safe_class"] = "OTHER"
+				}
+			}
 		}
 	}
 	response["bootstrap_stage_sequence"] = stages
 	response["bootstrap_steps"] = safeConsumerWebBootstrapSteps(traceSteps)
 	if err != nil {
-		var typed *service.ConsumerWebAcquireError
-		if errors.As(err, &typed) {
-			response["safe_cause"] = typed.Cause
-		}
+		response["safe_cause"] = consumerWebProbeFailureCause(err, traceSteps)
 		c.JSON(http.StatusServiceUnavailable, response)
 		return
 	}
