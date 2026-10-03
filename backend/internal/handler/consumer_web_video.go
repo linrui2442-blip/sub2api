@@ -22,6 +22,27 @@ type consumerWebProbeManager interface {
 	AcquireSession(context.Context, *service.Account) (service.ConsumerWebSessionHandle, error)
 }
 
+type consumerWebProbeResolver interface {
+	ResolvePersonalProvider(context.Context, string, string) (string, string, error)
+}
+
+// The ungrouped Personal key receives this context from the unified router on
+// /v1/videos. The standalone probe must apply the same resolver decision.
+func prepareConsumerWebProbePlatform(c *gin.Context, key *service.APIKey, resolver consumerWebProbeResolver) error {
+	if key.GroupID != nil {
+		return nil
+	}
+	platform, _, err := resolver.ResolvePersonalProvider(c.Request.Context(), "gemini-3.1-pro-high", "")
+	if err != nil {
+		return err
+	}
+	if platform != service.PlatformAntigravity {
+		return service.ErrPersonalRouteUnsupported
+	}
+	middleware.SetForcePlatform(c, platform)
+	return nil
+}
+
 // acquireConsumerWebForProbe deliberately has no video driver. The production
 // handler passes its real scheduler and session manager to this seam.
 func acquireConsumerWebForProbe(ctx context.Context, scheduler consumerWebProbeScheduler, manager consumerWebProbeManager, groupID *int64, sessionHash string) (*service.Account, *service.ConsumerWebBootstrapTrace, error) {
@@ -56,10 +77,14 @@ func (h *GatewayHandler) ConsumerWebAuthProbe(c *gin.Context) {
 		c.AbortWithStatus(http.StatusServiceUnavailable)
 		return
 	}
+	if err := prepareConsumerWebProbePlatform(c, key, h.gatewayService); err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"session_result": "FAIL", "safe_cause": "MODEL_UNSUPPORTED", "scheduler_failure_reason": "MODEL_UNSUPPORTED"})
+		return
+	}
 	sessionHash := h.openAIGatewayService.GenerateExplicitSessionHash(c, []byte("consumer-web-auth-probe"))
 	account, trace, err := acquireConsumerWebForProbe(c.Request.Context(), h.gatewayService, h.consumerWebManager, key.GroupID, sessionHash)
 	if account == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"session_result": "FAIL", "safe_cause": "ACCOUNT_NOT_CONSUMER_WEB_READY"})
+		c.JSON(http.StatusServiceUnavailable, gin.H{"session_result": "FAIL", "safe_cause": "NO_ELIGIBLE_ACCOUNT", "scheduler_failure_reason": "NO_ELIGIBLE_ACCOUNT"})
 		return
 	}
 	response := gin.H{

@@ -6,9 +6,41 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
 )
+
+type authProbeResolverFixture struct{ called bool }
+
+func (f *authProbeResolverFixture) ResolvePersonalProvider(_ context.Context, model, endpoint string) (string, string, error) {
+	f.called = true
+	if model != "gemini-3.1-pro-high" || endpoint != "" {
+		return "", "", service.ErrPersonalRouteUnsupported
+	}
+	return service.PlatformAntigravity, model, nil
+}
+
+func TestConsumerWebAuthProbeMatchesVideoUnifiedProviderContext(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/_acceptance/consumer-web/auth-probe", nil)
+	resolver := &authProbeResolverFixture{}
+	if err := prepareConsumerWebProbePlatform(c, &service.APIKey{}, resolver); err != nil {
+		t.Fatal(err)
+	}
+	platform, ok := middleware.GetForcePlatformFromContext(c)
+	if !resolver.called || !ok || platform != service.PlatformAntigravity {
+		t.Fatal("probe did not apply production unified-video provider context")
+	}
+	groupID := int64(7)
+	c2, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c2.Request = httptest.NewRequest(http.MethodPost, "/_acceptance/consumer-web/auth-probe", nil)
+	resolver = &authProbeResolverFixture{}
+	if err := prepareConsumerWebProbePlatform(c2, &service.APIKey{GroupID: &groupID}, resolver); err != nil || resolver.called {
+		t.Fatal("pinned key must retain group-scoped video selection")
+	}
+}
 
 type authProbeSchedulerFixture struct {
 	called, released bool
