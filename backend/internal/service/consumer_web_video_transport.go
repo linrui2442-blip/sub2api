@@ -16,6 +16,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -30,7 +32,9 @@ type ConsumerWebVideoUpload struct {
 	Data []byte
 }
 
-type consumerWebUploadedFile struct{ ID, Name string }
+type consumerWebUploadedFile struct{ ID, Name, MIME, AttachmentUUID string }
+
+func consumerWebVideoAttachmentUUID() string { return strings.ToUpper(uuid.NewString()) }
 
 // ConsumerWebVideoUploadError marks a failure before StreamGenerate. It does
 // not imply the provider accepted a video task or established a conversation.
@@ -147,7 +151,9 @@ func (t *ConsumerWebHTTPTransport) videoRequest(ctx context.Context, account *Ac
 func consumerWebVideoGenerateInner(prompt, language, requestID string, modelNumber int, file *consumerWebUploadedFile) []any {
 	message := []any{prompt, 0, nil, nil, nil, nil, 0}
 	if file != nil {
-		message = []any{prompt, 0, nil, []any{[]any{[]any{file.ID}, file.Name}}, nil, nil, 0}
+		attachment := []any{[]any{file.ID, 1, nil, file.MIME, file.AttachmentUUID}, file.Name, nil, nil, nil, nil, nil, nil, []any{0}}
+		mode := []any{nil, nil, nil, nil, nil, nil, []any{[]any{nil, nil, nil, 2}}}
+		message = []any{prompt, 0, nil, []any{attachment}, nil, nil, 0, nil, nil, mode}
 	}
 	inner := make([]any, 81)
 	inner[0] = message
@@ -157,6 +163,10 @@ func consumerWebVideoGenerateInner(prompt, language, requestID string, modelNumb
 	inner[7], inner[10], inner[11] = 1, 1, 0
 	inner[17], inner[18], inner[27], inner[30] = []any{[]any{0}}, 0, 1, []any{4}
 	inner[41], inner[53], inner[59], inner[61], inner[68] = []any{1}, 0, requestID, []any{}, 1
+	if file != nil {
+		inner[49] = 11
+		inner[55] = []any{[]any{17}}
+	}
 	inner[79], inner[80] = modelNumber, 1
 	return inner
 }
@@ -216,7 +226,7 @@ func (t *ConsumerWebHTTPTransport) uploadVideoInput(ctx context.Context, account
 	if fileID == "" {
 		return nil, ErrConsumerWebProtocolDrift
 	}
-	return &consumerWebUploadedFile{ID: fileID, Name: name}, nil
+	return &consumerWebUploadedFile{ID: fileID, Name: name, MIME: file.MIME, AttachmentUUID: consumerWebVideoAttachmentUUID()}, nil
 }
 
 func (t *ConsumerWebHTTPTransport) GenerateVideo(ctx context.Context, account *Account, session ConsumerWebSessionHandle, model, prompt string, image *ConsumerWebVideoUpload) ([]consumerWebGeneratedVideo, error) {
