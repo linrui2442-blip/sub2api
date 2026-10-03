@@ -2,8 +2,10 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -39,6 +41,29 @@ func TestConsumerWebAuthProbeMatchesVideoUnifiedProviderContext(t *testing.T) {
 	resolver = &authProbeResolverFixture{}
 	if err := prepareConsumerWebProbePlatform(c2, &service.APIKey{GroupID: &groupID}, resolver); err != nil || resolver.called {
 		t.Fatal("pinned key must retain group-scoped video selection")
+	}
+}
+
+func TestConsumerWebAuthProbeSafeBootstrapSequence(t *testing.T) {
+	steps := []service.ConsumerWebBootstrapStep{
+		{Stage: service.ConsumerWebStageGeminiAPP, AttemptOrdinal: 1, HTTPStatus: 200, APPTokenPresent: false},
+		{Stage: service.ConsumerWebStageRotateCookies, AttemptOrdinal: 1, HTTPStatus: 200, RotatePersistResult: "NOT_ATTEMPTED_NO_REPLACEMENT"},
+		{Stage: service.ConsumerWebStageGeminiAPP, AttemptOrdinal: 2, HTTPStatus: 200, APPTokenPresent: true},
+	}
+	encoded, err := json.Marshal(safeConsumerWebBootstrapSteps(steps))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(encoded)
+	for _, required := range []string{`"attempt_ordinal":1`, `"attempt_ordinal":2`, `"rotate_persist_result":"NOT_ATTEMPTED_NO_REPLACEMENT"`} {
+		if !strings.Contains(text, required) {
+			t.Fatalf("missing safe sequence field: %s", required)
+		}
+	}
+	for _, forbidden := range []string{"secret-cookie", "raw_error", "response_body"} {
+		if strings.Contains(text, forbidden) {
+			t.Fatal("secret or raw data leaked")
+		}
 	}
 }
 

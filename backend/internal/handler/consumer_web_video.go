@@ -26,6 +26,22 @@ type consumerWebProbeResolver interface {
 	ResolvePersonalProvider(context.Context, string, string) (string, string, error)
 }
 
+func safeConsumerWebBootstrapSteps(steps []service.ConsumerWebBootstrapStep) []gin.H {
+	result := make([]gin.H, 0, len(steps))
+	for _, step := range steps {
+		result = append(result, gin.H{
+			"stage":                      step.Stage,
+			"attempt_ordinal":            step.AttemptOrdinal,
+			"http_status":                step.HTTPStatus,
+			"app_snlm0e_present":         step.APPTokenPresent,
+			"rotate_replacement_present": step.RotateReplacementPresent,
+			"rotate_persist_attempted":   step.RotatePersistAttempted,
+			"rotate_persist_result":      step.RotatePersistResult,
+		})
+	}
+	return result
+}
+
 // The ungrouped Personal key receives this context from the unified router on
 // /v1/videos. The standalone probe must apply the same resolver decision.
 func prepareConsumerWebProbePlatform(c *gin.Context, key *service.APIKey, resolver consumerWebProbeResolver) error {
@@ -103,9 +119,11 @@ func (h *GatewayHandler) ConsumerWebAuthProbe(c *gin.Context) {
 		"rotate_persist_result":             "NOT_ATTEMPTED",
 		"otaq_status":                       0,
 		"account_status":                    string(h.consumerWebManager.State(account.ID)),
+		"bootstrap_steps":                   []gin.H{},
 	}
 	stages := make([]service.ConsumerWebBootstrapStage, 0)
-	for _, step := range trace.Steps() {
+	traceSteps := trace.Steps()
+	for _, step := range traceSteps {
 		stages = append(stages, step.Stage)
 		switch step.Stage {
 		case service.ConsumerWebStageGooglePreflight:
@@ -126,6 +144,7 @@ func (h *GatewayHandler) ConsumerWebAuthProbe(c *gin.Context) {
 		}
 	}
 	response["bootstrap_stage_sequence"] = stages
+	response["bootstrap_steps"] = safeConsumerWebBootstrapSteps(traceSteps)
 	if err != nil {
 		var typed *service.ConsumerWebAcquireError
 		if errors.As(err, &typed) {
