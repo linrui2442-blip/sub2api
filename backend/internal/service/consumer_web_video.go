@@ -191,7 +191,6 @@ func parseConsumerWebGeneratedVideoAttempt(body []byte) ([]consumerWebGeneratedV
 	seen := make(map[string]struct{})
 	result := make([]consumerWebGeneratedVideo, 0)
 	validFrame := false
-	completedCandidate := false
 	for _, line := range strings.Split(string(body), "\n") {
 		line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), ")]}'"))
 		if !strings.HasPrefix(line, "[") {
@@ -239,9 +238,6 @@ func parseConsumerWebGeneratedVideoAttempt(body []byte) ([]consumerWebGeneratedV
 					identity.RCID = choice
 					d.ChoiceIDPresent = true
 				}
-				if status, ok := consumerWebListAt(rawCandidate, 8, 0).(float64); ok && status == 2 {
-					completedCandidate = true
-				}
 				if textParts, ok := consumerWebListAt(rawCandidate, 1).([]any); ok {
 					for _, rawText := range textParts {
 						if text, ok := rawText.(string); ok && text != "" {
@@ -267,7 +263,7 @@ func parseConsumerWebGeneratedVideoAttempt(body []byte) ([]consumerWebGeneratedV
 			d.Cause = ConsumerWebVideoFailureURLMissing
 		case d.VideoKey60Present:
 			d.Cause = ConsumerWebVideoFailureSlotParse
-		case validFrame && identity.CID != "" && identity.RID != "" && !completedCandidate:
+		case validFrame && identity.CID != "" && identity.RID != "":
 			d.Cause = ConsumerWebVideoAcceptedPending
 		default:
 			d.Cause = ConsumerWebVideoFailureNoVideo

@@ -92,3 +92,20 @@ func TestConsumerWebVideoStreamAcceptedPending(t *testing.T) {
 		t.Fatalf("cause=%s err=%v", diag.Cause, err)
 	}
 }
+
+func TestConsumerWebVideoCompletedTextCandidateStillNeedsRecovery(t *testing.T) {
+	candidate := make([]any, 13)
+	candidate[1] = []any{"synthetic text"}
+	candidate[8] = []any{2}
+	for _, name := range []string{"text", "image"} {
+		t.Run(name, func(t *testing.T) {
+			// The StreamGenerate response has the same post-accept contract
+			// regardless of whether the request included an uploaded image.
+			videos, diag, identity, err := parseConsumerWebGeneratedVideoAttempt(videoDiagnosticFixture(t, candidate, true))
+			if err != nil || len(videos) != 0 || diag.Cause != ConsumerWebVideoAcceptedPending ||
+				identity.CID == "" || identity.RID == "" {
+				t.Fatalf("cause=%s identity=%t/%t err=%v", diag.Cause, identity.CID != "", identity.RID != "", err)
+			}
+		})
+	}
+}

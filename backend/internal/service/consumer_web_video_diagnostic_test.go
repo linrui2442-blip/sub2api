@@ -46,7 +46,7 @@ func TestConsumerWebVideoDiagnosticParserStages(t *testing.T) {
 	}{
 		{"valid", []any{[]any{"other"}, map[string]any{"60": valid}}, ConsumerWebVideoFailureNone, true, true},
 		{"moved slot", []any{map[string]any{"60": valid}, []any{"other"}}, ConsumerWebVideoFailureNone, true, true},
-		{"no slot", []any{map[string]any{"other": true}}, ConsumerWebVideoFailureNoVideo, false, false},
+		{"no slot", []any{map[string]any{"other": true}}, ConsumerWebVideoAcceptedPending, false, false},
 		{"malformed slot", []any{map[string]any{"60": []any{}}}, ConsumerWebVideoFailureSlotParse, true, false},
 		{"missing URL", []any{map[string]any{"60": []any{[]any{[]any{[]any{make([]any, 8)}}}}}}, ConsumerWebVideoFailureURLMissing, true, false},
 	}
@@ -73,7 +73,7 @@ func TestConsumerWebVideoDiagnosticTextOnlyAndProviderBlock(t *testing.T) {
 	candidate[1] = []any{"Synthetic provider text; do not log this value."}
 	candidate[8] = []any{2}
 	_, d, err := parseConsumerWebGeneratedVideosDetailed(videoDiagnosticFixture(t, candidate, true))
-	if err == nil || d.Cause != ConsumerWebVideoFailureNoVideo || !d.TextPresent || d.TextLengthBucket == "NONE" || !d.ParsePass || d.VideoKey60Present {
+	if err != nil || d.Cause != ConsumerWebVideoAcceptedPending || !d.TextPresent || d.TextLengthBucket == "NONE" || !d.ParsePass || d.VideoKey60Present {
 		t.Fatalf("text-only diagnostic mismatch: %+v", d)
 	}
 	_, d, err = parseConsumerWebGeneratedVideosDetailed([]byte("BardErrorInfo [synthetic]"))
