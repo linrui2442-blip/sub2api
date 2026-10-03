@@ -211,17 +211,36 @@ func (m *ConsumerWebSessionManager) AcquireSession(ctx context.Context, account 
 	if errors.Is(err, ErrConsumerWebAPPTokenMissing) && bootstrapCtx.Err() == nil {
 		if rotator, ok := m.transport.(consumerWebPreAuthRotator); ok {
 			rotation, rotateErr := rotator.PreAuthRotatePSIDTS(bootstrapCtx, account, snapshot.Credentials)
+			consumerWebBootstrapTraceFromContext(bootstrapCtx).updateLast(ConsumerWebStageRotateCookies, func(s *ConsumerWebBootstrapStep) {
+				s.RotateReplacementPresent = rotation.PSIDTS != ""
+				if rotateErr != nil {
+					s.RotatePersistResult = "NOT_ATTEMPTED_ROTATE_FAILED"
+				} else if rotation.PSIDTS == "" {
+					s.RotatePersistResult = "NOT_ATTEMPTED_NO_REPLACEMENT"
+				}
+			})
 			if rotateErr != nil {
 				err = rotateErr
 			} else if !rotation.Authenticated {
 				err = ErrConsumerWebAuthUnavailable
 			} else {
 				if rotation.PSIDTS != "" {
+					consumerWebBootstrapTraceFromContext(bootstrapCtx).updateLast(ConsumerWebStageRotateCookies, func(s *ConsumerWebBootstrapStep) { s.RotatePersistAttempted = true })
 					if m.persister == nil {
 						err = ErrConsumerWebPersistence
 					} else {
 						err = m.persister.PersistPSIDTS(bootstrapCtx, account.ID, snapshot.Revision, rotation.PSIDTS)
 					}
+					consumerWebBootstrapTraceFromContext(bootstrapCtx).updateLast(ConsumerWebStageRotateCookies, func(s *ConsumerWebBootstrapStep) {
+						s.RotateCASConflict = errors.Is(err, ErrCredentialCASConflict)
+						if err == nil {
+							s.RotatePersistResult = "PASS"
+						} else if s.RotateCASConflict {
+							s.RotatePersistResult = "CAS_CONFLICT"
+						} else {
+							s.RotatePersistResult = "FAILED"
+						}
+					})
 				}
 				if err == nil || errors.Is(err, ErrConsumerWebAPPTokenMissing) {
 					snapshot, err = m.credentials.LoadCredentialSnapshot(bootstrapCtx, account.ID)

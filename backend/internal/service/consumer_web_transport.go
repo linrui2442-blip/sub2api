@@ -127,13 +127,22 @@ func (t *ConsumerWebHTTPTransport) Bootstrap(ctx context.Context, account *Accou
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if err != nil {
-		return ConsumerWebBootstrapResult{}, fmt.Errorf("%w: %w", ErrConsumerWebTransportTransient, err)
+		consumerWebBootstrapTraceFromContext(ctx).updateLast(ConsumerWebStageGeminiAPP, func(s *ConsumerWebBootstrapStep) { s.TransportCause = ConsumerWebCauseBodyReadFailure })
+		return ConsumerWebBootstrapResult{}, &ConsumerWebBootstrapStageError{Stage: ConsumerWebStageGeminiAPP, Err: fmt.Errorf("%w: %w", ErrConsumerWebTransportTransient, err)}
 	}
 	if resp.StatusCode != http.StatusOK {
-		return ConsumerWebBootstrapResult{}, mapConsumerWebStatus(resp.StatusCode)
+		return ConsumerWebBootstrapResult{}, &ConsumerWebBootstrapStageError{Stage: ConsumerWebStageGeminiAPP, Err: mapConsumerWebStatus(resp.StatusCode)}
 	}
 	mergeConsumerWebAuxiliaryCookies(jar, t.endpoints.app, resp.Cookies())
 	runtime := parseConsumerWebRuntime(string(body))
+	consumerWebBootstrapTraceFromContext(ctx).updateLast(ConsumerWebStageGeminiAPP, func(s *ConsumerWebBootstrapStep) {
+		s.APPTokenPresent = runtime.AuthToken != ""
+		for _, present := range []bool{runtime.BuildLabel != "", runtime.SessionID != "", runtime.Language != "", runtime.PushID != ""} {
+			if present {
+				s.APPInitMarkerCount++
+			}
+		}
+	})
 	h.snlm, h.build, h.sid, h.language, h.push = runtime.AuthToken, runtime.BuildLabel, runtime.SessionID, runtime.Language, runtime.PushID
 	if h.snlm == "" {
 		return ConsumerWebBootstrapResult{}, ErrConsumerWebAPPTokenMissing
@@ -164,11 +173,12 @@ func (t *ConsumerWebHTTPTransport) otAQ(ctx context.Context, account *Account, h
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return ConsumerWebBootstrapResult{}, mapConsumerWebStatus(resp.StatusCode)
+		return ConsumerWebBootstrapResult{}, &ConsumerWebBootstrapStageError{Stage: ConsumerWebStageOTAQ, Err: mapConsumerWebStatus(resp.StatusCode)}
 	}
 	b, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if err != nil {
-		return ConsumerWebBootstrapResult{}, fmt.Errorf("%w: %w", ErrConsumerWebTransportTransient, err)
+		consumerWebBootstrapTraceFromContext(ctx).updateLast(ConsumerWebStageOTAQ, func(s *ConsumerWebBootstrapStep) { s.TransportCause = ConsumerWebCauseBodyReadFailure })
+		return ConsumerWebBootstrapResult{}, &ConsumerWebBootstrapStageError{Stage: ConsumerWebStageOTAQ, Err: fmt.Errorf("%w: %w", ErrConsumerWebTransportTransient, err)}
 	}
 	status, registry, err := parseConsumerWebOTAQ(string(b))
 	if err != nil {
@@ -254,7 +264,7 @@ func (t *ConsumerWebHTTPTransport) rotate(ctx context.Context, account *Account,
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return "", mapConsumerWebStatus(resp.StatusCode)
+		return "", &ConsumerWebBootstrapStageError{Stage: ConsumerWebStageRotateCookies, Err: mapConsumerWebStatus(resp.StatusCode)}
 	}
 	var psidts string
 	for _, c := range resp.Cookies() {
@@ -317,6 +327,19 @@ func (t *ConsumerWebHTTPTransport) do(ctx context.Context, account *Account, h *
 		return nil, ErrConsumerWebProtocolDrift
 	}
 	diagnostic := &HTTPTransportDiagnostic{}
+	var bootstrapStage ConsumerWebBootstrapStage
+	switch raw {
+	case t.endpoints.googlePreflight:
+		bootstrapStage = ConsumerWebStageGooglePreflight
+	case t.endpoints.geminiPrime:
+		bootstrapStage = ConsumerWebStageGeminiPrime
+	case t.endpoints.app:
+		bootstrapStage = ConsumerWebStageGeminiAPP
+	case t.endpoints.rotate:
+		bootstrapStage = ConsumerWebStageRotateCookies
+	case t.endpoints.otaq:
+		bootstrapStage = ConsumerWebStageOTAQ
+	}
 	req = WithHTTPTransportDiagnostic(req, diagnostic)
 	req.Header.Set("User-Agent", "Mozilla/5.0")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml")
@@ -354,15 +377,31 @@ func (t *ConsumerWebHTTPTransport) do(ctx context.Context, account *Account, h *
 	}
 	if err != nil {
 		cancel()
+		consumerWebBootstrapTraceFromContext(ctx).append(consumerWebStepFromHTTP(bootstrapStage, resp, err, *diagnostic))
 		if diagnostic.RedirectRejected || errors.Is(err, ErrConsumerWebRedirectRejected) {
-			return nil, ErrConsumerWebRedirectRejected
+			return nil, &ConsumerWebBootstrapStageError{Stage: bootstrapStage, Err: ErrConsumerWebRedirectRejected}
 		}
-		return nil, fmt.Errorf("%w: %w", ErrConsumerWebTransportTransient, err)
+		return nil, &ConsumerWebBootstrapStageError{Stage: bootstrapStage, Err: fmt.Errorf("%w: %w", ErrConsumerWebTransportTransient, err)}
 	}
 	if resp == nil || resp.Body == nil {
 		cancel()
-		return nil, ErrConsumerWebTransportTransient
+		consumerWebBootstrapTraceFromContext(ctx).append(consumerWebStepFromHTTP(bootstrapStage, resp, ErrConsumerWebTransportTransient, *diagnostic))
+		return nil, &ConsumerWebBootstrapStageError{Stage: bootstrapStage, Err: ErrConsumerWebTransportTransient}
 	}
+	step := consumerWebStepFromHTTP(bootstrapStage, resp, nil, *diagnostic)
+	if bootstrapStage == ConsumerWebStageGeminiAPP && resp.Request != nil && resp.Request.URL != nil {
+		if strings.EqualFold(resp.Request.URL.Hostname(), "gemini.google.com") {
+			step.APPFinalHostClass = "GEMINI"
+		} else {
+			step.APPFinalHostClass = "OTHER"
+		}
+		if resp.Request.URL.Path == "/app" {
+			step.APPFinalPathClass = "APP"
+		} else {
+			step.APPFinalPathClass = "OTHER"
+		}
+	}
+	consumerWebBootstrapTraceFromContext(ctx).append(step)
 	resp.Body = &consumerWebCancelOnBodyDone{ReadCloser: resp.Body, cancel: cancel}
 	return resp, nil
 }
