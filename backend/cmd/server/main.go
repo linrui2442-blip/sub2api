@@ -79,6 +79,7 @@ func main() {
 	// Personal Edition is the only runtime shipped by this branch. Desktop
 	// mode acquires its single-instance guard before touching runtime data.
 	personal.PrepareEnvironment("personal")
+	personal.ConfigureAcceptanceAuthProbe(BuildType)
 
 	log.Println("Personal Edition runtime enabled: private routes + upstream SIMPLE semantics")
 

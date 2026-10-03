@@ -12,6 +12,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	pkghttputil "github.com/Wei-Shaw/sub2api/internal/pkg/httputil"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -47,6 +48,11 @@ func RegisterGatewayRoutes(
 			return
 		}
 		h.OpenAIGateway.Images(c)
+	}
+	if personal.AcceptanceAuthProbeEnabled() {
+		probe := r.Group("/_acceptance/consumer-web")
+		probe.Use(gin.HandlerFunc(apiKeyAuth))
+		probe.POST("/auth-probe", h.Gateway.ConsumerWebAuthProbe)
 	}
 
 	// 未分组 Key 拦截中间件（按协议格式区分错误响应）

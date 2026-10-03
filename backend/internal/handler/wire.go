@@ -32,6 +32,7 @@ func ProvideGatewayHandler(
 		errorPassthroughService, userMsgQueueService, cfg, settingService)
 	h.securityAuditCoordinator = coordinator
 	h.consumerWebVideoTasks = service.NewConsumerWebVideoTaskService(consumerWebManager, consumerWebTransport)
+	h.consumerWebManager = consumerWebManager
 	return h
 }
 

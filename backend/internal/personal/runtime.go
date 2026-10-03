@@ -3,9 +3,22 @@ package personal
 import (
 	"os"
 	"strings"
+	"sync/atomic"
 )
 
 const EnvEnabled = "SUB2_PERSONAL_MODE"
+
+const EnvAcceptanceAuthProbe = "SUB2_ACCEPTANCE_AUTH_PROBE"
+
+var acceptanceAuthProbeEnabled atomic.Bool
+
+// ConfigureAcceptanceAuthProbe is called by the executable before routes are
+// assembled. Source builds cannot enable the acceptance seam via environment.
+func ConfigureAcceptanceAuthProbe(buildType string) {
+	acceptanceAuthProbeEnabled.Store(strings.EqualFold(buildType, ModeName) && Enabled() && truthy(os.Getenv(EnvAcceptanceAuthProbe)))
+}
+
+func AcceptanceAuthProbeEnabled() bool { return acceptanceAuthProbeEnabled.Load() }
 
 var personalDisabledBackgroundFeatureEnv = []string{
 	"OPS_ENABLED",

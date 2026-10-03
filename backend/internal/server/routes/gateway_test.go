@@ -12,6 +12,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	servermiddleware "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -378,6 +379,37 @@ func TestPersonalConsumerWebVideoTaskSurface(t *testing.T) {
 	routes := registeredGatewayRoutes(newGatewayRoutesTestRouter(service.PlatformAntigravity))
 	for _, route := range []string{"POST /v1/videos", "GET /v1/videos/:request_id", "GET /v1/videos/:request_id/content"} {
 		require.True(t, routes[route], "%s must be registered", route)
+	}
+}
+
+func TestPersonalConsumerWebAuthProbeRouteGates(t *testing.T) {
+	t.Setenv(personal.EnvEnabled, "1")
+	t.Setenv(personal.EnvAcceptanceAuthProbe, "1")
+	personal.ConfigureAcceptanceAuthProbe("source")
+	if registeredGatewayRoutes(newGatewayRoutesTestRouter())["POST /_acceptance/consumer-web/auth-probe"] {
+		t.Fatal("source build registered acceptance probe")
+	}
+	personal.ConfigureAcceptanceAuthProbe("personal")
+	t.Cleanup(func() { personal.ConfigureAcceptanceAuthProbe("source") })
+	router := newGatewayRoutesTestRouter()
+	if !registeredGatewayRoutes(router)["POST /_acceptance/consumer-web/auth-probe"] {
+		t.Fatal("personal opt-in did not register probe")
+	}
+	for _, tc := range []struct {
+		remote string
+		want   int
+	}{
+		{"203.0.113.9:1234", http.StatusForbidden},
+		{"127.0.0.1:1234", http.StatusServiceUnavailable},
+		{"[::1]:1234", http.StatusServiceUnavailable},
+	} {
+		req := httptest.NewRequest(http.MethodPost, "/_acceptance/consumer-web/auth-probe", nil)
+		req.RemoteAddr = tc.remote
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		if w.Code != tc.want {
+			t.Fatalf("remote=%s status=%d want=%d", tc.remote, w.Code, tc.want)
+		}
 	}
 }
 
