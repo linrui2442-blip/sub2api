@@ -186,9 +186,6 @@ func (t *ConsumerWebHTTPTransport) RotatePSIDTS(ctx context.Context, account *Ac
 	if err != nil {
 		return ConsumerWebRotationResult{}, err
 	}
-	if psidts == "" {
-		return ConsumerWebRotationResult{}, ErrConsumerWebProtocolDrift
-	}
 	return ConsumerWebRotationResult{Authenticated: true, PSIDTS: psidts, Session: h}, nil
 }
 

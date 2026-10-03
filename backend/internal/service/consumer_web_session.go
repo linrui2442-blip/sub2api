@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"reflect"
 	"sync"
 	"time"
 )
@@ -162,9 +164,26 @@ func (m *ConsumerWebSessionManager) AcquireSession(ctx context.Context, account 
 	e := m.entry(account.ID)
 	e.mu.Lock()
 	if e.state == ConsumerWebSessionAuthenticated && e.session != nil {
-		s := e.session
-		e.mu.Unlock()
-		return s, nil
+		// The database remains authoritative even if another process manually
+		// replaced credentials while this manager held an authenticated jar.
+		latest, loadErr := m.credentials.LoadCredentialSnapshot(ctx, account.ID)
+		if loadErr != nil {
+			e.mu.Unlock()
+			return nil, wrapConsumerWebAcquireError(loadErr)
+		}
+		if reflect.DeepEqual(latest.Revision, e.revision) {
+			s := e.session
+			e.mu.Unlock()
+			return s, nil
+		}
+		_ = m.transport.Close(context.Background(), e.session)
+		e.session = nil
+		e.registry = nil
+		e.state = ConsumerWebSessionEmpty
+		e.generation++
+		if e.timer != nil {
+			e.timer.Stop()
+		}
 	}
 	if e.state == ConsumerWebSessionBootstrapping {
 		e.mu.Unlock()
@@ -286,25 +305,36 @@ func (m *ConsumerWebSessionManager) refresh(e *consumerWebSessionEntry) {
 	result, err := m.transport.RotatePSIDTS(m.root, account, session)
 	if err != nil {
 		e.mu.Lock()
-		if e.generation == gen {
+		if e.generation == gen && e.state == ConsumerWebSessionRefreshing && m.root.Err() == nil {
 			e.state = ConsumerWebSessionDegraded
 		}
 		e.mu.Unlock()
 		return
 	}
-	if !result.Authenticated || m.persister == nil {
+	if !result.Authenticated {
 		e.mu.Lock()
-		e.state = ConsumerWebSessionUnauthenticated
+		if e.generation == gen && e.state == ConsumerWebSessionRefreshing && m.root.Err() == nil {
+			e.state = ConsumerWebSessionUnauthenticated
+		}
 		e.mu.Unlock()
 		return
 	}
-	err = m.persister.PersistPSIDTS(m.root, account.ID, rev, result.PSIDTS)
+	if result.PSIDTS != "" {
+		if m.persister == nil {
+			err = ErrConsumerWebPersistence
+		} else {
+			err = m.persister.PersistPSIDTS(m.root, account.ID, rev, result.PSIDTS)
+		}
+	}
+	latest, loadErr := m.credentials.LoadCredentialSnapshot(m.root, account.ID)
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	if e.generation != gen {
+	if e.generation != gen || e.state != ConsumerWebSessionRefreshing || m.root.Err() != nil {
 		return
 	}
-	if errors.Is(err, ErrCredentialCASConflict) {
+	if errors.Is(err, ErrCredentialCASConflict) || (err == nil && loadErr == nil && result.PSIDTS == "" && !reflect.DeepEqual(latest.Revision, rev)) {
+		slog.Warn("consumer_web_refresh_credential_stale", "account_id", account.ID)
+		_ = m.transport.Close(context.Background(), e.session)
 		e.state = ConsumerWebSessionEmpty
 		e.session = nil
 		e.registry = nil
@@ -312,15 +342,19 @@ func (m *ConsumerWebSessionManager) refresh(e *consumerWebSessionEntry) {
 		return
 	}
 	if err != nil {
+		slog.Warn("consumer_web_refresh_persist_failed", "account_id", account.ID, "cause", string(ConsumerWebPersistenceFailure))
 		e.state = ConsumerWebSessionDegraded
 		return
 	}
-	if m.credentials != nil {
-		if latest, loadErr := m.credentials.LoadCredentialSnapshot(m.root, account.ID); loadErr == nil {
-			e.revision = latest.Revision
-		}
+	if loadErr != nil || latest == nil {
+		slog.Warn("consumer_web_refresh_revision_reload_failed", "account_id", account.ID, "cause", string(ConsumerWebPersistenceFailure))
+		e.state = ConsumerWebSessionDegraded
+		return
 	}
-	e.session = result.Session
+	e.revision = latest.Revision
+	if result.Session != nil {
+		e.session = result.Session
+	}
 	e.state = ConsumerWebSessionAuthenticated
 	m.armLocked(e)
 }
@@ -354,6 +388,7 @@ func (m *ConsumerWebSessionManager) Close() error {
 			if e.session != nil && m.transport != nil {
 				_ = m.transport.Close(context.Background(), e.session)
 			}
+			e.generation++
 			e.state = ConsumerWebSessionClosed
 			e.session = nil
 			e.registry = nil

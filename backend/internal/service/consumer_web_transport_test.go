@@ -291,7 +291,7 @@ func TestConsumerWebHTTPErrorClassification(t *testing.T) {
 	}
 }
 
-func TestConsumerWebRotateRequiresReplacementPSIDTS(t *testing.T) {
+func TestConsumerWebRotateReplacementAndNoChange(t *testing.T) {
 	u := &consumerWebTestUpstream{responses: []*http.Response{consumerWebResp(200, "", &http.Cookie{Name: "__Secure-1PSIDTS", Value: "replacement"})}}
 	tx := consumerWebTestTransport(u)
 	h := &consumerWebHTTPHandle{jar: mustCookieJar(), endpoints: tx.endpoints}
@@ -303,8 +303,12 @@ func TestConsumerWebRotateRequiresReplacementPSIDTS(t *testing.T) {
 		t.Fatal("replacement not retained in session jar")
 	}
 	u.responses = []*http.Response{consumerWebResp(200, "", &http.Cookie{Name: "PSIDCC", Value: "only"})}
-	if _, err := tx.RotatePSIDTS(context.Background(), consumerWebTestAccount(), h); !errors.Is(err, ErrConsumerWebProtocolDrift) {
-		t.Fatal("PSIDCC-only rotation accepted")
+	res, err = tx.RotatePSIDTS(context.Background(), consumerWebTestAccount(), h)
+	if err != nil || !res.Authenticated || res.PSIDTS != "" {
+		t.Fatal("200 without replacement must preserve the current cookie")
+	}
+	if got := h.jar.Cookies(mustURL(tx.endpoints.app)); len(got) != 1 || got[0].Value != "replacement" {
+		t.Fatal("no-replacement rotation cleared the active cookie")
 	}
 }
 
