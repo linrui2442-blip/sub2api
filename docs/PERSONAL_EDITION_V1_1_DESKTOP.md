@@ -42,4 +42,8 @@ The startup option writes only the current executable path to the current user's
 
 ## Release boundary
 
+For the v1.1.8 R25 scope freeze and experimental Consumer Web video limitation,
+see [v1.1.8 closeout](V1_1_8_CLOSEOUT.md). Future browser-managed session work is
+[v1.2 design only](V1_2_BROWSER_SESSION_PLAN.md), not an implemented capability.
+
 The current v1.1 candidate is a portable Windows executable. Installer, upgrade/uninstall packaging, and a real Windows reboot acceptance remain separate release checks. The published v1.0.1 archive and tag remain unchanged.

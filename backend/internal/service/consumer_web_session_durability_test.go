@@ -41,6 +41,13 @@ type durabilityPersister struct {
 	failure error
 }
 
+func (p *durabilityPersister) PersistPSIDTSSnapshot(ctx context.Context, id int64, revision any, value string) (*AccountCredentialSnapshot, error) {
+	if err := p.PersistPSIDTS(ctx, id, revision, value); err != nil {
+		return nil, err
+	}
+	return p.creds.LoadCredentialSnapshot(ctx, id)
+}
+
 func (p *durabilityPersister) PersistPSIDTS(ctx context.Context, id int64, revision any, value string) error {
 	p.calls.Add(1)
 	if p.failure != nil {

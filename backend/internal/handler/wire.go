@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"database/sql"
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/personal"
 	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
@@ -26,12 +28,17 @@ func ProvideGatewayHandler(
 	coordinator *securityaudit.Coordinator,
 	consumerWebManager *service.ConsumerWebSessionManager,
 	consumerWebTransport service.ConsumerWebSessionTransport,
+	db *sql.DB,
+	encryptor service.SecretEncryptor,
 ) *GatewayHandler {
 	h := NewGatewayHandler(gatewayService, openAIGatewayService, geminiCompatService, antigravityGatewayService,
 		userService, concurrencyService, requestEligibility, usageService, apiKeyService, usageRecordWorkerPool,
 		errorPassthroughService, userMsgQueueService, cfg, settingService)
 	h.securityAuditCoordinator = coordinator
 	h.consumerWebVideoTasks = service.NewConsumerWebVideoTaskService(consumerWebManager, consumerWebTransport)
+	if personal.Enabled() {
+		h.consumerWebVideoTasks.SetTraceStore(service.NewConsumerWebVideoTraceStore(db, encryptor))
+	}
 	h.consumerWebManager = consumerWebManager
 	return h
 }

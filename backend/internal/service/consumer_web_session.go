@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"reflect"
 	"sync"
 	"time"
 )
@@ -100,16 +99,20 @@ type consumerWebTimer struct{ t *time.Timer }
 func (t consumerWebTimer) Stop() bool { return t.t.Stop() }
 
 type consumerWebSessionEntry struct {
-	mu          sync.Mutex
-	account     *Account
-	state       ConsumerWebSessionState
-	generation  uint64
-	revision    any
-	session     ConsumerWebSessionHandle
-	registry    []ConsumerWebModel
-	timer       ConsumerWebTimer
-	nextRefresh time.Time
-	cancel      context.CancelFunc
+	mu              sync.Mutex
+	account         *Account
+	state           ConsumerWebSessionState
+	generation      uint64
+	revision        any
+	core            consumerWebCoreIdentity
+	refreshRetry    bool
+	refreshErrors   uint
+	refreshTimerSeq uint64
+	session         ConsumerWebSessionHandle
+	registry        []ConsumerWebModel
+	timer           ConsumerWebTimer
+	nextRefresh     time.Time
+	cancel          context.CancelFunc
 }
 type ConsumerWebSessionManager struct {
 	transport                      ConsumerWebSessionTransport
@@ -171,7 +174,8 @@ func (m *ConsumerWebSessionManager) AcquireSession(ctx context.Context, account 
 			e.mu.Unlock()
 			return nil, wrapConsumerWebAcquireError(loadErr)
 		}
-		if reflect.DeepEqual(latest.Revision, e.revision) {
+		if coreIdentity(latest.Credentials) == e.core {
+			e.revision = latest.Revision
 			s := e.session
 			e.mu.Unlock()
 			return s, nil
@@ -188,6 +192,17 @@ func (m *ConsumerWebSessionManager) AcquireSession(ctx context.Context, account 
 	if e.state == ConsumerWebSessionBootstrapping {
 		e.mu.Unlock()
 		return m.acquireWait(ctx, e)
+	}
+	if e.refreshRetry {
+		if e.timer != nil {
+			e.timer.Stop()
+		}
+		e.refreshRetry = false
+		if e.session != nil {
+			_ = m.transport.Close(context.Background(), e.session)
+		}
+		e.session = nil
+		e.registry = nil
 	}
 	e.state = ConsumerWebSessionBootstrapping
 	e.account = account
@@ -207,8 +222,10 @@ func (m *ConsumerWebSessionManager) AcquireSession(ctx context.Context, account 
 	bootstrapCtx, cancel := context.WithCancel(ctx)
 	stopClose := context.AfterFunc(m.root, cancel)
 	defer func() { stopClose(); cancel() }()
+	bootstrapCtx = m.auxiliaryContext(bootstrapCtx, account, &snapshot)
 	result, err := m.transport.Bootstrap(bootstrapCtx, account, snapshot.Credentials, snapshot.Revision)
-	if errors.Is(err, ErrConsumerWebAPPTokenMissing) && bootstrapCtx.Err() == nil {
+	otaqUnauthenticated := errors.Is(err, ErrConsumerWebOTAQUnauthenticated)
+	if (errors.Is(err, ErrConsumerWebAPPTokenMissing) || otaqUnauthenticated) && bootstrapCtx.Err() == nil {
 		if rotator, ok := m.transport.(consumerWebPreAuthRotator); ok {
 			rotation, rotateErr := rotator.PreAuthRotatePSIDTS(bootstrapCtx, account, snapshot.Credentials)
 			consumerWebBootstrapTraceFromContext(bootstrapCtx).updateLast(ConsumerWebStageRotateCookies, func(s *ConsumerWebBootstrapStep) {
@@ -221,6 +238,9 @@ func (m *ConsumerWebSessionManager) AcquireSession(ctx context.Context, account 
 			})
 			if rotateErr != nil {
 				err = rotateErr
+			} else if otaqUnauthenticated && rotation.PSIDTS == "" {
+				// A 200 without replacement is not recovery of a rejected session.
+				err = ErrConsumerWebOTAQUnauthenticated
 			} else if !rotation.Authenticated {
 				err = ErrConsumerWebAuthUnavailable
 			} else {
@@ -269,9 +289,12 @@ func (m *ConsumerWebSessionManager) AcquireSession(ctx context.Context, account 
 	}
 	e.generation++
 	e.revision = snapshot.Revision
+	e.core = coreIdentity(snapshot.Credentials)
 	e.session = result.Session
 	e.registry = append([]ConsumerWebModel(nil), result.Registry...)
 	e.state = ConsumerWebSessionAuthenticated
+	e.refreshErrors = 0
+	e.refreshRetry = false
 	m.armLocked(e)
 	return e.session, nil
 }
@@ -302,80 +325,87 @@ func (m *ConsumerWebSessionManager) fail(e *consumerWebSessionEntry, _ error) {
 	e.mu.Unlock()
 }
 func (m *ConsumerWebSessionManager) armLocked(e *consumerWebSessionEntry) {
-	if e.timer != nil {
-		e.timer.Stop()
-	}
 	d := m.refreshInterval
 	if m.refreshJitter != 0 {
 		d += m.refreshJitter
 	}
-	e.nextRefresh = m.clock.Now().Add(d)
-	e.timer = m.clock.AfterFunc(d, func() { m.refresh(e) })
+	m.armRefreshAfterLocked(e, d)
 }
 func (m *ConsumerWebSessionManager) refresh(e *consumerWebSessionEntry) {
+	m.refreshExpected(e, nil)
+}
+func (m *ConsumerWebSessionManager) refreshExpected(e *consumerWebSessionEntry, timerSeq *uint64) {
 	e.mu.Lock()
-	if e.state != ConsumerWebSessionAuthenticated || e.account == nil {
+	if timerSeq != nil && *timerSeq != e.refreshTimerSeq {
+		e.mu.Unlock()
+		return
+	}
+	if (e.state != ConsumerWebSessionAuthenticated && !(e.state == ConsumerWebSessionDegraded && e.refreshRetry)) || e.account == nil || m.root.Err() != nil {
 		e.mu.Unlock()
 		return
 	}
 	e.state = ConsumerWebSessionRefreshing
-	account, session, rev, gen := e.account, e.session, e.revision, e.generation
+	e.refreshRetry = false
+	account, session, rev, gen, core := e.account, e.session, e.revision, e.generation, e.core
 	e.mu.Unlock()
-	result, err := m.transport.RotatePSIDTS(m.root, account, session)
-	if err != nil {
+	// Do not dispatch another request using an externally superseded core pair.
+	before, loadErr := m.credentials.LoadCredentialSnapshot(m.root, account.ID)
+	if loadErr != nil || before == nil {
+		m.refreshFailed(e, gen, ErrConsumerWebPersistence, "PRE_ROTATE_LOCAL_LOAD")
+		return
+	}
+	if coreIdentity(before.Credentials) != core {
 		e.mu.Lock()
 		if e.generation == gen && e.state == ConsumerWebSessionRefreshing && m.root.Err() == nil {
-			e.state = ConsumerWebSessionDegraded
+			m.stopRefreshLocked(e, "CORE_CHANGED_TERMINAL_STOP")
 		}
 		e.mu.Unlock()
+		return
+	}
+	result, err := m.transport.RotatePSIDTS(m.root, account, session)
+	if err != nil {
+		m.refreshFailed(e, gen, err, "ROTATE")
 		return
 	}
 	if !result.Authenticated {
-		e.mu.Lock()
-		if e.generation == gen && e.state == ConsumerWebSessionRefreshing && m.root.Err() == nil {
-			e.state = ConsumerWebSessionUnauthenticated
-		}
-		e.mu.Unlock()
+		m.refreshFailed(e, gen, ErrConsumerWebAuthLost, "ROTATE_RESULT")
 		return
 	}
-	if result.PSIDTS != "" {
-		if m.persister == nil {
-			err = ErrConsumerWebPersistence
-		} else {
-			err = m.persister.PersistPSIDTS(m.root, account.ID, rev, result.PSIDTS)
-		}
-	}
-	latest, loadErr := m.credentials.LoadCredentialSnapshot(m.root, account.ID)
+	latest, branch, err := m.reconcileRefresh(account.ID, rev, core, result.PSIDTS)
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.generation != gen || e.state != ConsumerWebSessionRefreshing || m.root.Err() != nil {
 		return
 	}
-	if errors.Is(err, ErrCredentialCASConflict) || (err == nil && loadErr == nil && result.PSIDTS == "" && !reflect.DeepEqual(latest.Revision, rev)) {
-		slog.Warn("consumer_web_refresh_credential_stale", "account_id", account.ID)
-		_ = m.transport.Close(context.Background(), e.session)
-		e.state = ConsumerWebSessionEmpty
-		e.session = nil
-		e.registry = nil
-		e.generation++
+	slog.Info("consumer_web_refresh_result", "safe_class", branch)
+	if branch == "CORE_CREDENTIAL_CHANGED_SESSION_STALE" || branch == "CAS_CONFLICT_CORE_CHANGED_ABORTED" {
+		m.stopRefreshLocked(e, "CORE_CHANGED_TERMINAL_STOP")
 		return
 	}
 	if err != nil {
 		slog.Warn("consumer_web_refresh_persist_failed", "account_id", account.ID, "cause", string(ConsumerWebPersistenceFailure))
-		e.state = ConsumerWebSessionDegraded
+		m.retryRefreshLocked(e, "TRANSIENT_LOCAL_ERROR", "RECONCILE")
 		return
 	}
-	if loadErr != nil || latest == nil {
+	if latest == nil {
 		slog.Warn("consumer_web_refresh_revision_reload_failed", "account_id", account.ID, "cause", string(ConsumerWebPersistenceFailure))
-		e.state = ConsumerWebSessionDegraded
+		m.retryRefreshLocked(e, "TRANSIENT_LOCAL_ERROR", "RECONCILE_LOAD")
 		return
 	}
 	e.revision = latest.Revision
+	e.core = coreIdentity(latest.Credentials)
 	if result.Session != nil {
 		e.session = result.Session
 	}
 	e.state = ConsumerWebSessionAuthenticated
+	event := "REFRESH_SUCCESS"
+	if e.refreshErrors != 0 {
+		event = "REFRESH_RECOVERED_AFTER_ERROR"
+	}
+	e.refreshErrors = 0
+	e.refreshRetry = false
 	m.armLocked(e)
+	slog.Info("consumer_web_refresh_lifecycle", "safe_class", event, "outcome", "SUCCESS", "timer_rearmed", true)
 }
 func (m *ConsumerWebSessionManager) InvalidateAccount(id int64) {
 	if v, ok := m.entries.Load(id); ok {

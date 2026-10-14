@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
 // ensurePersonalSQLiteInfrastructure creates the small set of runtime objects
@@ -19,6 +20,7 @@ func ensurePersonalSQLiteInfrastructure(ctx context.Context, db *sql.DB) error {
 	}
 
 	statements := []string{
+		service.VideoTraceSchema,
 		// Remove unreachable external-user identity adoption tables from upgrades.
 		`DROP TABLE IF EXISTS identity_adoption_decisions`,
 		`DROP TABLE IF EXISTS auth_identity_channels`,

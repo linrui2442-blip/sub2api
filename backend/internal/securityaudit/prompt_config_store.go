@@ -19,9 +19,12 @@ import (
 )
 
 type activeConfigSnapshot struct {
-	storage  storageConfig
-	active   ActiveConfig
-	loadedAt time.Time
+	sourceRaw   string
+	sourceRisk  bool
+	sourceKnown bool
+	storage     storageConfig
+	active      ActiveConfig
+	loadedAt    time.Time
 }
 
 type ConfigManager struct {
@@ -54,6 +57,7 @@ type ConfigManager struct {
 	lastErrorAt   *time.Time
 
 	lifecycleMu sync.Mutex
+	reloadMu    sync.Mutex
 	cancel      context.CancelFunc
 	wg          sync.WaitGroup
 }
@@ -110,13 +114,21 @@ func (m *ConfigManager) Reload(ctx context.Context) error {
 		m.markUntrustedIfNoActiveSnapshot()
 		return errors.New("prompt audit setting repository unavailable")
 	}
+	m.reloadMu.Lock()
+	defer m.reloadMu.Unlock()
 	values, err := m.settings.GetMultiple(ctx, []string{SettingKeyPromptAuditConfig, SettingKeyRiskControl})
 	if err != nil {
 		m.recordLoadError(err)
 		m.markUntrustedIfNoActiveSnapshot()
 		return err
 	}
-	m.observeExpectedState(values[SettingKeyPromptAuditConfig], values[SettingKeyRiskControl] == "true")
+	raw, risk := values[SettingKeyPromptAuditConfig], values[SettingKeyRiskControl] == "true"
+	if previous := m.snapshot.Load(); previous != nil && previous.sourceKnown && previous.sourceRaw == raw && previous.sourceRisk == risk && !m.configUntrusted.Load() && m.expected.Load() == previous.active.ConfigVersion {
+		m.expectedBlocking.Store(risk && previous.storage.Enabled && previous.storage.BlockingEnabled)
+		m.clearLoadError()
+		return nil
+	}
+	m.observeExpectedState(raw, risk)
 	storage, err := ParseStorageConfig(values[SettingKeyPromptAuditConfig])
 	if err != nil {
 		m.recordLoadError(err)
@@ -134,7 +146,7 @@ func (m *ConfigManager) Reload(ctx context.Context) error {
 	}
 	now := m.clock.Now()
 	previous := m.snapshot.Load()
-	m.snapshot.Store(&activeConfigSnapshot{storage: cloneStorageConfig(storage), active: cloneActiveConfig(active), loadedAt: now})
+	m.snapshot.Store(&activeConfigSnapshot{storage: cloneStorageConfig(storage), active: cloneActiveConfig(active), loadedAt: now, sourceRaw: raw, sourceRisk: risk, sourceKnown: true})
 	m.configUntrusted.Store(false)
 	m.clearLoadError()
 	m.logInvalidTokenEndpoints(previous, active)
@@ -247,6 +259,8 @@ func (m *ConfigManager) Save(ctx context.Context, req UpdateConfigRequest, actor
 	if m == nil || m.db == nil || m.encryptor == nil {
 		return PublicConfig{}, errors.New("prompt audit config persistence unavailable")
 	}
+	m.reloadMu.Lock()
+	defer m.reloadMu.Unlock()
 	if req.ExpectedConfigVersion < 1 {
 		return PublicConfig{}, infraerrors.BadRequest("prompt_audit_expected_config_version_required", "必须提供有效的配置版本")
 	}

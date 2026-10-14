@@ -353,6 +353,11 @@ func tryServeOverrideFile(c *gin.Context, overrideDir, cleanPath string) bool {
 }
 
 func shouldBypassEmbeddedFrontend(path string) bool {
+	// The opt-in backend route retains its loopback and API-key gates.
+	// Do not exempt other acceptance paths from the frontend middleware.
+	if path == "/_acceptance/consumer-web/auth-probe" {
+		return true
+	}
 	trimmed := strings.TrimSpace(path)
 	return strings.HasPrefix(trimmed, "/api/") ||
 		strings.HasPrefix(trimmed, "/v1/") ||

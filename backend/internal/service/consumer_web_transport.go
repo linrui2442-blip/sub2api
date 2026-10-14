@@ -26,14 +26,15 @@ const (
 )
 
 var (
-	ErrConsumerWebTransportTransient = errors.New("consumer web transport transient failure")
-	ErrConsumerWebAuthLost           = errors.New("consumer web authentication lost")
-	ErrConsumerWebProtocolDrift      = errors.New("consumer web protocol drift")
-	ErrConsumerWebRateLimited        = errors.New("consumer web rate limited")
-	ErrConsumerWebForbidden          = errors.New("consumer web forbidden")
-	ErrConsumerWebTransportClosed    = errors.New("consumer web transport closed")
-	ErrConsumerWebRedirectRejected   = errors.New("consumer web redirect rejected")
-	ErrConsumerWebAPPTokenMissing    = errors.New("consumer web app session token missing")
+	ErrConsumerWebTransportTransient  = errors.New("consumer web transport transient failure")
+	ErrConsumerWebAuthLost            = errors.New("consumer web authentication lost")
+	ErrConsumerWebOTAQUnauthenticated = fmt.Errorf("consumer web OTAQ status 1016: %w", ErrConsumerWebAuthLost)
+	ErrConsumerWebProtocolDrift       = errors.New("consumer web protocol drift")
+	ErrConsumerWebRateLimited         = errors.New("consumer web rate limited")
+	ErrConsumerWebForbidden           = errors.New("consumer web forbidden")
+	ErrConsumerWebTransportClosed     = errors.New("consumer web transport closed")
+	ErrConsumerWebRedirectRejected    = errors.New("consumer web redirect rejected")
+	ErrConsumerWebAPPTokenMissing     = errors.New("consumer web app session token missing")
 )
 
 type consumerWebEndpointSet struct{ googlePreflight, geminiPrime, app, otaq, rotate string }
@@ -101,6 +102,7 @@ func (t *ConsumerWebHTTPTransport) Bootstrap(ctx context.Context, account *Accou
 		return ConsumerWebBootstrapResult{}, &ConsumerWebAcquireError{Cause: ConsumerWebAcquireAccountNotReady, Err: ErrConsumerWebAuthLost}
 	}
 	h := t.newCredentialHandle(psid, psidts)
+	t.restoreAuxiliary(ctx, h, credentials)
 	jar := h.jar
 	// Both navigation steps are bounded, best-effort cookie priming. The
 	// durable authenticated pair always wins over response auxiliary cookies.
@@ -205,6 +207,9 @@ func (t *ConsumerWebHTTPTransport) otAQ(ctx context.Context, account *Account, h
 	if err != nil {
 		return ConsumerWebBootstrapResult{}, err
 	}
+	if status == 1016 {
+		return ConsumerWebBootstrapResult{}, ErrConsumerWebOTAQUnauthenticated
+	}
 	return ConsumerWebBootstrapResult{Authenticated: status == 1000, Registry: registry, Session: h}, nil
 }
 
@@ -231,11 +236,6 @@ func (t *ConsumerWebHTTPTransport) PreAuthRotatePSIDTS(ctx context.Context, acco
 		return ConsumerWebRotationResult{}, ErrConsumerWebAuthLost
 	}
 	h := t.newCredentialHandle(psid, psidts)
-	rotateCookies := []*http.Cookie{{Name: "__Secure-1PSID", Value: psid}}
-	if psidts != "" {
-		rotateCookies = append(rotateCookies, &http.Cookie{Name: "__Secure-1PSIDTS", Value: psidts})
-	}
-	setConsumerWebCredentialCookies(h.jar, t.endpoints.rotate, rotateCookies)
 	replacement, err := t.rotate(withConsumerWebRecoveryRole(ctx, "PREAUTH_ROTATE"), account, h)
 	if err != nil {
 		return ConsumerWebRotationResult{}, err
@@ -251,6 +251,8 @@ func (t *ConsumerWebHTTPTransport) newCredentialHandle(psid, psidts string) *con
 		cookies = append(cookies, &http.Cookie{Name: "__Secure-1PSIDTS", Value: psidts, Path: "/"})
 	}
 	setConsumerWebCredentialCookies(jar, t.endpoints.app, cookies)
+	// Both pre-auth and authenticated/background rotation use this core seed.
+	setConsumerWebCredentialCookies(jar, t.endpoints.rotate, cookies)
 	if t.endpoints.googlePreflight != "" {
 		setConsumerWebCredentialCookies(jar, t.endpoints.googlePreflight, cookies)
 	}
@@ -293,6 +295,7 @@ func (t *ConsumerWebHTTPTransport) rotate(ctx context.Context, account *Account,
 			psidts = c.Value
 			replacement := []*http.Cookie{{Name: c.Name, Value: c.Value}}
 			setConsumerWebCredentialCookies(h.jar, h.endpoints.app, replacement)
+			setConsumerWebCredentialCookies(h.jar, h.endpoints.rotate, replacement)
 		}
 	}
 	return psidts, nil
@@ -595,6 +598,10 @@ func parseConsumerWebOTAQWithDiagnostic(body string, diagnostic *ConsumerWebBoot
 				status = 1000
 			case float64:
 				status = int(v)
+				if v != float64(status) {
+					diagnostic.BootstrapSafeCause = ConsumerWebBootstrapOTAQPayloadJSONInvalid
+					return 0, nil, ErrConsumerWebProtocolDrift
+				}
 				diagnostic.OTAQAccountStatusParsed = true
 				diagnostic.OTAQAccountStatusCode = status
 				if status != 1000 && status != 1016 {

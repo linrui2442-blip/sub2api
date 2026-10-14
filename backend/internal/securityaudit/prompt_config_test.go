@@ -1,9 +1,11 @@
 package securityaudit
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"strings"
 	"testing"
 
@@ -69,6 +71,41 @@ func TestConfigRejectsBlockingWithoutAudit(t *testing.T) {
 	storage := DefaultStorageConfig()
 	storage.BlockingEnabled = true
 	require.Error(t, validateStorageConfig(storage))
+}
+
+func TestConfigReloadContentAndRiskDedupe(t *testing.T) {
+	var logs bytes.Buffer
+	oldLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(oldLogger) })
+	values := map[string]string{SettingKeyPromptAuditConfig: "", SettingKeyRiskControl: "false"}
+	m := NewConfigManager(nil, staticSettingRepository{values: values}, nil, prefixEncryptor{}, testTotpKeyConfig())
+	require.NoError(t, m.Reload(context.Background()))
+	first := m.snapshot.Load()
+	require.NotNil(t, first)
+	initialLogCount := strings.Count(logs.String(), EventConfigLoaded)
+	require.Equal(t, 1, initialLogCount)
+	require.NoError(t, m.Reload(context.Background()))
+	require.Same(t, first, m.snapshot.Load())
+	require.Equal(t, initialLogCount, strings.Count(logs.String(), EventConfigLoaded))
+	cfg := DefaultStorageConfig()
+	cfg.StorePassEvents = !cfg.StorePassEvents
+	raw, err := json.Marshal(cfg)
+	require.NoError(t, err)
+	values[SettingKeyPromptAuditConfig] = string(raw)
+	require.NoError(t, m.Reload(context.Background()))
+	second := m.snapshot.Load()
+	require.NotSame(t, first, second)
+	require.Equal(t, first.active.ConfigVersion, second.active.ConfigVersion)
+	require.NoError(t, m.Reload(context.Background()))
+	require.Same(t, second, m.snapshot.Load())
+	values[SettingKeyRiskControl] = "true"
+	require.NoError(t, m.Reload(context.Background()))
+	third := m.snapshot.Load()
+	require.NotSame(t, second, third)
+	values[SettingKeyPromptAuditConfig] = "{"
+	require.Error(t, m.Reload(context.Background()))
+	require.Same(t, third, m.snapshot.Load())
 }
 
 func TestPublicConfigNeverMarshalsToken(t *testing.T) {

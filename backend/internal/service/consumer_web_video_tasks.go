@@ -35,6 +35,7 @@ type ConsumerWebVideoTaskSnapshot struct {
 }
 
 type consumerWebVideoTask struct {
+	trace      ConsumerWebVideoTrace
 	mu         sync.Mutex
 	snapshot   ConsumerWebVideoTaskSnapshot
 	ownerID    int64
@@ -62,10 +63,11 @@ type ConsumerWebVideoDriver interface {
 }
 
 type ConsumerWebVideoTaskService struct {
-	mu      sync.Mutex
-	tasks   map[string]*consumerWebVideoTask
-	manager *ConsumerWebSessionManager
-	driver  ConsumerWebVideoDriver
+	traceStore *ConsumerWebVideoTraceStore
+	mu         sync.Mutex
+	tasks      map[string]*consumerWebVideoTask
+	manager    *ConsumerWebSessionManager
+	driver     ConsumerWebVideoDriver
 }
 
 func NewConsumerWebVideoTaskService(manager *ConsumerWebSessionManager, transport ConsumerWebSessionTransport) *ConsumerWebVideoTaskService {
@@ -196,6 +198,7 @@ func (s *ConsumerWebVideoTaskService) run(task *consumerWebVideoTask, prompt str
 		}
 		task.mu.Lock()
 		task.snapshot.AttemptDiagnostic = diagnostic
+		task.trace.Initial = ConsumerWebVideoInitialTrace{CIDPresent: identity.CID != "", RIDPresent: identity.RID != "", RCIDPresent: identity.RCID != "", TextPresent: diagnostic.TextPresent, FinalVideoPresent: len(videos) > 0, MediaKey60Present: diagnostic.VideoKey60Present, MediaKey65Present: diagnostic.VideoKey65Present, TaskMarkerClass: "UNKNOWN", ProgressMarkerClass: "UNKNOWN"}
 		if diagnostic.ConversationIDPresent || diagnostic.ResponseIDPresent {
 			// The provider established a stable conversation identity even if it
 			// returned no usable video. This account is now permanently bound.
@@ -204,6 +207,7 @@ func (s *ConsumerWebVideoTaskService) run(task *consumerWebVideoTask, prompt str
 			task.snapshot.AccountID = account.ID
 		}
 		task.mu.Unlock()
+		s.persistTrace(task)
 		slog.Info("consumer_web_video_attempt_diagnostic",
 			"task_id", task.snapshot.ID, "account_id", account.ID,
 			"public_model", task.snapshot.Model, "mapped_model", account.GetMappedModel(task.snapshot.Model),
@@ -252,6 +256,10 @@ func (s *ConsumerWebVideoTaskService) run(task *consumerWebVideoTask, prompt str
 }
 
 func (s *ConsumerWebVideoTaskService) recoverPendingVideo(parent context.Context, task *consumerWebVideoTask, account *Account, identity consumerWebVideoIdentity) {
+	s.recoverPendingVideoWithInterval(parent, task, account, identity, 10*time.Second)
+}
+
+func (s *ConsumerWebVideoTaskService) recoverPendingVideoWithInterval(parent context.Context, task *consumerWebVideoTask, account *Account, identity consumerWebVideoIdentity, interval time.Duration) {
 	reader, ok := s.driver.(interface {
 		ReadVideoConversation(context.Context, *Account, ConsumerWebSessionHandle, consumerWebVideoIdentity) (consumerWebVideoRecoveryResult, error)
 	})
@@ -275,7 +283,9 @@ func (s *ConsumerWebVideoTaskService) recoverPendingVideo(parent context.Context
 		task.snapshot.RecoveryReadCount++
 		task.snapshot.RecoveryTargetFound = append(task.snapshot.RecoveryTargetFound, result.TargetFound)
 		readCount := task.snapshot.RecoveryReadCount
+		task.trace.Polls = append(task.trace.Polls, ConsumerWebVideoPollTrace{Index: readCount, HTTPClass: result.HTTPClass, Parsed: result.Parsed, VideoPresent: len(result.Videos) > 0, TextPresent: result.TextPresent, MediaKey65Present: result.MediaKey65Present, CandidateCount: result.CandidateCount, CompletionClass: string(result.State), TaskMarkerClass: "UNKNOWN", ProgressMarkerClass: "UNKNOWN"})
 		task.mu.Unlock()
+		s.persistTrace(task)
 		slog.Info("consumer_web_video_recovery_read", "task_id", task.snapshot.ID, "account_id", account.ID,
 			"read_count", readCount, "target_found", result.TargetFound, "candidate_count", result.CandidateCount,
 			"video_found", len(result.Videos) > 0, "state", result.State, "error_class", consumerWebVideoRecoveryErrorClass(err))
@@ -297,15 +307,15 @@ func (s *ConsumerWebVideoTaskService) recoverPendingVideo(parent context.Context
 			task.mu.Unlock()
 			return
 		case consumerWebVideoRecoveryNoVideo:
-			s.failPendingVideo(task, ConsumerWebVideoFailureNoVideo)
-			return
+			// A completed text candidate is not proof that asynchronous video
+			// generation is terminal. Keep the existing bounded recovery window.
 		case consumerWebVideoRecoveryRefusal:
 			s.failPendingVideo(task, ConsumerWebVideoFailureProviderBlock)
 			return
 		}
 		select {
 		case <-ctx.Done():
-		case <-time.After(10 * time.Second):
+		case <-time.After(interval):
 		}
 	}
 	s.failPendingVideo(task, ConsumerWebVideoRecoveryTimeout)
@@ -372,6 +382,7 @@ func (s *ConsumerWebVideoTaskService) fail(task *consumerWebVideoTask, class str
 	task.snapshot.Status = ConsumerWebVideoFailed
 	task.snapshot.Error = class
 	task.mu.Unlock()
+	s.persistTrace(task)
 }
 
 func (s *ConsumerWebVideoTaskService) get(id string, ownerID int64) (*consumerWebVideoTask, error) {
@@ -392,6 +403,7 @@ func (s *ConsumerWebVideoTaskService) Status(ctx context.Context, id string, own
 	if err != nil {
 		return ConsumerWebVideoTaskSnapshot{}, err
 	}
+	defer s.persistTrace(task)
 	task.mu.Lock()
 	defer task.mu.Unlock()
 	if task.snapshot.Status != ConsumerWebVideoRunning || task.video.URL == "" {

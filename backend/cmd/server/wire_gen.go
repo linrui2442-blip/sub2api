@@ -187,7 +187,7 @@ func initializePersonalApplication(buildInfo handler.BuildInfo) (*Application, e
 	atomicMetrics := securityaudit.NewAtomicMetrics()
 	promptService := securityaudit.NewPromptService(configManager, sqlRepository, redisPayloadStore, openAICompatibleScanner, atomicMetrics)
 	coordinator := securityaudit.NewCoordinator(promptService)
-	gatewayHandler := handler.ProvideGatewayHandler(gatewayService, openAIGatewayService, geminiMessagesCompatService, antigravityGatewayService, userService, concurrencyService, requestEligibilityChecker, usageService, apiKeyService, usageRecordWorkerPool, errorPassthroughService, userMessageQueueService, configConfig, settingService, coordinator, consumerWebSessionManager, consumerWebSessionTransport)
+	gatewayHandler := handler.ProvideGatewayHandler(gatewayService, openAIGatewayService, geminiMessagesCompatService, antigravityGatewayService, userService, concurrencyService, requestEligibilityChecker, usageService, apiKeyService, usageRecordWorkerPool, errorPassthroughService, userMessageQueueService, configConfig, settingService, coordinator, consumerWebSessionManager, consumerWebSessionTransport, db, secretEncryptor)
 	openAIGatewayHandler := handler.ProvideOpenAIGatewayHandler(openAIGatewayService, concurrencyService, requestEligibilityChecker, apiKeyService, usageRecordWorkerPool, errorPassthroughService, opsService, grokQuotaService, configConfig, coordinator)
 	settingHandler := handler.ProvidePersonalSettingHandler(settingService, buildInfo)
 	totpHandler := handler.NewTotpHandler(totpService)

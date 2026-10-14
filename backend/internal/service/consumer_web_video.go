@@ -15,8 +15,8 @@ type consumerWebGeneratedVideo struct {
 	MIME  string
 }
 
-// Provider identity is held only in the live task/session. It is never
-// serialized into public task status, logs or acceptance evidence.
+// Provider identity may be persisted only inside encrypted internal task traces.
+// It is never serialized into public task status or logs.
 type consumerWebVideoIdentity struct{ CID, RID, RCID string }
 
 // ConsumerWebVideoFailureCause contains only a bounded, secret-free stage.
@@ -46,6 +46,7 @@ const (
 // ConsumerWebVideoAttemptDiagnostic is safe to log. Provider identifiers and
 // response text are represented only by presence/shape, never by their value.
 type ConsumerWebVideoAttemptDiagnostic struct {
+	VideoKey65Present                                             bool
 	Cause                                                         ConsumerWebVideoFailureCause
 	RequestBuilt, Sent, ResponseReceived                          bool
 	HTTPStatus                                                    int
@@ -143,6 +144,9 @@ func consumerWebCandidateVideos(rawCandidate any, diagnostic *ConsumerWebVideoAt
 		entry, ok := rawEntry.(map[string]any)
 		if !ok {
 			continue
+		}
+		if _, exists := entry["65"]; exists {
+			diagnostic.VideoKey65Present = true
 		}
 		if _, exists := entry["60"]; !exists {
 			continue

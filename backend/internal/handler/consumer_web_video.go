@@ -76,16 +76,44 @@ func prepareConsumerWebProbePlatform(c *gin.Context, key *service.APIKey, resolv
 
 // acquireConsumerWebForProbe deliberately has no video driver. The production
 // handler passes its real scheduler and session manager to this seam.
-func acquireConsumerWebForProbe(ctx context.Context, scheduler consumerWebProbeScheduler, manager consumerWebProbeManager, groupID *int64, sessionHash string) (*service.Account, *service.ConsumerWebBootstrapTrace, error) {
+func acquireConsumerWebForProbe(ctx context.Context, scheduler consumerWebProbeScheduler, manager consumerWebProbeManager, groupID *int64, sessionHash string, observations ...*authProbeTrace) (*service.Account, *service.ConsumerWebBootstrapTrace, error) {
+	var observation *authProbeTrace
+	if len(observations) > 0 {
+		observation = observations[0]
+	}
 	selection, err := scheduler.SelectAccountWithLoadAwareness(ctx, groupID, sessionHash, "gemini-3.1-pro-high", nil, "", 0)
 	if err != nil || selection == nil || selection.Account == nil {
+		if observation != nil {
+			observation.Result = "NO_ELIGIBLE_ACCOUNT"
+		}
 		return nil, nil, service.ErrNoAvailableAccounts
 	}
 	if selection.ReleaseFunc != nil {
 		defer selection.ReleaseFunc()
 	}
 	trace := &service.ConsumerWebBootstrapTrace{}
+	if observation != nil {
+		observation.Selected = true
+		observation.AccountIDPresent = selection.Account.ID > 0
+		observation.Attempted = true
+	}
 	_, err = manager.AcquireSession(service.WithConsumerWebBootstrapTrace(ctx, trace), selection.Account)
+	if observation != nil {
+		observation.Succeeded = err == nil
+		observation.Result = "SESSION_ACQUIRE_FAILED"
+		if err == nil {
+			observation.Result = "SUCCESS"
+		}
+		for _, step := range trace.Steps() {
+			observation.Bootstrap = "YES"
+			if step.Stage == service.ConsumerWebStageOTAQ {
+				observation.OTAQ = "YES"
+			}
+			if step.Stage == service.ConsumerWebStageRotateCookies {
+				observation.Rotate = "YES"
+			}
+		}
+	}
 	return selection.Account, trace, err
 }
 
@@ -93,29 +121,40 @@ func acquireConsumerWebForProbe(ctx context.Context, scheduler consumerWebProbeS
 // independently gated; RemoteAddr is checked here without trusting Host or
 // forwarded headers. It invokes the same scheduler and manager as video create.
 func (h *GatewayHandler) ConsumerWebAuthProbe(c *gin.Context) {
+	observation := newAuthProbeTrace()
+	persistAuthProbeTrace(observation)
+	defer func() { persistAuthProbeTrace(observation) }()
+	writeJSON := func(status int, body any) { writeAuthProbeJSON(c, observation, status, body, persistAuthProbeTrace) }
 	host, _, splitErr := net.SplitHostPort(c.Request.RemoteAddr)
 	ip := net.ParseIP(host)
 	if splitErr != nil || ip == nil || !ip.IsLoopback() {
-		c.AbortWithStatus(http.StatusForbidden)
+		writeJSON(http.StatusForbidden, gin.H{"ok": false, "code": "OTHER_SAFE_ERROR"})
+		c.Abort()
 		return
 	}
 	key, ok := middleware.GetAPIKeyFromContext(c)
 	if !ok || key == nil {
-		c.AbortWithStatus(http.StatusUnauthorized)
+		observation.Result = "AUTH_REQUIRED"
+		writeJSON(http.StatusUnauthorized, gin.H{"ok": false, "code": observation.Result})
+		c.Abort()
 		return
 	}
 	if h == nil || h.gatewayService == nil || h.consumerWebManager == nil || h.openAIGatewayService == nil {
-		c.AbortWithStatus(http.StatusServiceUnavailable)
+		observation.Result = "INTERNAL_DEPENDENCY_UNAVAILABLE"
+		writeJSON(http.StatusServiceUnavailable, gin.H{"ok": false, "code": observation.Result})
+		c.Abort()
 		return
 	}
 	if err := prepareConsumerWebProbePlatform(c, key, h.gatewayService); err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"session_result": "FAIL", "safe_cause": "MODEL_UNSUPPORTED", "scheduler_failure_reason": "MODEL_UNSUPPORTED"})
+		observation.Result = "MODEL_UNSUPPORTED"
+		writeJSON(http.StatusServiceUnavailable, gin.H{"session_result": "FAIL", "safe_cause": "MODEL_UNSUPPORTED", "scheduler_failure_reason": "MODEL_UNSUPPORTED"})
 		return
 	}
+	observation.PlatformOK = true
 	sessionHash := h.openAIGatewayService.GenerateExplicitSessionHash(c, []byte("consumer-web-auth-probe"))
-	account, trace, err := acquireConsumerWebForProbe(c.Request.Context(), h.gatewayService, h.consumerWebManager, key.GroupID, sessionHash)
+	account, trace, err := acquireConsumerWebForProbe(c.Request.Context(), h.gatewayService, h.consumerWebManager, key.GroupID, sessionHash, observation)
 	if account == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"session_result": "FAIL", "safe_cause": "NO_ELIGIBLE_ACCOUNT", "scheduler_failure_reason": "NO_ELIGIBLE_ACCOUNT"})
+		writeJSON(http.StatusServiceUnavailable, gin.H{"session_result": "FAIL", "safe_cause": "NO_ELIGIBLE_ACCOUNT", "scheduler_failure_reason": "NO_ELIGIBLE_ACCOUNT"})
 		return
 	}
 	response := gin.H{
@@ -189,12 +228,12 @@ func (h *GatewayHandler) ConsumerWebAuthProbe(c *gin.Context) {
 	response["bootstrap_steps"] = safeConsumerWebBootstrapSteps(traceSteps)
 	if err != nil {
 		response["safe_cause"] = consumerWebProbeFailureCause(err, traceSteps)
-		c.JSON(http.StatusServiceUnavailable, response)
+		writeJSON(http.StatusServiceUnavailable, response)
 		return
 	}
 	response["session_result"] = "PASS"
 	response["safe_cause"] = "NONE"
-	c.JSON(http.StatusOK, response)
+	writeJSON(http.StatusOK, response)
 }
 
 type consumerWebVideoCreateRequest struct {

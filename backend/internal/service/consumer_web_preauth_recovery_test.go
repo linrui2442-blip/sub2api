@@ -23,6 +23,31 @@ type preAuthFixtureTransport struct {
 	session        struct{}
 }
 
+func TestConsumerWeb1016RecoveryBounded(t *testing.T) {
+	for _, tc := range []struct {
+		name, replacement string
+		second, persist   error
+		boots             int
+		pass              bool
+	}{
+		{"recovered", "new", nil, nil, 2, true},
+		{"still1016", "new", ErrConsumerWebOTAQUnauthenticated, nil, 2, false},
+		{"noReplacement", "", nil, nil, 1, false},
+		{"casConflict", "new", nil, ErrCredentialCASConflict, 1, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tr := &preAuthFixtureTransport{firstErr: ErrConsumerWebOTAQUnauthenticated, replacement: tc.replacement, secondErr: tc.second, secondToken: true}
+			m := NewConsumerWebSessionManager(ConsumerWebSessionManagerOptions{Transport: tr, Credentials: &sessionFakeCredentials{values: map[string]any{}}, Persister: &sessionFakePersister{err: tc.persist}, RefreshInterval: time.Hour})
+			defer m.Close()
+			_, err := m.AcquireSession(context.Background(), testSessionAccount(90))
+			boots, rotates := tr.counts()
+			if boots != tc.boots || rotates != 1 || (err == nil) != tc.pass {
+				t.Fatalf("boots=%d rotates=%d pass=%v", boots, rotates, err == nil)
+			}
+		})
+	}
+}
+
 func (f *preAuthFixtureTransport) Bootstrap(ctx context.Context, _ *Account, _ map[string]any, _ any) (ConsumerWebBootstrapResult, error) {
 	f.mu.Lock()
 	f.boots++

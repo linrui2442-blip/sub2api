@@ -20,6 +20,27 @@ import (
 
 type consumerWebTransportEncryptor struct{}
 
+func TestConsumerWebBackgroundRotateCoreSeed(t *testing.T) {
+	for _, ts := range []string{"", "synthetic-ts"} {
+		u := &consumerWebTestUpstream{responses: []*http.Response{consumerWebResp(200, "")}}
+		tx := NewConsumerWebHTTPTransport(ConsumerWebHTTPTransportOptions{HTTPUpstream: u, Encryptor: consumerWebTransportEncryptor{}})
+		h := tx.newCredentialHandle("synthetic-psid", ts)
+		_, err := tx.RotatePSIDTS(context.Background(), consumerWebTestAccount(), h)
+		require.NoError(t, err)
+		require.Len(t, u.requests, 1)
+		c, err := u.requests[0].Cookie("__Secure-1PSID")
+		require.NoError(t, err)
+		require.Equal(t, "synthetic-psid", c.Value)
+		c, err = u.requests[0].Cookie("__Secure-1PSIDTS")
+		if ts == "" {
+			require.Error(t, err)
+		} else {
+			require.NoError(t, err)
+			require.Equal(t, ts, c.Value)
+		}
+	}
+}
+
 func (consumerWebTransportEncryptor) Encrypt(v string) (string, error) { return "enc:" + v, nil }
 func (consumerWebTransportEncryptor) Decrypt(v string) (string, error) {
 	return strings.TrimPrefix(v, "enc:"), nil
@@ -368,6 +389,9 @@ func TestConsumerWebOTAQFailuresDoNotTriggerAPPRecovery(t *testing.T) {
 			_, err := consumerWebTestTransport(u).Bootstrap(context.Background(), consumerWebTestAccount(), consumerWebTestCreds(), nil)
 			if err == nil || errors.Is(err, ErrConsumerWebAPPTokenMissing) || len(u.requests) != 2 {
 				t.Fatal("otAQ failure was misclassified as APP token missing")
+			}
+			if tc.name == "unauthenticated" && !errors.Is(err, ErrConsumerWebOTAQUnauthenticated) {
+				t.Fatal("1016 must carry explicit recovery classification")
 			}
 		})
 	}

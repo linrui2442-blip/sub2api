@@ -22,16 +22,18 @@ const (
 )
 
 type consumerWebVideoRecoveryResult struct {
-	State          consumerWebVideoRecoveryState
-	TargetFound    bool
-	CandidateCount int
-	Videos         []consumerWebGeneratedVideo
+	HTTPClass                              string
+	Parsed, TextPresent, MediaKey65Present bool
+	State                                  consumerWebVideoRecoveryState
+	TargetFound                            bool
+	CandidateCount                         int
+	Videos                                 []consumerWebGeneratedVideo
 }
 
 // hNvQHb is the source-backed LIST_CONVERSATION_TURNS RPC. The response is a
 // batchexecute frame whose [0] contains newest-first conversation turns.
 func (t *ConsumerWebHTTPTransport) ReadVideoConversation(ctx context.Context, account *Account, session ConsumerWebSessionHandle, identity consumerWebVideoIdentity) (consumerWebVideoRecoveryResult, error) {
-	pending := consumerWebVideoRecoveryResult{State: consumerWebVideoRecoveryPending}
+	pending := consumerWebVideoRecoveryResult{State: consumerWebVideoRecoveryPending, HTTPClass: "NOT_SENT"}
 	h, ok := session.(*consumerWebHTTPHandle)
 	if !ok || h.closed.Load() || account == nil || identity.CID == "" || (identity.RID == "" && identity.RCID == "") {
 		return pending, ErrConsumerWebProtocolDrift
@@ -57,17 +59,23 @@ func (t *ConsumerWebHTTPTransport) ReadVideoConversation(ctx context.Context, ac
 	}
 	resp, err := t.do(ctx, account, h, http.MethodPost, h.endpoints.otaq, strings.NewReader(form.Encode()), "application/x-www-form-urlencoded;charset=UTF-8")
 	if err != nil {
+		pending.HTTPClass = "TRANSPORT_FAILURE"
 		return pending, err
 	}
 	defer resp.Body.Close()
+	pending.HTTPClass = "NON_200"
 	if resp.StatusCode != http.StatusOK {
 		return pending, mapConsumerWebStatus(resp.StatusCode)
 	}
+	pending.HTTPClass = "HTTP_200"
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20+1))
 	if err != nil || len(body) > 8<<20 {
 		return pending, ErrConsumerWebProtocolDrift
 	}
-	return parseConsumerWebVideoConversation(body, identity)
+	result, parseErr := parseConsumerWebVideoConversation(body, identity)
+	result.HTTPClass = "HTTP_200"
+	result.Parsed = parseErr == nil
+	return result, parseErr
 }
 
 func parseConsumerWebVideoConversation(body []byte, identity consumerWebVideoIdentity) (consumerWebVideoRecoveryResult, error) {
@@ -136,6 +144,14 @@ func parseConsumerWebVideoConversation(body []byte, identity consumerWebVideoIde
 					result.CandidateCount++
 					diagnostic := ConsumerWebVideoAttemptDiagnostic{}
 					videos := consumerWebCandidateVideos(candidate, &diagnostic, make(map[string]struct{}))
+					result.MediaKey65Present = diagnostic.VideoKey65Present
+					if parts, ok := consumerWebListAt(candidate, 1).([]any); ok {
+						for _, part := range parts {
+							if text, ok := part.(string); ok && text != "" {
+								result.TextPresent = true
+							}
+						}
+					}
 					if len(videos) > 0 {
 						result.Videos = videos
 						result.State = consumerWebVideoRecoveryVideo
